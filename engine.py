@@ -1147,6 +1147,949 @@ def print_gap_report(gaps):
         print(f"    {icon} [{lvl:>3}] {a['zone']}")
 
 
+# ============================================================================
+# DOMAINES — Patterns de nœuds typiques par type de projet
+# ============================================================================
+
+DOMAIN_PATTERNS = {
+    "audio": {
+        "keywords": ["audio", "son", "music", "shazam", "piano", "micro", "fréquence",
+                     "note", "accord", "pitch", "frequency", "recording", "wav", "mp3"],
+        "typical_nodes": {
+            "-5": ["FFT (transformée de Fourier rapide)", "Fréquences harmoniques & physique du son",
+                   "Latence audio hardware (~10ms incompressible)"],
+            "-4": ["Permission microphone (iOS/Android)", "Licences audio (si samples)",
+                   "Privacy policy (enregistrement audio)"],
+            "-3": ["Public cible (musiciens débutants/pro)", "App Store / Play Store rules",
+                   "Modèle gratuit/premium"],
+            "-2": ["Architecture audio pipeline (capture→FFT→matching→display)",
+                   "Choix : traitement on-device vs cloud"],
+            "-1": ["Framework mobile (Flutter/React Native/Swift)",
+                   "Lib audio (AudioKit, TarsosDSP, flutter_audio)",
+                   "Lib FFT (fftea, dart:typed_data)"],
+            "+1": ["Pipeline : capture micro → buffer → FFT → détection fréquence → matching note → affichage"],
+            "+2": ["Module capture micro", "Module analyse FFT",
+                   "Module matching note/accord", "Module affichage résultat"],
+            "+3": ["Bouton record/stop", "Visualisation fréquences", "Historique des détections",
+                   "Réglages sensibilité", "Accordeur (tuner mode)"],
+            "+4": ["Écran principal (note détectée)", "Écran historique",
+                   "Écran settings", "Feedback visuel temps réel"],
+            "+5": ["Tests unitaires matching", "Test micro simulé",
+                   "CI/CD build APK/IPA", "Publication store"],
+        }
+    },
+    "trading": {
+        "keywords": ["trading", "algo", "bourse", "stock", "forex", "crypto", "signal",
+                     "backtest", "portfolio", "hedge", "quant", "market", "price"],
+        "typical_nodes": {
+            "-5": ["Probabilités & statistiques", "Séries temporelles (ARIMA, GARCH)",
+                   "Latence réseau/exécution"],
+            "-4": ["Régulation financière (MiFID II, SEC)", "Licences broker API",
+                   "Règles anti-manipulation"],
+            "-3": ["Capital disponible", "Frais (commissions, spread, slippage)",
+                   "Fréquence de trading", "Drawdown max acceptable"],
+            "-2": ["Architecture : monolith vs microservices",
+                   "Choix : event-driven vs polling", "Base de données marché (tick vs OHLCV)"],
+            "-1": ["Python + pandas + numpy", "API broker (IBKR, Alpaca, Binance)",
+                   "Base de données (PostgreSQL, InfluxDB)"],
+            "+1": ["Pipeline : data feed → signal generation → risk check → execution → logging"],
+            "+2": ["Module data ingestion", "Module signal/stratégie",
+                   "Module risk management", "Module execution", "Module reporting"],
+            "+3": ["Indicateurs techniques", "Stop-loss/take-profit logic",
+                   "Position sizing", "Slippage model", "P&L tracking"],
+            "+4": ["Dashboard P&L", "Alertes temps réel",
+                   "Visualisation positions", "Log des trades"],
+            "+5": ["Backtests automatisés", "Paper trading mode",
+                   "CI tests sur données historiques", "Monitoring production"],
+        }
+    },
+    "mobile_app": {
+        "keywords": ["app", "mobile", "ios", "android", "flutter", "react native",
+                     "téléphone", "smartphone", "application"],
+        "typical_nodes": {
+            "-5": ["Limites mémoire mobile (~2GB)", "Batterie / consommation CPU",
+                   "Taille écran / densité pixels"],
+            "-4": ["Privacy (GDPR, CCPA)", "Permissions (caméra, localisation, contacts)",
+                   "App Store Review Guidelines", "Google Play policies"],
+            "-3": ["Public cible", "Modèle de monétisation",
+                   "Stores (iOS + Android ?)", "Budget / timeline"],
+            "-2": ["Natif vs cross-platform", "State management (BLoC, Provider, Redux)",
+                   "Architecture (MVVM, Clean Architecture)", "Backend : Firebase vs custom"],
+            "-1": ["Framework (Flutter, React Native, SwiftUI)",
+                   "Backend/BaaS (Firebase, Supabase)", "CI/CD (Fastlane, Codemagic)"],
+            "+1": ["Navigation principale + routing", "Auth flow", "Data layer"],
+            "+2": ["Auth/profil", "Feature principale",
+                   "Settings", "Notifications"],
+            "+3": ["Écrans par feature", "Composants UI réutilisables",
+                   "Offline mode", "Deep linking"],
+            "+4": ["Écran d'accueil", "Écran principal",
+                   "Profil utilisateur", "Onboarding"],
+            "+5": ["Tests widget + intégration", "CI builds",
+                   "Beta testing (TestFlight/Firebase)", "Publication stores"],
+        }
+    },
+    "web_app": {
+        "keywords": ["web", "site", "dashboard", "saas", "webapp", "frontend",
+                     "backend", "api", "rest", "graphql"],
+        "typical_nodes": {
+            "-5": ["HTTP/TCP latence", "Limites navigateur (CORS, storage)",
+                   "Bande passante"],
+            "-4": ["GDPR / cookies", "HTTPS obligatoire", "Accessibilité WCAG",
+                   "Licences open source"],
+            "-3": ["Hosting budget", "Nombre d'utilisateurs attendus",
+                   "SLA requis", "SEO nécessaire ?"],
+            "-2": ["SSR vs SPA vs SSG", "Monolith vs API+frontend",
+                   "Base de données (SQL vs NoSQL)", "Auth strategy (JWT, OAuth, session)"],
+            "-1": ["Frontend (React, Vue, Svelte)", "Backend (Node, Python, Go)",
+                   "DB (PostgreSQL, MongoDB)", "Hosting (Vercel, AWS, Railway)"],
+            "+1": ["API routes + auth middleware + DB connection"],
+            "+2": ["Auth système", "CRUD principal",
+                   "Admin panel", "API externe"],
+            "+3": ["Pages/vues", "Composants forms",
+                   "Recherche/filtres", "Notifications"],
+            "+4": ["Landing page", "Dashboard utilisateur",
+                   "Pages de contenu", "Responsive mobile"],
+            "+5": ["Tests E2E (Playwright)", "CI/CD",
+                   "Monitoring (Sentry)", "Déploiement auto"],
+        }
+    },
+    "hardware_3d": {
+        "keywords": ["3d", "printer", "stl", "cad", "fdm", "cnc", "robot",
+                     "mécanique", "mechanical", "automate", "automata", "impression"],
+        "typical_nodes": {
+            "-5": ["Tolérances mécaniques (FDM ~0.2mm)", "Propriétés matériau (PLA, ABS)",
+                   "Géométrie manifold / topologie STL", "Gravité, friction, jeu mécanique"],
+            "-4": ["Normes sécurité (EN 71 jouets, CE)", "Propriété intellectuelle designs",
+                   "Restrictions d'export"],
+            "-3": ["Coût matériau par pièce", "Temps d'impression",
+                   "Public cible (makers, enfants, industrie)"],
+            "-2": ["Parametric vs direct modeling", "Format de sortie (STL, STEP, 3MF)",
+                   "Architecture contraintes (CSP, optimisation)"],
+            "-1": ["Python + NumPy/SciPy", "Lib 3D (trimesh, OpenSCAD, CadQuery)",
+                   "Slicer integration (Cura, PrusaSlicer)"],
+            "+1": ["Pipeline : paramètres → géométrie → contraintes → validation → export STL"],
+            "+2": ["Générateur de géométrie", "Moteur de contraintes/collision",
+                   "Validateur printabilité", "Exporteur STL", "Base de données formes"],
+            "+3": ["Templates par type", "Profils matériau",
+                   "Visualisation 3D", "Paramètres utilisateur"],
+            "+4": ["CLI ou GUI", "Preview 3D",
+                   "Rapport de validation", "Fichier STL final"],
+            "+5": ["Self-tests géométrie", "Validation manifold automatique",
+                   "Test print réel", "CI sur bibliothèque de formes"],
+        }
+    },
+    "tool_cli": {
+        "keywords": ["outil", "tool", "cli", "script", "automatisation", "batch",
+                     "utility", "toolkit", "helper"],
+        "typical_nodes": {
+            "-5": ["Limites OS (filesystem, mémoire)", "Encodage (UTF-8, line endings)"],
+            "-4": ["Licences dépendances", "Permissions filesystem"],
+            "-3": ["Utilisateurs cibles (devs, ops, tous)",
+                   "Distribution (pip, npm, binaire)"],
+            "-2": ["Architecture : monolith script vs modules",
+                   "Config : args vs fichier vs env vars"],
+            "-1": ["Langage (Python, Bash, Go, Rust)",
+                   "Libs (click, argparse, inquirer)"],
+            "+1": ["CLI entry point + arg parsing + dispatch"],
+            "+2": ["Commande 1", "Commande 2", "Commande 3"],
+            "+3": ["Options/flags par commande", "Output formatters",
+                   "Error handling"],
+            "+4": ["Help text", "Output console / fichier",
+                   "Progress bars", "Couleurs terminal"],
+            "+5": ["Tests par commande", "CI", "Publication package"],
+        }
+    },
+}
+
+
+def detect_domain(desc):
+    """Détecte le domaine d'un projet à partir de sa description."""
+    desc_lower = desc.lower()
+    scores = {}
+    for domain, data in DOMAIN_PATTERNS.items():
+        score = sum(1 for kw in data["keywords"] if kw in desc_lower)
+        if score > 0:
+            scores[domain] = score
+    if scores:
+        return max(scores, key=scores.get)
+    return "tool_cli"  # default
+
+
+def plant(idea, lang=None, platform=None):
+    """🌱 PLANTER UN ARBRE — Génère un arbre complet à partir d'une idée.
+
+    C'est LA fonction centrale. Le vibe codeur dit son idée,
+    et l'arbre lui montre tout ce qu'il faut, dans le bon ordre.
+
+    Args:
+        idea: description en langage naturel ("je veux un Shazam pour piano")
+        lang: langage préféré (optionnel, auto-détecté sinon)
+        platform: plateforme cible (optionnel)
+
+    Returns:
+        dict avec l'arbre complet, la famille, et l'ordre de construction
+    """
+    # 1. Détecter le domaine
+    domain = detect_domain(idea)
+    pattern = DOMAIN_PATTERNS[domain]
+
+    # 2. Classifier la famille automatiquement
+    # Heuristiques par domaine
+    domain_family_hints = {
+        "audio": "palmier",       # un seul pipeline critique
+        "trading": "conifere",    # pipeline linéaire signal→exec
+        "mobile_app": "feuillu",  # multi-modules
+        "web_app": "feuillu",     # multi-modules
+        "hardware_3d": "baobab",  # gros moteur
+        "tool_cli": "buisson",    # collection de commandes
+    }
+    family_id = domain_family_hints.get(domain, "feuillu")
+
+    # Affiner avec des signaux dans la description
+    idea_lower = idea.lower()
+    if any(kw in idea_lower for kw in ["collection", "toolkit", "utils", "outils"]):
+        family_id = "buisson"
+    if any(kw in idea_lower for kw in ["plugin", "extension", "wrapper", "addon"]):
+        family_id = "liane"
+    if any(kw in idea_lower for kw in ["pipeline", "etl", "flux", "stream"]):
+        family_id = "conifere"
+    if any(kw in idea_lower for kw in ["moteur", "engine", "solver", "generator"]):
+        family_id = "baobab"
+
+    family = FAMILIES[family_id]
+
+    # 3. Générer les nœuds à partir du pattern domaine
+    nodes = []
+    node_counter = {"M": 0, "P": 0, "D": 0, "A": 0, "R": 0, "S": 0,
+                    "T": 0, "B": 0, "b": 0, "F": 0, "C": 0}
+
+    level_mapping = {
+        "-5": ("M", "R", -5),   # Mycorhizes
+        "-4": ("P", "R", -4),   # Poils
+        "-3": ("D", "R", -3),   # radicelles (business/Demand)
+        "-2": ("A", "R", -2),   # Architecture pivotante
+        "-1": ("R", "R", -1),   # Racines structurelles
+        "+1": ("T", "T", None), # Tronc
+        "+2": ("B", "B", None), # Branches
+        "+3": ("b", "b", None), # rameaux
+        "+4": ("F", "F", None), # Feuilles
+        "+5": ("C", "C", None), # Cime
+    }
+
+    for level_key, typical_items in pattern["typical_nodes"].items():
+        prefix, node_level, depth = level_mapping.get(level_key, ("?", "?", None))
+
+        for item in typical_items:
+            node_counter[prefix] = node_counter.get(prefix, 0) + 1
+            node_id = f"{prefix}{node_counter[prefix]}"
+
+            node = {
+                "id": node_id,
+                "level": node_level,
+                "label": item,
+                "status": "todo",
+                "entry": "~",
+                "depends": [],
+                "desc": "",
+            }
+            if depth is not None:
+                node["depth"] = depth
+
+            nodes.append(node)
+
+    # Override language if specified
+    if lang:
+        for n in nodes:
+            if n.get("depth") == -1 and "framework" in n["label"].lower():
+                n["label"] = f"{lang} — {n['label']}"
+
+    # 4. Générer l'ordre de construction
+    build_order = generate_build_order(family_id, nodes)
+
+    # 5. Assembler le résultat
+    result = {
+        "idea": idea,
+        "domain": domain,
+        "family": family_id,
+        "family_name": family["nom"],
+        "family_emoji": family["emoji"],
+        "date": datetime.now().isoformat(),
+        "phase": "GRAINE",
+        "nodes": nodes,
+        "build_order": build_order,
+        "next_step": build_order[0]["action"] if build_order else "Définir les contraintes",
+    }
+
+    return result
+
+
+def generate_build_order(family_id, nodes):
+    """Génère l'ordre de construction basé sur la famille.
+
+    La biologie dicte : racines d'abord, toujours.
+    La famille dicte : quel ordre pour le reste.
+    """
+    order = []
+
+    # Grouper les nœuds par niveau
+    by_depth = {}
+    for n in nodes:
+        d = n.get("depth", None)
+        lvl = n["level"]
+        key = f"depth_{d}" if d is not None else f"level_{lvl}"
+        by_depth.setdefault(key, []).append(n["id"])
+
+    # Phase 0 : Mycorhizes (-5) — lois physiques
+    ids = by_depth.get("depth_-5", [])
+    if ids:
+        order.append({
+            "phase": 0,
+            "name": "Mycorhizes — lois physiques",
+            "ids": ids,
+            "action": "Identifier les lois physiques/math immuables du projet",
+            "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
+        })
+
+    # Phase 1 : Racines -4 à -1
+    for depth, name in [(-4, "Poils — contraintes légales"),
+                        (-3, "Radicelles — business"),
+                        (-2, "Pivot — architecture"),
+                        (-1, "Structurelles — stack technique")]:
+        ids = by_depth.get(f"depth_{depth}", [])
+        if ids:
+            order.append({
+                "phase": 1,
+                "name": name,
+                "ids": ids,
+                "action": f"Définir les contraintes de niveau {depth}",
+                "bio": ANATOMY[str(depth)]["bio_detail"]
+            })
+
+    # Phase 2+ : dépend de la famille
+    if family_id == "conifere":
+        # Tronc d'abord, branches subordonnées
+        if "level_T" in by_depth:
+            order.append({"phase": 2, "name": "Tronc — pipeline principal",
+                         "ids": by_depth["level_T"],
+                         "action": "Construire le pipeline end-to-end minimal",
+                         "bio": "Le leader terminal pousse en premier (contrôle apical)"})
+        if "level_B" in by_depth:
+            order.append({"phase": 3, "name": "Branches — modules subordonnés",
+                         "ids": by_depth["level_B"],
+                         "action": "Ajouter les modules UN PAR UN, toujours subordonnés au tronc",
+                         "bio": "Les latérales ne dépassent jamais le leader"})
+
+    elif family_id == "baobab":
+        # Consolider le tronc massivement avant d'étendre
+        if "level_T" in by_depth:
+            order.append({"phase": 2, "name": "Tronc — core engine MASSIF",
+                         "ids": by_depth["level_T"],
+                         "action": "Construire et CONSOLIDER le core avant toute extension",
+                         "bio": "Le baobab met toute son énergie dans le tronc d'abord"})
+        if "level_B" in by_depth:
+            order.append({"phase": 3, "name": "Branches — petites extensions",
+                         "ids": by_depth["level_B"],
+                         "action": "Extensions petites — ne pas rivaliser avec le tronc",
+                         "bio": "Les branches du baobab sont fines comparées au tronc massif"})
+
+    elif family_id == "palmier":
+        # Un seul chemin, protéger à tout prix
+        if "level_T" in by_depth:
+            order.append({"phase": 2, "name": "Tronc — LE chemin unique",
+                         "ids": by_depth["level_T"],
+                         "action": "Construire LE pipeline unique — le protéger à tout prix",
+                         "bio": "Un seul méristème. Si il meurt, le palmier meurt."})
+        # Pas de branches pour un palmier — direct aux feuilles
+        if "level_F" in by_depth:
+            order.append({"phase": 3, "name": "Feuilles — output riche",
+                         "ids": by_depth["level_F"],
+                         "action": "Output riche au sommet du pipeline unique",
+                         "bio": "Les palmes sont grandes et complexes — tout l'output est au sommet"})
+
+    elif family_id == "feuillu":
+        if "level_T" in by_depth:
+            order.append({"phase": 2, "name": "Tronc — core minimal",
+                         "ids": by_depth["level_T"],
+                         "action": "Core minimal — il va perdre la dominance face aux branches",
+                         "bio": "Le tronc du feuillu se perd parmi les branches (forme décurrente)"})
+        if "level_B" in by_depth:
+            order.append({"phase": 3, "name": "Branches — modules en parallèle",
+                         "ids": by_depth["level_B"],
+                         "action": "Modules en parallèle — SURVEILLER la co-dominance",
+                         "bio": "⚠️ Si une branche dépasse le tronc = risque de rupture"})
+
+    elif family_id == "buisson":
+        # Pas de tronc — tiges en parallèle
+        if "level_B" in by_depth:
+            order.append({"phase": 2, "name": "Tiges — lancer en parallèle",
+                         "ids": by_depth["level_B"],
+                         "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
+                         "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."})
+
+    elif family_id == "liane":
+        if "level_B" in by_depth:
+            order.append({"phase": 2, "name": "Point d'attache — interface hôte",
+                         "ids": by_depth.get("level_B", [])[:1],
+                         "action": "Se connecter au système hôte d'abord",
+                         "bio": "La liane s'accroche avant de grandir"})
+
+    # Rameaux, feuilles, cime — toujours en dernier
+    for lvl, name in [("b", "Rameaux — sous-features"),
+                      ("F", "Feuilles — UI/outputs"),
+                      ("C", "Cime — tests et déploiement")]:
+        if f"level_{lvl}" in by_depth:
+            order.append({
+                "phase": 4 if lvl != "C" else 5,
+                "name": name,
+                "ids": by_depth[f"level_{lvl}"],
+                "action": f"Implémenter {name.lower()}",
+                "bio": ANATOMY.get({"b": "+3", "F": "+4", "C": "+5"}.get(lvl, "+3"), {}).get("bio_detail", "")
+            })
+
+    return order
+
+
+def print_planted_tree(result):
+    """Affiche un arbre planté de manière lisible."""
+    f = result
+    fam = FAMILIES[f["family"]]
+
+    print(f"\n{'=' * 70}")
+    print(f"  🌱 ARBRE PLANTÉ — {f['idea']}")
+    print(f"{'=' * 70}")
+    print(f"  Famille  : {f['family_emoji']} {f['family_name']} ({fam['forme']})")
+    print(f"  Domaine  : {f['domain']}")
+    print(f"  Phase    : {f['phase']}")
+    print(f"  Nœuds    : {len(f['nodes'])}")
+    print()
+
+    # Afficher par niveau (de -5 à +5)
+    level_names = {
+        -5: "🔬 -5 MYCORHIZES (physique/math)",
+        -4: "⚖️  -4 POILS ABSORBANTS (légal)",
+        -3: "💰 -3 RADICELLES (business)",
+        -2: "⚓ -2 PIVOTANTES (architecture)",
+        -1: "🔧 -1 STRUCTURELLES (stack)",
+        "+1": "🏗️  +1 TRONC (core)",
+        "+2": "🪵 +2 BRANCHES (modules)",
+        "+3": "🌿 +3 RAMEAUX (sous-features)",
+        "+4": "🍃 +4 FEUILLES (outputs/UI)",
+        "+5": "🌱 +5 CIME (tests/deploy)",
+    }
+
+    # Sous le sol
+    print("  ▼ SOUS LE SOL (racines)")
+    print("  " + "─" * 50)
+    for depth in [-5, -4, -3, -2, -1]:
+        depth_nodes = [n for n in f["nodes"] if n.get("depth") == depth]
+        if depth_nodes:
+            print(f"\n  {level_names[depth]}")
+            for n in depth_nodes:
+                print(f"    🔴 [{n['id']:>3}] {n['label']}")
+
+    # Sol
+    print(f"\n  {'═' * 50}")
+    print(f"  🌍  0  SOL — Interface Sky ↔ Claude")
+    print(f"  {'═' * 50}")
+
+    # Au-dessus du sol
+    print(f"\n  ▲ AU-DESSUS DU SOL (visible)")
+    print("  " + "─" * 50)
+    for lvl_key in ["+1", "+2", "+3", "+4", "+5"]:
+        level_char = {"T": "+1", "B": "+2", "b": "+3", "F": "+4", "C": "+5"}
+        reverse_map = {v: k for k, v in level_char.items()}
+        char = reverse_map.get(lvl_key, "?")
+        lvl_nodes = [n for n in f["nodes"] if n["level"] == char and n.get("depth") is None]
+        if lvl_nodes:
+            print(f"\n  {level_names[lvl_key]}")
+            for n in lvl_nodes:
+                print(f"    🔴 [{n['id']:>3}] {n['label']}")
+
+    # Ordre de construction
+    print(f"\n{'=' * 70}")
+    print(f"  🔨 ORDRE DE CONSTRUCTION ({fam['emoji']} {fam['nom']})")
+    print(f"{'=' * 70}")
+
+    for step in f["build_order"]:
+        phase = step["phase"]
+        ids_str = ", ".join(step["ids"][:5])
+        if len(step["ids"]) > 5:
+            ids_str += f" +{len(step['ids'])-5} autres"
+        print(f"\n  Phase {phase} : {step['name']}")
+        print(f"    → {step['action']}")
+        print(f"    📦 {ids_str}")
+
+    print(f"\n{'═' * 70}")
+    print(f"  ⏭️  PROCHAIN PAS : {f['next_step']}")
+    print(f"{'═' * 70}")
+
+
+def save_planted_tree(result, filepath=None):
+    """Sauvegarde l'arbre planté en YAML-like markdown."""
+    f = result
+    fam = FAMILIES[f["family"]]
+
+    if filepath is None:
+        name_slug = f["idea"].lower()
+        for char in " /'\"()[]{}!?,;:":
+            name_slug = name_slug.replace(char, "-")
+        name_slug = name_slug[:50].strip("-")
+        filepath = f"winter-trees/{name_slug}_tree.md"
+
+    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else "winter-trees", exist_ok=True)
+
+    lines = []
+    lines.append(f"# WINTER TREE — {f['idea']}")
+    lines.append(f"")
+    lines.append(f"- Famille : {f['family_emoji']} {f['family_name']}")
+    lines.append(f"- Domaine : {f['domain']}")
+    lines.append(f"- Date plantation : {f['date']}")
+    lines.append(f"- Phase : {f['phase']}")
+    lines.append(f"")
+    lines.append(f"## ARBRE")
+    lines.append(f"")
+
+    # Group nodes by level
+    level_order = [
+        ("-5", "mycorhizes", "Lois physiques / math / hardware"),
+        ("-4", "poils_absorbants", "Contraintes légales"),
+        ("-3", "radicelles", "Contraintes business"),
+        ("-2", "pivotantes", "Décisions d'architecture"),
+        ("-1", "structurelles", "Stack technique"),
+        ("+1", "tronc", "Core engine / pipeline"),
+        ("+2", "branches", "Modules majeurs"),
+        ("+3", "rameaux", "Sous-features"),
+        ("+4", "feuilles", "Outputs / UI"),
+        ("+5", "cime", "Tests / déploiement"),
+    ]
+
+    for depth_key, section_name, section_desc in level_order:
+        if depth_key.startswith("-") or depth_key.startswith("+"):
+            if depth_key.startswith("-"):
+                depth_val = int(depth_key)
+                section_nodes = [n for n in f["nodes"] if n.get("depth") == depth_val]
+            else:
+                level_char = {"+1": "T", "+2": "B", "+3": "b", "+4": "F", "+5": "C"}[depth_key]
+                section_nodes = [n for n in f["nodes"] if n["level"] == level_char and n.get("depth") is None]
+
+            lines.append(f"### [{depth_key}] {section_name} — {section_desc}")
+            lines.append(f"")
+            if section_nodes:
+                for n in section_nodes:
+                    lines.append(f"```yaml")
+                    lines.append(f"- id: {n['id']}")
+                    lines.append(f"  label: \"{n['label']}\"")
+                    lines.append(f"  status: {n['status']}")
+                    lines.append(f"  entry: {n.get('entry', '~')}")
+                    lines.append(f"  depends: {n.get('depends', [])}")
+                    lines.append(f"```")
+                    lines.append(f"")
+            else:
+                lines.append(f"_Aucun nœud — à remplir_")
+                lines.append(f"")
+
+    lines.append(f"## ORDRE DE CONSTRUCTION")
+    lines.append(f"")
+    for step in f["build_order"]:
+        ids_str = ", ".join(step["ids"])
+        status = "⬜"
+        lines.append(f"- {status} **Phase {step['phase']}** : {step['name']}")
+        lines.append(f"  - Action : {step['action']}")
+        lines.append(f"  - Nœuds : {ids_str}")
+        lines.append(f"")
+
+    lines.append(f"## PROCHAIN PAS")
+    lines.append(f"")
+    lines.append(f"> {f['next_step']}")
+
+    content = "\n".join(lines)
+    with open(filepath, "w", encoding="utf-8") as fp:
+        fp.write(content)
+
+    return filepath
+
+
+# ============================================================================
+# 🛡️ GARDIEN — Protège l'ordre + maintient l'index
+# ============================================================================
+
+def load_tree(filepath):
+    """Charge un arbre planté depuis un fichier JSON ou depuis le dict."""
+    if isinstance(filepath, dict):
+        return filepath
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_tree_json(tree, filepath=None):
+    """Sauvegarde l'arbre en JSON pour persistance entre sessions."""
+    if filepath is None:
+        name_slug = tree["idea"].lower()
+        for char in " /'\"()[]{}!?,;:":
+            name_slug = name_slug.replace(char, "-")
+        name_slug = name_slug[:50].strip("-")
+        filepath = f"winter-trees/{name_slug}.json"
+
+    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else "winter-trees", exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(tree, f, indent=2, ensure_ascii=False)
+    return filepath
+
+
+def guardian_check(tree, target_node_id):
+    """🛡️ GARDIEN — Vérifie si on peut travailler sur un nœud.
+
+    Avant de coder quoi que ce soit, le gardien vérifie :
+    1. Est-ce que les dépendances du nœud sont satisfaites ?
+    2. Est-ce que l'ordre de construction de la famille est respecté ?
+    3. Est-ce qu'on saute pas des niveaux ?
+
+    Returns:
+        dict avec:
+        - ok: bool — peut-on travailler sur ce nœud ?
+        - warnings: list — avertissements non-bloquants
+        - blockers: list — blocages (nœuds manquants)
+        - recommendation: str — ce qu'il faudrait faire à la place
+    """
+    nodes = tree["nodes"]
+    family_id = tree["family"]
+    family = FAMILIES[family_id]
+
+    target = None
+    for n in nodes:
+        if n["id"] == target_node_id:
+            target = n
+            break
+
+    if target is None:
+        return {
+            "ok": False,
+            "warnings": [],
+            "blockers": [f"Nœud '{target_node_id}' introuvable dans l'arbre"],
+            "recommendation": f"Nœuds disponibles : {', '.join(n['id'] for n in nodes)}"
+        }
+
+    result = {"ok": True, "warnings": [], "blockers": [], "recommendation": ""}
+
+    # --- CHECK 1 : Dépendances directes ---
+    if target.get("depends"):
+        for dep_id in target["depends"]:
+            dep = next((n for n in nodes if n["id"] == dep_id), None)
+            if dep and dep["status"] != "done":
+                result["blockers"].append(
+                    f"⛔ {target_node_id} dépend de {dep_id} ({dep['label']}) — status: {dep['status']}"
+                )
+
+    # --- CHECK 2 : Ordre des niveaux (racines avant tronc, tronc avant branches) ---
+    level_priority = {"R": 0, "T": 1, "B": 2, "b": 3, "F": 4, "C": 5}
+    target_priority = level_priority.get(target["level"], 99)
+
+    # Vérifier que les niveaux inférieurs ont au moins UN nœud done
+    for level_char, priority in level_priority.items():
+        if priority < target_priority:
+            level_nodes = [n for n in nodes if n["level"] == level_char]
+            if level_nodes:
+                done_count = sum(1 for n in level_nodes if n["status"] == "done")
+                if done_count == 0:
+                    level_names = {"R": "Racines", "T": "Tronc", "B": "Branches", "b": "Rameaux", "F": "Feuilles", "C": "Cime"}
+                    result["warnings"].append(
+                        f"⚠️ Aucun nœud {level_names.get(level_char, level_char)} n'est done — "
+                        f"tu construis {target_node_id} ({target['level']}) avant les {level_names.get(level_char, level_char).lower()}"
+                    )
+
+    # --- CHECK 3 : Profondeur des racines ---
+    target_depth = target.get("depth")
+    if target_depth is not None:
+        # Vérifier que les racines plus profondes existent
+        deeper_roots = [n for n in nodes if n.get("depth") is not None
+                       and n["depth"] < target_depth and n["status"] == "todo"]
+        if deeper_roots:
+            result["warnings"].append(
+                f"⚠️ Des racines plus profondes sont encore todo : "
+                f"{', '.join(n['id'] for n in deeper_roots[:3])}"
+            )
+
+    # --- CHECK 4 : Règles spécifiques à la famille ---
+    if family_id == "palmier" and target["level"] == "B":
+        result["warnings"].append(
+            "⚠️ PALMIER : pas de branches ! Un palmier a un tronc et des feuilles, jamais de branches."
+        )
+
+    if family_id == "conifere" and target["level"] == "B":
+        trunk_nodes = [n for n in nodes if n["level"] == "T"]
+        trunk_done = any(n["status"] == "done" for n in trunk_nodes)
+        if not trunk_done:
+            result["blockers"].append(
+                "⛔ CONIFÈRE : le tronc (pipeline) DOIT être done avant de toucher aux branches. "
+                "Contrôle apical = le leader d'abord."
+            )
+
+    if family_id == "baobab" and target["level"] in ("B", "b", "F"):
+        trunk_nodes = [n for n in nodes if n["level"] == "T"]
+        trunk_done = all(n["status"] == "done" for n in trunk_nodes)
+        if not trunk_done:
+            result["warnings"].append(
+                "⚠️ BAOBAB : consolider le tronc avant d'étendre. "
+                "Le core doit être solide avant les branches."
+            )
+
+    if family_id == "buisson":
+        # Vérifier LOW_INVESTMENT_PER_STEM
+        stem_nodes = [n for n in nodes if n["level"] == "B"]
+        if len(stem_nodes) > 9:
+            result["warnings"].append(
+                f"⚠️ BUISSON : {len(stem_nodes)} tiges — le max recommandé est 9. "
+                "Trop dense = risque d'étouffement."
+            )
+
+    # --- VERDICT ---
+    if result["blockers"]:
+        result["ok"] = False
+        # Trouver quoi faire à la place
+        todo_roots = [n for n in nodes if n["level"] == "R" and n["status"] == "todo"]
+        todo_trunk = [n for n in nodes if n["level"] == "T" and n["status"] == "todo"]
+        if todo_roots:
+            result["recommendation"] = f"Commence par les racines : {todo_roots[0]['id']} — {todo_roots[0]['label']}"
+        elif todo_trunk:
+            result["recommendation"] = f"Commence par le tronc : {todo_trunk[0]['id']} — {todo_trunk[0]['label']}"
+        else:
+            result["recommendation"] = f"Résous d'abord les dépendances bloquantes."
+    else:
+        result["recommendation"] = f"✅ OK — tu peux travailler sur {target_node_id}"
+
+    return result
+
+
+def guardian_update(tree, node_id, status=None, entry=None, desc=None):
+    """Met à jour un nœud de l'arbre (status, entry, description).
+
+    Le champ `entry` est LA boussole de Claude dans le code.
+    Format : "fichier:ligne:fonction" ou "fichier:ligne"
+    Exemple : "lib/mic_engine.dart:340:matchNote()"
+
+    Returns:
+        Le nœud mis à jour, ou None si introuvable.
+    """
+    for n in tree["nodes"]:
+        if n["id"] == node_id:
+            if status is not None:
+                old_status = n["status"]
+                n["status"] = status
+                # Mettre à jour la phase du projet
+                _update_phase(tree)
+                print(f"  📝 {node_id} : {old_status} → {status}")
+
+            if entry is not None:
+                n["entry"] = entry
+                print(f"  📍 {node_id} entry → {entry}")
+
+            if desc is not None:
+                n["desc"] = desc
+
+            return n
+
+    print(f"  ❌ Nœud {node_id} introuvable")
+    return None
+
+
+def _update_phase(tree):
+    """Met à jour la phase du projet en fonction des status."""
+    nodes = tree["nodes"]
+    total = len(nodes)
+    done = sum(1 for n in nodes if n["status"] == "done")
+    wip = sum(1 for n in nodes if n["status"] == "wip")
+
+    roots_done = all(n["status"] == "done" for n in nodes if n["level"] == "R")
+    trunk_done = all(n["status"] == "done" for n in nodes if n["level"] == "T")
+    all_done = all(n["status"] == "done" for n in nodes)
+
+    if all_done:
+        tree["phase"] = "MATURE"
+    elif trunk_done:
+        tree["phase"] = "CROISSANCE"
+    elif roots_done:
+        tree["phase"] = "JEUNE POUSSE"
+    elif done > 0 or wip > 0:
+        tree["phase"] = "GERMINATION"
+    else:
+        tree["phase"] = "GRAINE"
+
+
+def guardian_session_report(tree):
+    """🛡️ Rapport de session — à exécuter au début de chaque conversation.
+
+    Affiche :
+    - Phase du projet
+    - Santé de l'arbre (niveaux couverts/manquants)
+    - Prochains pas recommandés
+    - Index des entrées code (la carte pour Claude)
+    """
+    nodes = tree["nodes"]
+    family_id = tree["family"]
+    fam = FAMILIES[family_id]
+
+    total = len(nodes)
+    done = sum(1 for n in nodes if n["status"] == "done")
+    wip = sum(1 for n in nodes if n["status"] == "wip")
+    todo = sum(1 for n in nodes if n["status"] == "todo")
+
+    _update_phase(tree)
+
+    print(f"\n{'=' * 60}")
+    print(f"  🛡️ GARDIEN — Rapport de session")
+    print(f"{'=' * 60}")
+    print(f"  Projet  : {tree['idea']}")
+    print(f"  Famille : {fam['emoji']} {fam['nom']} ({fam['forme']})")
+    print(f"  Phase   : {tree['phase']}")
+    print(f"  Nœuds   : {done}✅ {wip}🔨 {todo}🔴 / {total} total")
+
+    # Barre de progression
+    bar_len = 40
+    done_bars = int((done / total) * bar_len) if total > 0 else 0
+    wip_bars = int((wip / total) * bar_len) if total > 0 else 0
+    todo_bars = bar_len - done_bars - wip_bars
+    bar = "█" * done_bars + "▓" * wip_bars + "░" * todo_bars
+    pct = int((done / total) * 100) if total > 0 else 0
+    print(f"  [{bar}] {pct}%")
+
+    # Santé par niveau
+    print(f"\n  --- Santé par niveau ---")
+    level_order = [
+        ("R", -5, "🔬 Mycorhizes"),
+        ("R", -4, "⚖️  Poils abs."),
+        ("R", -3, "💰 Radicelles"),
+        ("R", -2, "⚓ Pivotantes"),
+        ("R", -1, "🔧 Structurelles"),
+        ("T", None, "🏗️  Tronc"),
+        ("B", None, "🪵 Branches"),
+        ("b", None, "🌿 Rameaux"),
+        ("F", None, "🍃 Feuilles"),
+        ("C", None, "🌱 Cime"),
+    ]
+
+    for level_char, depth, label in level_order:
+        if depth is not None:
+            lvl_nodes = [n for n in nodes if n["level"] == level_char and n.get("depth") == depth]
+        else:
+            lvl_nodes = [n for n in nodes if n["level"] == level_char and n.get("depth") is None]
+
+        if not lvl_nodes:
+            # Check if level was expected
+            if level_char == "T" and family_id != "buisson":
+                print(f"    {label:20s}  ⬜ absent")
+            continue
+
+        d = sum(1 for n in lvl_nodes if n["status"] == "done")
+        w = sum(1 for n in lvl_nodes if n["status"] == "wip")
+        t = sum(1 for n in lvl_nodes if n["status"] == "todo")
+        total_lvl = len(lvl_nodes)
+
+        if d == total_lvl:
+            icon = "✅"
+        elif t == total_lvl:
+            icon = "🔴"
+        else:
+            icon = "🔨"
+        print(f"    {label:20s}  {icon} {d}/{total_lvl} done")
+
+    # Prochains pas (nœuds todo triés par priorité de construction)
+    print(f"\n  --- Prochains pas recommandés ---")
+    build_order = tree.get("build_order", [])
+    shown = 0
+    for step in build_order:
+        step_nodes = [n for n in nodes if n["id"] in step["ids"] and n["status"] == "todo"]
+        if step_nodes and shown < 3:
+            print(f"    Phase {step['phase']} : {step['name']}")
+            for n in step_nodes[:3]:
+                print(f"      🔴 [{n['id']}] {n['label']}")
+            shown += 1
+
+    if shown == 0:
+        wip_nodes = [n for n in nodes if n["status"] == "wip"]
+        if wip_nodes:
+            print(f"    Terminer les WIP :")
+            for n in wip_nodes[:3]:
+                print(f"      🔨 [{n['id']}] {n['label']}")
+        else:
+            print(f"    🌳 Tout est done ! L'arbre est mature.")
+
+    # Index code (entrées non-vides)
+    entries = [(n["id"], n["label"], n.get("entry", "~")) for n in nodes if n.get("entry") and n["entry"] != "~"]
+    if entries:
+        print(f"\n  --- Index code (carte pour Claude) ---")
+        for nid, label, entry in entries:
+            print(f"    [{nid:>3}] {entry}")
+            print(f"          └─ {label}")
+    else:
+        print(f"\n  --- Index code ---")
+        print(f"    (vide — les entrées se rempliront au fur et à mesure du dev)")
+
+    print(f"\n{'=' * 60}")
+
+    return {
+        "phase": tree["phase"],
+        "progress": f"{done}/{total}",
+        "pct": pct,
+        "entries": len(entries),
+    }
+
+
+def guardian_find(tree, query):
+    """🔍 Cherche dans l'arbre — par ID, label, ou entry.
+
+    Claude utilise ça pour trouver où aller dans le code.
+    Sky utilise ça pour trouver un nœud par mot-clé.
+
+    Returns:
+        Liste de nœuds matchés.
+    """
+    query_lower = query.lower()
+    results = []
+
+    for n in tree["nodes"]:
+        score = 0
+        # Match exact ID
+        if n["id"].lower() == query_lower:
+            score = 100
+        # Match in label
+        elif query_lower in n.get("label", "").lower():
+            score = 50
+        # Match in entry
+        elif query_lower in n.get("entry", "").lower():
+            score = 40
+        # Match in desc
+        elif query_lower in n.get("desc", "").lower():
+            score = 30
+
+        if score > 0:
+            results.append((score, n))
+
+    results.sort(key=lambda x: -x[0])
+    return [n for _, n in results]
+
+
+def print_guardian_check(result):
+    """Affiche le résultat d'un guardian_check de manière lisible."""
+    if result["ok"]:
+        print(f"\n  ✅ {result['recommendation']}")
+    else:
+        print(f"\n  ⛔ BLOQUÉ")
+
+    if result["blockers"]:
+        print(f"\n  Blocages :")
+        for b in result["blockers"]:
+            print(f"    {b}")
+
+    if result["warnings"]:
+        print(f"\n  Avertissements :")
+        for w in result["warnings"]:
+            print(f"    {w}")
+
+    if not result["ok"]:
+        print(f"\n  💡 Recommandation : {result['recommendation']}")
+
+
 def export_knowledge_base(filepath="winter_tree_kb.json"):
     """Exporte toute la knowledge base en JSON."""
     data = {
@@ -1241,31 +2184,98 @@ def main():
     """Point d'entrée CLI."""
     if len(sys.argv) < 2:
         print("""
-🌲 WINTER TREE ENGINE v1.1
+🌲 WINTER TREE ENGINE v1.2
 ==========================
 
 Usage:
-  python engine.py classify          Classification interactive d'un projet
-  python engine.py families          Liste toutes les familles
-  python engine.py family <id>       Détails d'une famille
-  python engine.py anatomy [id]      Anatomie biologique 10 niveaux [+ famille]
-  python engine.py gaps <id>         Détecte les trous (demo avec nœuds exemple)
-  python engine.py generate <id>     Génère un template pour une famille
-  python engine.py export            Exporte la knowledge base en JSON
-  python engine.py validate          Validation (TODO: input YAML)
+  python engine.py plant "<idée>"     🌱 PLANTE UN ARBRE à partir d'une idée
+  python engine.py guard <json>       🛡️ Rapport gardien (début de session)
+  python engine.py check <json> <id>  🛡️ Peut-on bosser sur ce nœud ?
+  python engine.py update <json> <id> <status> [entry]  📝 Update un nœud
+  python engine.py find <json> <query>  🔍 Cherche dans l'arbre
+  python engine.py classify           Classification interactive
+  python engine.py families           Liste toutes les familles
+  python engine.py family <id>        Détails d'une famille
+  python engine.py anatomy [id]       Anatomie biologique 10 niveaux
+  python engine.py gaps <id>          Détecte les trous
+  python engine.py export             Exporte la knowledge base en JSON
 
 Familles: conifere, feuillu, palmier, baobab, buisson, liane
 
 Exemples:
-  python engine.py anatomy baobab
-  python engine.py gaps feuillu
-  python engine.py generate conifere > mon_projet.md
+  python engine.py plant "je veux un Shazam pour piano"
+  python engine.py guard winter-trees/shazam.json
+  python engine.py check winter-trees/shazam.json B1
+  python engine.py update winter-trees/shazam.json T1 done "lib/engine.dart:40"
+  python engine.py find winter-trees/shazam.json "matching"
 """)
         return
 
     cmd = sys.argv[1].lower()
 
-    if cmd == "classify":
+    if cmd == "plant":
+        if len(sys.argv) < 3:
+            print("Usage: python engine.py plant \"<idée>\"")
+            print("Exemple: python engine.py plant \"je veux un Shazam pour piano\"")
+            return
+        idea = " ".join(sys.argv[2:])
+        result = plant(idea)
+        print_planted_tree(result)
+
+        # Sauvegarder en markdown + JSON
+        filepath_md = save_planted_tree(result)
+        filepath_json = save_tree_json(result)
+        print(f"\n  💾 Arbre sauvé : {filepath_md}")
+        print(f"  💾 JSON sauvé  : {filepath_json}")
+
+    elif cmd == "guard":
+        if len(sys.argv) < 3:
+            print("Usage: python engine.py guard <fichier.json>")
+            return
+        tree = load_tree(sys.argv[2])
+        guardian_session_report(tree)
+
+    elif cmd == "check":
+        if len(sys.argv) < 4:
+            print("Usage: python engine.py check <fichier.json> <node_id>")
+            return
+        tree = load_tree(sys.argv[2])
+        result = guardian_check(tree, sys.argv[3].upper())
+        print_guardian_check(result)
+
+    elif cmd == "update":
+        if len(sys.argv) < 5:
+            print("Usage: python engine.py update <fichier.json> <node_id> <status> [entry]")
+            print("Status: todo, wip, done")
+            print("Entry: fichier:ligne:fonction (ex: lib/engine.dart:40:main)")
+            return
+        tree = load_tree(sys.argv[2])
+        node_id = sys.argv[3].upper()
+        status = sys.argv[4].lower()
+        entry = sys.argv[5] if len(sys.argv) > 5 else None
+        guardian_update(tree, node_id, status=status, entry=entry)
+        save_tree_json(tree, sys.argv[2])
+        print(f"  💾 Arbre mis à jour : {sys.argv[2]}")
+
+    elif cmd == "find":
+        if len(sys.argv) < 4:
+            print("Usage: python engine.py find <fichier.json> <query>")
+            return
+        tree = load_tree(sys.argv[2])
+        query = " ".join(sys.argv[3:])
+        results = guardian_find(tree, query)
+        if results:
+            print(f"\n  🔍 {len(results)} résultat(s) pour '{query}' :")
+            for n in results:
+                status_icon = {"done": "✅", "wip": "🔨", "todo": "🔴"}.get(n["status"], "?")
+                entry = n.get("entry", "~")
+                print(f"    {status_icon} [{n['id']:>3}] {n['label']}")
+                if entry != "~":
+                    print(f"           📍 {entry}")
+        else:
+            print(f"\n  Aucun résultat pour '{query}'")
+
+    elif cmd == "classify":
         result = classify_interactive()
         if result:
             print(f"\n--- RÉSULTAT ---")
