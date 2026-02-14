@@ -1391,6 +1391,10 @@ def plant(idea, lang=None, platform=None):
                 "entry": "~",
                 "depends": [],
                 "desc": "",
+                "confidence": 0,  # 0-100% — taux de complétion de la connaissance
+                                  # 0-30  = 🔴 flou → deep research obligatoire
+                                  # 31-70 = 🟡 surface → deep research recommandée
+                                  # 71-100 = 🟢 solide → prêt à coder
             }
             if depth is not None:
                 node["depth"] = depth
@@ -1866,12 +1870,17 @@ def scan_repo(path):
                        "T": 0, "B": 0, "b": 0, "F": 0, "C": 0}
     found_patterns = set()
 
-    def add_node(prefix, level, depth, label, entry="~", status="done"):
+    def add_node(prefix, level, depth, label, entry="~", status="done", confidence=0):
         node_id_counter[prefix] = node_id_counter.get(prefix, 0) + 1
         nid = f"{prefix}{node_id_counter[prefix]}"
+        # Si le fichier existe (status=done), confidence auto à 80
+        # Si absent (status=todo), confidence reste à 0
+        if confidence == 0 and status == "done":
+            confidence = 80
         node = {
             "id": nid, "level": level, "label": label,
             "status": status, "entry": entry, "depends": [], "desc": "",
+            "confidence": confidence,
         }
         if depth is not None:
             node["depth"] = depth
@@ -2105,6 +2114,181 @@ def print_scan_report(tree):
 
 
 # ============================================================================
+# 🔍 RESEARCH PROMPTS — Génère les requêtes de recherche par nœud
+# ============================================================================
+
+# Stratégie de recherche par profondeur
+RESEARCH_STRATEGY = {
+    -5: {
+        "zone": "Mycorhizes",
+        "cherche": "FORMULES, CONSTANTES, LIMITES physiques, théorèmes",
+        "template": "{sujet} formule calcul constantes limites {contexte}",
+        "exemples": ["FFT window size latence minimum", "barème impôt progressif formule"],
+        "depth_target": "Chiffres exacts, formules, seuils, limites physiques"
+    },
+    -4: {
+        "zone": "Poils absorbants",
+        "cherche": "LOIS, ARTICLES de loi, NORMES, DATES, CERTIFICATIONS",
+        "template": "{sujet} loi réglementation obligations {contexte} {année}",
+        "exemples": ["GDPR obligations app mobile", "nLPD Suisse logiciel données personnelles"],
+        "depth_target": "Numéros d'articles, dates d'entrée en vigueur, sanctions"
+    },
+    -3: {
+        "zone": "Radicelles",
+        "cherche": "CHIFFRES de marché, CONCURRENTS, PRIX, UTILISATEURS",
+        "template": "{sujet} marché concurrents parts prix {contexte}",
+        "exemples": ["logiciel fiscal suisse concurrent GeTax prix", "app piano marché taille"],
+        "depth_target": "Noms de concurrents, prix, nombre d'utilisateurs, parts de marché"
+    },
+    -2: {
+        "zone": "Pivotantes",
+        "cherche": "ARCHITECTURES existantes, PATTERNS, comment les autres ont résolu",
+        "template": "{sujet} architecture technique solution existante {contexte}",
+        "exemples": ["architecture logiciel fiscal calcul", "audio pipeline mobile architecture"],
+        "depth_target": "Diagrammes d'architecture, choix techniques des concurrents, patterns"
+    },
+    -1: {
+        "zone": "Structurelles",
+        "cherche": "LIBS, FRAMEWORKS, APIs concrètes avec VERSIONS",
+        "template": "{sujet} framework library API {contexte} {année}",
+        "exemples": ["python tax calculation library", "flutter audio recording package 2025"],
+        "depth_target": "Noms de packages, versions, liens GitHub, documentation"
+    },
+}
+
+
+def generate_research_prompts(tree, context=""):
+    """🔍 Génère les prompts de recherche pour remplir les racines.
+
+    Le plant enrichi utilise ces prompts pour chercher automatiquement.
+    La deep research utilise le même format mais creuse plus profond.
+
+    Args:
+        tree: l'arbre planté
+        context: contexte donné par Sky ("suisse, genève, particuliers")
+
+    Returns:
+        list de dicts {node_id, level, prompt, strategy, depth_target}
+    """
+    idea = tree["idea"]
+    prompts = []
+
+    for node in tree["nodes"]:
+        depth = node.get("depth")
+        if depth is None or depth not in RESEARCH_STRATEGY:
+            continue
+
+        strategy = RESEARCH_STRATEGY[depth]
+
+        # Construire le prompt de recherche
+        sujet = node["label"]
+        année = "2025"
+        prompt = strategy["template"].format(
+            sujet=sujet, contexte=context, année=année
+        ).strip()
+
+        prompts.append({
+            "node_id": node["id"],
+            "node_label": node["label"],
+            "level": depth,
+            "zone": strategy["zone"],
+            "prompt": prompt,
+            "strategy": strategy["cherche"],
+            "depth_target": strategy["depth_target"],
+            "confidence": node.get("confidence", 0),
+        })
+
+    # Trier : les moins confiants d'abord (besoin de recherche en premier)
+    prompts.sort(key=lambda x: x["confidence"])
+
+    return prompts
+
+
+def confidence_bar(pct, width=10):
+    """Génère une barre de confiance visuelle."""
+    filled = int((pct / 100) * width)
+    empty = width - filled
+    bar = "█" * filled + "░" * empty
+
+    if pct <= 30:
+        icon = "🔴"
+        label = "deep research obligatoire"
+    elif pct <= 70:
+        icon = "🟡"
+        label = "deep research recommandée"
+    else:
+        icon = "🟢"
+        label = "prêt à coder"
+
+    return f"{icon} {bar} {pct:3d}%  {label}"
+
+
+def print_research_prompts(prompts):
+    """Affiche les prompts de recherche."""
+    print(f"\n{'=' * 60}")
+    print(f"  🔍 PROMPTS DE RECHERCHE")
+    print(f"{'=' * 60}")
+
+    current_level = None
+    for p in prompts:
+        if p["level"] != current_level:
+            current_level = p["level"]
+            strategy = RESEARCH_STRATEGY[current_level]
+            print(f"\n  [{current_level}] {strategy['zone']} — cherche: {strategy['cherche']}")
+            print(f"  " + "─" * 50)
+
+        bar = confidence_bar(p["confidence"])
+        print(f"    [{p['node_id']:>3}] {p['node_label']}")
+        print(f"          {bar}")
+        print(f"          🔎 \"{p['prompt']}\"")
+        print(f"          📎 Cible: {p['depth_target']}")
+        print()
+
+    # Résumé
+    total = len(prompts)
+    red = sum(1 for p in prompts if p["confidence"] <= 30)
+    yellow = sum(1 for p in prompts if 30 < p["confidence"] <= 70)
+    green = sum(1 for p in prompts if p["confidence"] > 70)
+    print(f"  {'─' * 50}")
+    print(f"  Résumé: {red} 🔴 deep obligatoire | {yellow} 🟡 recommandée | {green} 🟢 prêt")
+    print(f"{'=' * 60}")
+
+
+def print_confidence_map(tree):
+    """Affiche la carte de confiance de l'arbre — vue rapide."""
+    nodes = tree["nodes"]
+
+    print(f"\n{'=' * 60}")
+    print(f"  📊 CARTE DE CONFIANCE — {tree['idea']}")
+    print(f"{'=' * 60}")
+
+    level_order = [
+        (-5, "🔬 Mycorhizes"), (-4, "⚖️  Poils abs."),
+        (-3, "💰 Radicelles"), (-2, "⚓ Pivotantes"),
+        (-1, "🔧 Structurelles"),
+    ]
+
+    for depth, label in level_order:
+        depth_nodes = [n for n in nodes if n.get("depth") == depth]
+        if not depth_nodes:
+            continue
+        print(f"\n  {label}")
+        for n in depth_nodes:
+            conf = n.get("confidence", 0)
+            bar = confidence_bar(conf)
+            print(f"    [{n['id']:>3}] {n['label'][:45]:45s} {bar}")
+
+    # Au-dessus du sol — résumé simple
+    above = [n for n in nodes if n.get("depth") is None]
+    if above:
+        avg_conf = sum(n.get("confidence", 0) for n in above) // len(above) if above else 0
+        print(f"\n  🌳 Au-dessus du sol ({len(above)} nœuds)")
+        print(f"    Confiance moyenne: {confidence_bar(avg_conf)}")
+
+    print(f"\n{'=' * 60}")
+
+
+# ============================================================================
 # 🛡️ GARDIEN — Protège l'ordre + maintient l'index
 # ============================================================================
 
@@ -2256,12 +2440,17 @@ def guardian_check(tree, target_node_id):
     return result
 
 
-def guardian_update(tree, node_id, status=None, entry=None, desc=None):
-    """Met à jour un nœud de l'arbre (status, entry, description).
+def guardian_update(tree, node_id, status=None, entry=None, desc=None, confidence=None):
+    """Met à jour un nœud de l'arbre (status, entry, description, confidence).
 
     Le champ `entry` est LA boussole de Claude dans le code.
     Format : "fichier:ligne:fonction" ou "fichier:ligne"
     Exemple : "lib/mic_engine.dart:340:matchNote()"
+
+    Le champ `confidence` (0-100) indique le taux de connaissance :
+    - 0-30  🔴 deep research obligatoire
+    - 31-70 🟡 deep research recommandée
+    - 71-100 🟢 prêt à coder
 
     Returns:
         Le nœud mis à jour, ou None si introuvable.
@@ -2271,7 +2460,6 @@ def guardian_update(tree, node_id, status=None, entry=None, desc=None):
             if status is not None:
                 old_status = n["status"]
                 n["status"] = status
-                # Mettre à jour la phase du projet
                 _update_phase(tree)
                 print(f"  📝 {node_id} : {old_status} → {status}")
 
@@ -2281,6 +2469,12 @@ def guardian_update(tree, node_id, status=None, entry=None, desc=None):
 
             if desc is not None:
                 n["desc"] = desc
+
+            if confidence is not None:
+                old_conf = n.get("confidence", 0)
+                n["confidence"] = confidence
+                bar = confidence_bar(confidence)
+                print(f"  📊 {node_id} confiance : {old_conf}% → {bar}")
 
             return n
 
@@ -2585,6 +2779,8 @@ def main():
 Usage:
   python engine.py plant "<idée>"     🌱 PLANTE UN ARBRE à partir d'une idée
   python engine.py scan <dossier>     🔬 SCANNE un repo existant
+  python engine.py research <json> [contexte]  🔍 Prompts de recherche
+  python engine.py confidence <json>  📊 Carte de confiance
   python engine.py guard <json>       🛡️ Rapport gardien (début de session)
   python engine.py check <json> <id>  🛡️ Peut-on bosser sur ce nœud ?
   python engine.py update <json> <id> <status> [entry]  📝 Update un nœud
@@ -2639,6 +2835,23 @@ Exemples:
             filepath_md = save_planted_tree(tree)
             print(f"\n  💾 JSON sauvé : {filepath_json}")
             print(f"  💾 MD sauvé   : {filepath_md}")
+
+    elif cmd == "research":
+        if len(sys.argv) < 3:
+            print("Usage: python engine.py research <fichier.json> [contexte]")
+            print("Exemple: python engine.py research winter-trees/impots.json \"suisse genève particuliers\"")
+            return
+        tree = load_tree(sys.argv[2])
+        context = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
+        prompts = generate_research_prompts(tree, context)
+        print_research_prompts(prompts)
+
+    elif cmd == "confidence":
+        if len(sys.argv) < 3:
+            print("Usage: python engine.py confidence <fichier.json>")
+            return
+        tree = load_tree(sys.argv[2])
+        print_confidence_map(tree)
 
     elif cmd == "guard":
         if len(sys.argv) < 3:
