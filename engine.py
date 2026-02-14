@@ -1419,6 +1419,7 @@ def plant(idea, lang=None, platform=None):
         "family_emoji": family["emoji"],
         "date": datetime.now().isoformat(),
         "phase": "GRAINE",
+        "scale": calculate_scale(0),  # nouveau projet = 0 lignes, grandira avec le dev
         "nodes": nodes,
         "build_order": build_order,
         "next_step": build_order[0]["action"] if build_order else "Définir les contraintes",
@@ -1565,6 +1566,9 @@ def print_planted_tree(result):
     print(f"  Domaine  : {f['domain']}")
     print(f"  Phase    : {f['phase']}")
     print(f"  Nœuds    : {len(f['nodes'])}")
+    scale = f.get("scale")
+    if scale:
+        print(f"  Taille   : {scale['label']} (×{scale['factor']})")
     print()
 
     # Afficher par niveau (de -5 à +5)
@@ -2015,6 +2019,9 @@ def scan_repo(path):
     # ── Construire l'arbre ──
     build_order = generate_build_order(family_id, nodes)
 
+    # Calculer l'échelle visuelle
+    scale = calculate_scale(total_code_lines)
+
     tree = {
         "idea": f"[scanned] {project_name}",
         "domain": domain,
@@ -2024,6 +2031,7 @@ def scan_repo(path):
         "date": datetime.now().isoformat(),
         "phase": "MATURE",  # sera recalculé
         "scanned_from": str(path),
+        "scale": scale,
         "stats": {
             "total_files": len(all_files),
             "total_code_lines": total_code_lines,
@@ -2074,6 +2082,93 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines):
     return "feuillu"
 
 
+def calculate_scale(total_lines):
+    """Calcule l'échelle visuelle de l'arbre basée sur les lignes de code.
+
+    L'échelle est logarithmique pour que la différence soit visible
+    sans que les gros projets écrasent les petits.
+
+    Retourne un dict avec :
+    - lines: nombre de lignes brut
+    - factor: multiplicateur (1.0 = référence ~1000 lignes)
+    - category: nom lisible (graine, arbuste, arbre, géant, titan)
+    - height_px: hauteur suggérée en pixels pour le rendu SVG
+
+    Échelle :
+        < 500       → graine      (factor 0.5,  height 200)
+        500-2000    → pousse      (factor 0.8,  height 300)
+        2000-10000  → arbre       (factor 1.0,  height 400)
+        10000-50000 → grand arbre (factor 1.5,  height 500)
+        50000-200k  → géant       (factor 2.0,  height 600)
+        200k+       → titan       (factor 2.5,  height 700)
+    """
+    import math
+
+    if total_lines <= 0:
+        return {"lines": 0, "factor": 0.5, "category": "graine",
+                "height_px": 200, "label": "🌰 Graine (0 lignes)"}
+
+    # Logarithmic scale
+    log_lines = math.log10(max(total_lines, 1))
+
+    # Map to categories
+    if total_lines < 500:
+        cat = "graine"
+        emoji = "🌰"
+        factor = 0.5
+        height = 200
+    elif total_lines < 2000:
+        cat = "pousse"
+        emoji = "🌱"
+        factor = 0.8
+        height = 300
+    elif total_lines < 10000:
+        cat = "arbre"
+        emoji = "🌳"
+        factor = 1.0
+        height = 400
+    elif total_lines < 50000:
+        cat = "grand arbre"
+        emoji = "🌲"
+        factor = 1.5
+        height = 500
+    elif total_lines < 200000:
+        cat = "géant"
+        emoji = "🏔️"
+        factor = 2.0
+        height = 600
+    else:
+        cat = "titan"
+        emoji = "⛰️"
+        factor = 2.5
+        height = 700
+
+    # Smooth interpolation within category
+    # Adds up to 0.3 extra factor based on position within range
+    ranges = [(0, 500), (500, 2000), (2000, 10000),
+              (10000, 50000), (50000, 200000), (200000, 1000000)]
+    for low, high in ranges:
+        if low <= total_lines < high:
+            position = (total_lines - low) / (high - low)
+            factor += position * 0.3
+            height += int(position * 50)
+            break
+
+    # Format human-readable
+    if total_lines >= 1000:
+        lines_str = f"{total_lines // 1000}k"
+    else:
+        lines_str = str(total_lines)
+
+    return {
+        "lines": total_lines,
+        "factor": round(factor, 2),
+        "category": cat,
+        "height_px": height,
+        "label": f"{emoji} {cat.title()} ({lines_str} lignes)",
+    }
+
+
 def print_scan_report(tree):
     """Affiche le rapport de scan."""
     stats = tree["stats"]
@@ -2097,6 +2192,9 @@ def print_scan_report(tree):
         print(f"  Plus gros: {bf['path']} ({bf['lines']}L, {bf['lang']})")
 
     print(f"  Nœuds    : {len(tree['nodes'])}")
+    scale = tree.get("scale")
+    if scale:
+        print(f"  Taille   : {scale['label']} (×{scale['factor']})")
 
     # Résumé par niveau
     done = sum(1 for n in tree["nodes"] if n["status"] == "done")
@@ -2531,6 +2629,9 @@ def guardian_session_report(tree):
     print(f"  Projet  : {tree['idea']}")
     print(f"  Famille : {fam['emoji']} {fam['nom']} ({fam['forme']})")
     print(f"  Phase   : {tree['phase']}")
+    scale = tree.get("scale")
+    if scale:
+        print(f"  Taille  : {scale['label']} (×{scale['factor']})")
     print(f"  Nœuds   : {done}✅ {wip}🔨 {todo}🔴 / {total} total")
 
     # Barre de progression
