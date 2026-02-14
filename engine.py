@@ -2009,7 +2009,7 @@ def scan_repo(path):
         add_node("F", "F", None, "README — ABSENT", "~", "todo")
 
     # ── Classifier la famille ──
-    family_id = _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines)
+    family_id = _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, path, all_files)
 
     # ── Détecter le domaine ──
     # Utiliser les noms de fichiers et dossiers pour deviner
@@ -2048,38 +2048,286 @@ def scan_repo(path):
     return tree
 
 
-def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines):
-    """Classifie la famille à partir des données scannées."""
+def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_path=None, all_files=None):
+    """Classifie la famille à partir des données scannées.
 
-    trunk_nodes = [n for n in nodes if n["level"] == "T"]
-    branch_nodes = [n for n in nodes if n["level"] == "B"]
+    Logique en 3 étapes :
+    1. BAOBAB CHECK — un fichier fait >50% du code ? → baobab, terminé
+    2. SÉPARER CŒUR / PÉRIPHÉRIE — src/, lib/, core/, app/ = architecture.
+       scripts/, tools/, outputs/, tests/ = outils autour. On classe sur le cœur.
+    3. TRACER LES IMPORTS dans le cœur — chaîne linéaire = conifère,
+       modules parallèles = feuillu, indépendants = buisson.
+    """
+
     trunk_lines = biggest_file["lines"] if biggest_file else 0
-
-    # Ratio tronc / total
     trunk_ratio = trunk_lines / total_code_lines if total_code_lines > 0 else 0
 
-    # Nombre de branches
-    n_branches = len(branch_nodes)
-
-    # Heuristiques
+    # ── Étape 1 : Baobab check ──
     if trunk_ratio > 0.5:
-        # Un seul fichier = plus de 50% du code → baobab
         return "baobab"
 
-    if n_branches == 0 or n_branches == 1:
-        # Très peu de structure → palmier (un seul chemin)
+    # ── Étape 2 : Séparer cœur / périphérie ──
+    CORE_DIRS = {"src", "lib", "core", "app", "pkg", "internal", "modules",
+                 "binance_bot", "engine", "api", "server", "services"}
+    PERIPHERAL_DIRS = {"scripts", "tools", "utils", "outputs", "docs",
+                       "examples", "samples", "notebooks", "archives",
+                       "data", "assets", "static", "templates", "config",
+                       "test", "tests", "__tests__", "spec"}
+
+    core_lines = 0
+    peripheral_lines = 0
+    core_dirs_found = set()
+    peripheral_dirs_found = set()
+
+    if all_files:
+        for f in all_files:
+            if f["lines"] == 0:
+                continue
+            parts = f["path"].split(os.sep)
+            if len(parts) > 1:
+                top = parts[0].lower()
+                if top in CORE_DIRS:
+                    core_lines += f["lines"]
+                    core_dirs_found.add(parts[0])
+                elif top in PERIPHERAL_DIRS:
+                    peripheral_lines += f["lines"]
+                    peripheral_dirs_found.add(parts[0])
+                else:
+                    # Dossier inconnu — on le compte comme cœur par défaut
+                    core_lines += f["lines"]
+                    core_dirs_found.add(parts[0])
+            else:
+                # Fichier racine — cœur
+                core_lines += f["lines"]
+
+    # ── Étape 3 : Tracer les imports dans le cœur ──
+    import_graph = {}  # fichier → set(fichiers importés)
+
+    if repo_path and all_files:
+        # Mapper les modules disponibles dans le projet
+        project_modules = set()
+        for f in all_files:
+            if f["ext"] in (".py", ".dart", ".js", ".ts", ".jsx", ".tsx"):
+                # Extraire le nom de module du chemin
+                mod = f["path"].replace(os.sep, ".").replace("/", ".")
+                for ext in (".py", ".dart", ".js", ".ts", ".jsx", ".tsx"):
+                    mod = mod.replace(ext, "")
+                project_modules.add(mod)
+                # Ajouter aussi les dossiers comme modules
+                parts = f["path"].split(os.sep)
+                for i in range(len(parts)):
+                    project_modules.add(".".join(parts[:i + 1]).replace(".py", "").replace(".dart", ""))
+
+        # Scanner les imports de chaque fichier du cœur
+        for f in all_files:
+            if f["ext"] not in (".py", ".dart", ".js", ".ts"):
+                continue
+            if f["lines"] == 0:
+                continue
+
+            # Ne tracer que les fichiers du cœur (pas scripts/, tests/, etc)
+            parts = f["path"].split(os.sep)
+            if len(parts) > 1 and parts[0].lower() in PERIPHERAL_DIRS:
+                continue
+
+            fpath = Path(repo_path) / f["path"]
+            imports = set()
+
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
+                    for line in fh:
+                        line = line.strip()
+
+                        # Python: from src.ichimoku.data import X
+                        if line.startswith("from ") and " import " in line:
+                            module = line.split("from ")[1].split(" import")[0].strip()
+                            # Imports relatifs (.data, ..utils)
+                            if module.startswith("."):
+                                # Résoudre relative au dossier du fichier
+                                base = ".".join(parts[:-1])
+                                module = base + module
+                            imports.add(module)
+
+                        # Python: import src.optimizer
+                        elif line.startswith("import ") and not line.startswith("import "):
+                            module = line.split("import ")[1].split(" as ")[0].split(",")[0].strip()
+                            imports.add(module)
+
+                        # Dart: import 'package:myapp/services/engine.dart'
+                        elif line.startswith("import '") or line.startswith('import "'):
+                            path_str = line.split("'")[1] if "'" in line else line.split('"')[1]
+                            if not path_str.startswith("dart:") and not path_str.startswith("package:flutter"):
+                                imports.add(path_str)
+
+                        # JS/TS: import X from './module'
+                        elif line.startswith("import ") and "from " in line:
+                            module = line.split("from ")[1].strip().strip("'\"").strip(";")
+                            if module.startswith("."):
+                                imports.add(module)
+
+            except:
+                continue
+
+            # Filtrer : garder seulement les imports INTERNES au projet
+            internal_imports = set()
+            for imp in imports:
+                imp_clean = imp.replace("/", ".").replace("\\", ".")
+                for pm in project_modules:
+                    if imp_clean.startswith(pm) or pm.startswith(imp_clean):
+                        internal_imports.add(imp_clean)
+                        break
+                # Aussi garder les imports relatifs (commencent par .)
+                if imp.startswith("."):
+                    internal_imports.add(imp)
+
+            if internal_imports:
+                file_key = f["path"]
+                import_graph[file_key] = internal_imports
+
+    # ── Étape 4 : Analyser la topologie du graphe d'imports ──
+
+    n_core_dirs = len(core_dirs_found)
+    n_files_with_imports = len(import_graph)
+    total_internal_imports = sum(len(v) for v in import_graph.values())
+
+    # Calculer la "profondeur de chaîne" — est-ce que A→B→C→D ?
+    # Si oui = pipeline = conifère
+    chain_depth = _find_longest_chain(import_graph)
+
+    # Compter combien de fichiers importent le MÊME module (convergence)
+    imported_by_count = {}
+    for src_file, imports in import_graph.items():
+        for imp in imports:
+            imported_by_count[imp] = imported_by_count.get(imp, 0) + 1
+
+    # Hub = module importé par beaucoup d'autres (nœud central)
+    max_hub = max(imported_by_count.values()) if imported_by_count else 0
+
+    # ── Décision finale ──
+
+    branch_nodes = [n for n in nodes if n["level"] == "B"]
+    n_branches = len(branch_nodes)
+
+    # Palmier : très peu de structure
+    if n_branches <= 1 and n_files_with_imports <= 2:
         return "palmier"
 
-    if n_branches >= 6 and trunk_ratio < 0.15:
-        # Beaucoup de branches, petit tronc → buisson
-        return "buisson"
+    # Conifère : chaîne d'imports profonde (pipeline)
+    # OU mot "pipeline" dans les noms de fichiers
+    has_pipeline_name = any("pipeline" in f["path"].lower() for f in (all_files or []))
+    has_versioned_files = _detect_versioned_files(all_files or [])
 
-    if trunk_ratio > 0.25 and n_branches <= 5:
-        # Tronc dominant, quelques branches subordonnées → conifère
+    if chain_depth >= 3:
         return "conifere"
 
-    # Default : feuillu (multi-modules)
+    if has_pipeline_name and n_core_dirs >= 2:
+        return "conifere"
+
+    # Si y'a des fichiers versionnés (v1, v2, v3) ça veut dire itérations
+    # sur UN pipeline, pas des outils indépendants
+    if has_versioned_files and n_core_dirs >= 2:
+        return "conifere"
+
+    # Hub fort = un module central qui orchestre = conifère
+    if max_hub >= 4 and chain_depth >= 2:
+        return "conifere"
+
+    # Buisson : pas d'imports croisés dans le cœur, tout est indépendant
+    if n_files_with_imports <= 1 and n_branches >= 3:
+        return "buisson"
+
+    # Buisson : que des fichiers avec chacun son propre main
+    if core_lines == 0 and peripheral_lines > 0 and n_branches >= 5:
+        return "buisson"
+
+    # Feuillu : plusieurs modules qui importent une base commune (parallèle)
+    if max_hub >= 3 and chain_depth <= 2 and n_core_dirs >= 2:
+        return "feuillu"
+
+    # Feuillu par défaut si multi-modules
+    if n_core_dirs >= 2:
+        return "feuillu"
+
+    # Fallback
+    if n_branches >= 6:
+        return "buisson"
+
     return "feuillu"
+
+
+def _find_longest_chain(import_graph):
+    """Trouve la plus longue chaîne d'imports A→B→C→D.
+
+    Une chaîne longue = pipeline linéaire = conifère.
+    """
+    if not import_graph:
+        return 0
+
+    # Simplifier : mapper les imports vers des fichiers connus du graphe
+    file_keys = set(import_graph.keys())
+
+    def match_import_to_file(imp):
+        """Essayer de matcher un import à un fichier du graphe."""
+        imp_parts = imp.replace(".", "/")
+        for fk in file_keys:
+            fk_clean = fk.replace(".py", "").replace(".dart", "").replace(".js", "")
+            if imp_parts in fk_clean or fk_clean.endswith(imp_parts):
+                return fk
+        return None
+
+    # Construire le graphe simplifié fichier → fichier
+    graph = {}
+    for src_file, imports in import_graph.items():
+        targets = set()
+        for imp in imports:
+            target = match_import_to_file(imp)
+            if target and target != src_file:
+                targets.add(target)
+        if targets:
+            graph[src_file] = targets
+
+    # DFS pour trouver la plus longue chaîne
+    max_depth = 0
+
+    def dfs(node, visited):
+        nonlocal max_depth
+        max_depth = max(max_depth, len(visited))
+        for neighbor in graph.get(node, set()):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                dfs(neighbor, visited)
+                visited.discard(neighbor)
+
+    for start in graph:
+        dfs(start, {start})
+
+    return max_depth
+
+
+def _detect_versioned_files(all_files):
+    """Détecte des fichiers versionnés (v1, v2, v3...).
+
+    Si on trouve ça, c'est des itérations d'un même pipeline,
+    pas des outils indépendants. → conifère, pas buisson.
+    """
+    import re
+    version_pattern = re.compile(r'_v\d+[\._]')
+    versioned = [f["path"] for f in all_files
+                 if version_pattern.search(f["path"]) and f["ext"] in (".py", ".dart", ".js")]
+
+    # Si on trouve au moins 2 fichiers versionnés avec le même préfixe
+    if len(versioned) >= 2:
+        prefixes = set()
+        for v in versioned:
+            prefix = version_pattern.split(v)[0]
+            prefixes.add(prefix)
+        # Si un même préfixe a plusieurs versions → oui
+        for prefix in prefixes:
+            count = sum(1 for v in versioned if v.startswith(prefix))
+            if count >= 2:
+                return True
+
+    return False
 
 
 def calculate_scale(total_lines):
