@@ -1789,6 +1789,13 @@ EXT_LANG = {
     ".sh": "Shell", ".ps1": "PowerShell",
 }
 
+# Extensions considérées comme du code (tout le reste = data)
+CODE_EXTENSIONS = set(EXT_LANG.keys()) | {
+    ".html", ".css", ".scss", ".less", ".xml", ".json", ".yaml", ".yml",
+    ".toml", ".ini", ".cfg", ".conf", ".md", ".rst", ".txt",
+    ".sql", ".graphql", ".proto", ".gradle", ".cmake",
+}
+
 # Fichiers/dossiers à ignorer
 IGNORE = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
@@ -2019,8 +2026,28 @@ def scan_repo(path):
     # ── Construire l'arbre ──
     build_order = generate_build_order(family_id, nodes)
 
-    # Calculer l'échelle visuelle
-    scale = calculate_scale(total_code_lines)
+    # Calculer le poids des données (tout sauf le code et .git)
+    data_weight_mb = 0
+    try:
+        for root_dir, dirs, filenames in os.walk(path):
+            # Ignorer .git
+            if ".git" in root_dir:
+                continue
+            dirs[:] = [d for d in dirs if d != ".git"]
+            for fname in filenames:
+                fpath = os.path.join(root_dir, fname)
+                ext = os.path.splitext(fname)[1].lower()
+                # Si c'est pas du code, c'est de la data
+                if ext not in CODE_EXTENSIONS:
+                    try:
+                        data_weight_mb += os.path.getsize(fpath) / (1024 * 1024)
+                    except:
+                        pass
+    except:
+        pass
+
+    # Calculer l'échelle visuelle (hauteur = code, épaisseur = data)
+    scale = calculate_scale(total_code_lines, data_weight_mb)
 
     tree = {
         "idea": f"[scanned] {project_name}",
@@ -2035,6 +2062,7 @@ def scan_repo(path):
         "stats": {
             "total_files": len(all_files),
             "total_code_lines": total_code_lines,
+            "data_weight_mb": round(data_weight_mb, 1),
             "languages": lang_count,
             "biggest_file": biggest_file,
         },
@@ -2330,69 +2358,63 @@ def _detect_versioned_files(all_files):
     return False
 
 
-def calculate_scale(total_lines):
-    """Calcule l'échelle visuelle de l'arbre basée sur les lignes de code.
+def calculate_scale(total_lines, data_weight_mb=0):
+    """Calcule l'échelle visuelle de l'arbre — 2 dimensions.
 
-    L'échelle est logarithmique pour que la différence soit visible
-    sans que les gros projets écrasent les petits.
+    HAUTEUR (factor, height_px) = lignes de code = le bois, la structure.
+    ÉPAISSEUR (density, trunk_width) = poids des données = la nourriture, les racines.
+
+    Un projet de 35k lignes + 7Go de data sera moins haut qu'un projet de 40k
+    mais avec un tronc bien plus épais et un sol riche autour.
+
+    Args:
+        total_lines: nombre de lignes de code
+        data_weight_mb: poids total du repo hors code (en MB)
 
     Retourne un dict avec :
-    - lines: nombre de lignes brut
-    - factor: multiplicateur (1.0 = référence ~1000 lignes)
-    - category: nom lisible (graine, arbuste, arbre, géant, titan)
-    - height_px: hauteur suggérée en pixels pour le rendu SVG
+    - lines, factor, height_px: dimension HAUTEUR (code)
+    - data_mb, density, trunk_width: dimension ÉPAISSEUR (data)
+    - category, label: résumé lisible
 
-    Échelle :
-        < 500       → graine      (factor 0.5,  height 200)
-        500-2000    → pousse      (factor 0.8,  height 300)
-        2000-10000  → arbre       (factor 1.0,  height 400)
-        10000-50000 → grand arbre (factor 1.5,  height 500)
-        50000-200k  → géant       (factor 2.0,  height 600)
-        200k+       → titan       (factor 2.5,  height 700)
+    Échelle hauteur (code) :
+        < 500       → graine      (factor 0.5)
+        500-2000    → pousse      (factor 0.8)
+        2000-10000  → arbre       (factor 1.0)
+        10000-50000 → grand arbre (factor 1.5)
+        50000-200k  → géant       (factor 2.0)
+        200k+       → titan       (factor 2.5)
+
+    Échelle épaisseur (data) :
+        < 10 MB     → léger       (density 1.0)
+        10-100 MB   → normal      (density 1.3)
+        100-1000 MB → dense       (density 1.6)
+        1-10 GB     → massif      (density 2.0)
+        10 GB+      → colossal    (density 2.5)
     """
     import math
 
     if total_lines <= 0:
         return {"lines": 0, "factor": 0.5, "category": "graine",
-                "height_px": 200, "label": "🌰 Graine (0 lignes)"}
+                "height_px": 200, "data_mb": data_weight_mb, "density": 1.0,
+                "trunk_width": 1.0, "label": "🌰 Graine (0 lignes)"}
 
-    # Logarithmic scale
+    # ── HAUTEUR (code) ──
     log_lines = math.log10(max(total_lines, 1))
 
-    # Map to categories
     if total_lines < 500:
-        cat = "graine"
-        emoji = "🌰"
-        factor = 0.5
-        height = 200
+        cat, emoji, factor, height = "graine", "🌰", 0.5, 200
     elif total_lines < 2000:
-        cat = "pousse"
-        emoji = "🌱"
-        factor = 0.8
-        height = 300
+        cat, emoji, factor, height = "pousse", "🌱", 0.8, 300
     elif total_lines < 10000:
-        cat = "arbre"
-        emoji = "🌳"
-        factor = 1.0
-        height = 400
+        cat, emoji, factor, height = "arbre", "🌳", 1.0, 400
     elif total_lines < 50000:
-        cat = "grand arbre"
-        emoji = "🌲"
-        factor = 1.5
-        height = 500
+        cat, emoji, factor, height = "grand arbre", "🌲", 1.5, 500
     elif total_lines < 200000:
-        cat = "géant"
-        emoji = "🏔️"
-        factor = 2.0
-        height = 600
+        cat, emoji, factor, height = "géant", "🏔️", 2.0, 600
     else:
-        cat = "titan"
-        emoji = "⛰️"
-        factor = 2.5
-        height = 700
+        cat, emoji, factor, height = "titan", "⛰️", 2.5, 700
 
     # Smooth interpolation within category
-    # Adds up to 0.3 extra factor based on position within range
     ranges = [(0, 500), (500, 2000), (2000, 10000),
               (10000, 50000), (50000, 200000), (200000, 1000000)]
     for low, high in ranges:
@@ -2402,18 +2424,52 @@ def calculate_scale(total_lines):
             height += int(position * 50)
             break
 
-    # Format human-readable
-    if total_lines >= 1000:
-        lines_str = f"{total_lines // 1000}k"
+    # ── ÉPAISSEUR (data) ──
+    if data_weight_mb < 10:
+        density = 1.0
+        data_cat = "léger"
+    elif data_weight_mb < 100:
+        density = 1.3
+        data_cat = "normal"
+    elif data_weight_mb < 1000:
+        density = 1.6
+        data_cat = "dense"
+    elif data_weight_mb < 10000:
+        density = 2.0
+        data_cat = "massif"
     else:
-        lines_str = str(total_lines)
+        density = 2.5
+        data_cat = "colossal"
+
+    # Smooth interpolation épaisseur
+    data_ranges = [(0, 10), (10, 100), (100, 1000), (1000, 10000), (10000, 100000)]
+    for low, high in data_ranges:
+        if low <= data_weight_mb < high:
+            pos = (data_weight_mb - low) / (high - low)
+            density += pos * 0.3
+            break
+
+    trunk_width = round(density, 2)
+
+    # Format human-readable
+    lines_str = f"{total_lines // 1000}k" if total_lines >= 1000 else str(total_lines)
+    if data_weight_mb >= 1000:
+        data_str = f"{data_weight_mb / 1000:.1f}Go"
+    elif data_weight_mb > 0:
+        data_str = f"{int(data_weight_mb)}Mo"
+    else:
+        data_str = "~"
 
     return {
         "lines": total_lines,
         "factor": round(factor, 2),
         "category": cat,
         "height_px": height,
-        "label": f"{emoji} {cat.title()} ({lines_str} lignes)",
+        "data_mb": data_weight_mb,
+        "density": round(density, 2),
+        "trunk_width": trunk_width,
+        "data_category": data_cat,
+        "label": f"{emoji} {cat.title()} ({lines_str} lignes, {data_str} data)",
     }
 
 
@@ -2429,6 +2485,12 @@ def print_scan_report(tree):
     print(f"  Domaine  : {tree['domain']}")
     print(f"  Fichiers : {stats['total_files']}")
     print(f"  Code     : {stats['total_code_lines']} lignes")
+
+    data_mb = stats.get('data_weight_mb', 0)
+    if data_mb >= 1000:
+        print(f"  Data     : {data_mb / 1000:.1f} Go")
+    elif data_mb > 0:
+        print(f"  Data     : {int(data_mb)} Mo")
 
     if stats["languages"]:
         langs = sorted(stats["languages"].items(), key=lambda x: -x[1])
