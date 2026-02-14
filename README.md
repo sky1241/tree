@@ -1,4 +1,4 @@
-# 🌳 Winter Tree Engine v1.1
+# 🌳 Winter Tree Engine v1.2
 
 > **L'arbre qui dit quoi construire, dans quel ordre, et où chercher dans le code.**
 
@@ -36,33 +36,53 @@ Le Winter Tree c'est 3 choses en 1 :
 
 **Règle d'or : les racines d'abord. Toujours.**
 
-## 🌱 Commande principale — `plant`
+## Les 3 modes
+
+### 🌱 Mode 1 — Nouvelle idée → arbre complet
 
 ```bash
 python engine.py plant "je veux un Shazam pour piano"
-```
-
-Tu donnes une idée en langage naturel → l'engine :
-1. Détecte le **domaine** (audio, trading, mobile, web, 3D, outil)
-2. Classifie la **famille** d'arbre (conifère, feuillu, palmier, baobab, buisson, liane)
-3. Génère les **nœuds des 10 niveaux** (-5 à +5)
-4. Calcule l'**ordre de construction** selon la famille
-5. Sauvegarde l'arbre dans `winter-trees/`
-
-### Exemples
-
-```bash
-python engine.py plant "je veux un Shazam pour piano"
-# → 🌴 Palmier, 32 nœuds, domaine audio
+# → 🌴 Palmier, 32 nœuds, domaine audio, ordre de construction
 
 python engine.py plant "trading algo crypto avec backtesting"
 # → 🌲 Conifère, 35 nœuds, domaine trading
 
 python engine.py plant "générateur STL pour figurines 3D"
 # → 🌳 Baobab, 33 nœuds, domaine hardware_3d
+```
 
-python engine.py plant "collection d'outils CLI pour devs"
-# → 🌿 Buisson, 25 nœuds, domaine tool_cli
+### 🔬 Mode 2 — Scanner un repo existant
+
+```bash
+python engine.py scan /chemin/vers/mon-repo
+```
+
+Le scanner analyse automatiquement :
+- Structure de fichiers → branches et rameaux
+- package.json / pubspec.yaml / requirements.txt → racines stack (-1)
+- Dockerfile / firebase.json → architecture (-2)
+- LICENSE → légal (-4)
+- test/ / .github/workflows/ → cime (+5)
+- Plus gros fichier de code → tronc (+1)
+- Langages détectés → mycorhizes (-5)
+- Ce qui MANQUE → gaps 🔴
+
+### 🛡️ Mode 3 — Gardien (suivi en cours)
+
+```bash
+# Rapport de session — à lancer au début de chaque conversation
+python engine.py guard winter-trees/mon-projet.json
+
+# Vérifier avant de bosser sur un nœud
+python engine.py check winter-trees/mon-projet.json B1
+# → "⚠️ Aucune racine done — tu construis avant les racines"
+
+# Mettre à jour un nœud après avoir codé
+python engine.py update winter-trees/mon-projet.json T1 done "lib/engine.dart:340:matchNote()"
+
+# Chercher dans l'arbre par mot-clé
+python engine.py find winter-trees/mon-projet.json "FFT"
+# → 5 résultats avec les entries code 📍
 ```
 
 ## Les 6 familles
@@ -76,17 +96,6 @@ python engine.py plant "collection d'outils CLI pour devs"
 | 🌿 Buisson | Multi-tiges | Collection d'outils indépendants | Tiges en parallèle, pas de hiérarchie |
 | 🌿 Liane | Grimpante | Extension d'un système existant | S'accrocher à l'hôte d'abord |
 
-## Autres commandes
-
-```bash
-python engine.py classify          # Classification interactive
-python engine.py families          # Liste les 6 familles
-python engine.py family conifere   # Détails d'une famille
-python engine.py anatomy baobab    # Anatomie biologique 10 niveaux
-python engine.py gaps feuillu      # Détection de trous
-python engine.py export            # Export JSON de la knowledge base
-```
-
 ## Domaines reconnus
 
 Le moteur reconnaît automatiquement ces domaines et pré-remplit les nœuds typiques :
@@ -98,19 +107,29 @@ Le moteur reconnaît automatiquement ces domaines et pré-remplit les nœuds typ
 - **hardware_3d** — tolérances FDM, normes sécurité, géométrie manifold
 - **tool_cli** — filesystem, distribution, arg parsing
 
+## Autres commandes
+
+```bash
+python engine.py classify          # Classification interactive
+python engine.py families          # Liste les 6 familles
+python engine.py family conifere   # Détails d'une famille
+python engine.py anatomy baobab    # Anatomie biologique 10 niveaux
+python engine.py gaps feuillu      # Détection de trous
+python engine.py export            # Export JSON de la knowledge base
+```
+
 ## Fichiers du projet
 
 ```
 tree/
-├── engine.py                    # Moteur principal (~2000 lignes)
+├── engine.py                    # Moteur principal (2777 lignes)
 ├── PROTOCOLE_PLANTATION.md      # Prompt pour Claude — quoi faire à chaque nouveau projet
 ├── ANATOMIE_BIOLOGIQUE.md       # Documentation biologique 10 niveaux + sources
 ├── GROWTH_PATTERNS_6_FAMILIES.md # Règles de croissance par famille
 ├── RECHERCHE_APPROFONDIE_v2.md  # 87 recherches web compilées
-├── MASTER_PROMPT_SKY.md         # Prompt système Sky
 ├── README.md                    # Ce fichier
 ├── winter_tree_kb.json          # Knowledge base exportée
-├── winter-trees/                # Arbres plantés (générés)
+├── winter-trees/                # Arbres plantés et scannés (JSON + MD)
 ├── prompts/                     # Templates de prompts
 └── workflows/                   # Workflows documentés
 ```
@@ -160,3 +179,4 @@ US Forest Service, Arbor Day Foundation, ISA Arboriculture (1992, 2010), CSU Ext
 
 *Auteur : Sky — l'architecte de l'architecte*
 *Moteur : Claude — les racines*
+*Licence : MIT*
