@@ -1,0 +1,569 @@
+{
+  "version": "1.1",
+  "date": "2026-02-14T12:39:56.441393",
+  "source": "Winter Tree Engine",
+  "references": {
+    "lindenmayer_1968": {
+      "author": "Aristid Lindenmayer",
+      "year": 1968,
+      "title": "Mathematical models for cellular interactions in development",
+      "journal": "Journal of Theoretical Biology",
+      "volume": 18,
+      "pages": "280-315",
+      "concept": "L-Systems — parallel string rewriting for plant growth"
+    },
+    "prusinkiewicz_1990": {
+      "authors": [
+        "Przemyslaw Prusinkiewicz",
+        "Aristid Lindenmayer"
+      ],
+      "year": 1990,
+      "title": "The Algorithmic Beauty of Plants",
+      "publisher": "Springer",
+      "concept": "Turtle graphics interpretation of L-systems"
+    },
+    "tomer_schach_2000": {
+      "authors": [
+        "Amir Tomer",
+        "Stephen R. Schach"
+      ],
+      "year": 2000,
+      "title": "The Evolution Tree: A Maintenance-Oriented Software Development Model",
+      "venue": "CSMR 2000, Zurich",
+      "concept": "Software development as tree of engineering decisions"
+    },
+    "fowler_2004": {
+      "author": "Martin Fowler",
+      "year": 2004,
+      "title": "Strangler Fig Application",
+      "url": "https://martinfowler.com/bliki/StranglerFigApplication.html",
+      "concept": "Gradual legacy system replacement inspired by strangler figs"
+    },
+    "barnes_2013": {
+      "author": "Jeffrey M. Barnes",
+      "year": 2013,
+      "title": "Software Architecture Evolution",
+      "institution": "Carnegie Mellon University",
+      "ref": "CMU-ISR-13-118",
+      "concept": "Evolution paths as graph of architectural states"
+    }
+  },
+  "families": {
+    "conifere": {
+      "emoji": "🌲",
+      "nom": "Conifère",
+      "forme": "Pyramide verticale",
+      "desc": "Pipeline linéaire avec leader dominant. Le tronc d'abord, les branches subordonnées.",
+      "quand": "Pipeline linéaire (signal → analyse → action)",
+      "exemples": "Trading algo, ETL, CI/CD pipeline",
+      "regles": {
+        "TRUNK_FIRST": {
+          "desc": "Toujours étendre le tronc (pipeline principal) avant les branches",
+          "bio": "Le leader terminal dépasse les latérales grâce au contrôle apical fort",
+          "violation": "Développer une feature avant que le pipeline end-to-end fonctionne"
+        },
+        "BRANCH_SUBORDINATION": {
+          "desc": "branch.size < 0.6 × trunk.size",
+          "bio": "Les branches restent plus petites que le tronc (contrôle apical)",
+          "violation": "Un module secondaire dépasse en complexité le pipeline principal"
+        },
+        "TOP_DOWN_GROWTH": {
+          "desc": "L'énergie/info descend de l'apex",
+          "bio": "Flux d'auxine basipétal (apex → base)",
+          "violation": "Dépendance circulaire ou bottom-up non planifiée"
+        },
+        "NO_RECOVERY_ON_OLD_WOOD": {
+          "desc": "Si le leader casse, refactoring majeur nécessaire",
+          "bio": "La plupart des conifères ne régénèrent pas sur vieux bois",
+          "violation": "Ignorer une cassure du pipeline principal"
+        },
+        "ENVIRONMENTAL_ADAPTATION": {
+          "desc": "Forêt dense → plus vertical ; terrain ouvert → plus large",
+          "bio": "La compétition façonne la forme même chez les excurrents",
+          "violation": "Ignorer les contraintes de l'écosystème (API limits, hardware, etc.)"
+        }
+      },
+      "risques": [
+        "Si le tronc (pipeline) casse, tout l'arbre meurt",
+        "Pas de redondance naturelle — single point of failure",
+        "Les branches ne peuvent pas prendre le relais du leader"
+      ],
+      "diagnostic_keywords": [
+        "pipeline",
+        "séquentiel",
+        "linéaire",
+        "signal",
+        "étape",
+        "flux",
+        "stream"
+      ]
+    },
+    "feuillu": {
+      "emoji": "🍁",
+      "nom": "Feuillu",
+      "forme": "Canopée large",
+      "desc": "Multi-modules en parallèle. Tronc court, branches compétitives.",
+      "quand": "Projet multi-modules interdépendants",
+      "exemples": "App mobile full-stack, moteur 3D, framework",
+      "regles": {
+        "TRUNK_THEN_BRANCH": {
+          "desc": "Tronc court (architecture de base) puis branches en compétition",
+          "bio": "Dominance apicale forte la 1ère année, puis latérales libérées",
+          "violation": "Développer des branches sans avoir un tronc stable"
+        },
+        "LATERAL_COMPETITION": {
+          "desc": "Les branches peuvent DÉPASSER le tronc — le module le plus utilisé devient dominant",
+          "bio": "Contrôle apical faible — les latérales dépassent le leader",
+          "violation": "Forcer un module à rester petit quand l'usage le pousse à grandir"
+        },
+        "CO_DOMINANCE_RISK": {
+          "desc": "Deux branches de même taille = point de rupture structurel",
+          "bio": "V-shape avec écorce incluse = défaillance en tempête",
+          "violation": "Deux modules rivaux de même taille sans arbitrage"
+        },
+        "CANOPY_SPREAD": {
+          "desc": "L'énergie se distribue en LARGEUR",
+          "bio": "Forme décurrente — canopée étalée",
+          "violation": "Concentrer tout l'effort sur un seul module au détriment des autres"
+        },
+        "SEASONAL_CYCLE": {
+          "desc": "Build → ship → pause → rebuild",
+          "bio": "Alternance croissance/dormance essentielle pour libérer les bourgeons",
+          "violation": "Développer sans jamais faire de pause (burnout technique)"
+        },
+        "ENVIRONMENT_SHAPES_FORM": {
+          "desc": "Compétition → vertical (MVP rapide) ; open → spread (features riches)",
+          "bio": "Plasticité extrême — même espèce, formes différentes selon l'environnement",
+          "violation": "Ignorer le contexte marché/concurrence dans les décisions d'architecture"
+        }
+      },
+      "risques": [
+        "Co-dominance : deux modules rivaux créent un point de rupture",
+        "Le leader se perd parmi les branches — qui pilote ?",
+        "Complexité croissante des inter-dépendances"
+      ],
+      "diagnostic_keywords": [
+        "modules",
+        "parallel",
+        "composants",
+        "multi",
+        "bricks",
+        "interdépendant",
+        "full-stack"
+      ]
+    },
+    "palmier": {
+      "emoji": "🌴",
+      "nom": "Palmier",
+      "forme": "Colonne + couronne",
+      "desc": "Un seul méristème, zéro branche. Pipeline étroit, output riche au sommet.",
+      "quand": "Pipeline étroit avec output riche concentré",
+      "exemples": "Audio processing, data transformation, traduction",
+      "regles": {
+        "SINGLE_MERISTEM": {
+          "desc": "Tout passe par UN SEUL point de production",
+          "bio": "Un seul SAM (Shoot Apical Meristem) par tige",
+          "violation": "Créer un deuxième point d'entrée ou de traitement parallèle"
+        },
+        "DIAMETER_FIRST": {
+          "desc": "Fixer l'architecture/scope AVANT de coder",
+          "bio": "Establishment growth : diamètre fixé avant la hauteur",
+          "violation": "Commencer à coder avant d'avoir fixé le scope et l'API"
+        },
+        "NO_LATERAL_BRANCHING": {
+          "desc": "Zéro module secondaire — tout dans le pipeline",
+          "bio": "Pas de branches latérales (extrêmement rare chez les palmiers)",
+          "violation": "Ajouter des features hors du pipeline principal"
+        },
+        "PERMANENT_WOUNDS": {
+          "desc": "Bugs et dette technique sont permanents — pas de refactoring du tronc",
+          "bio": "Pas de compartimentalisation — blessures permanentes",
+          "violation": "Compter sur un refactoring futur du core pour résoudre les problèmes"
+        },
+        "FLEXIBLE_RESILIENCE": {
+          "desc": "Adaptable aux changements externes mais structure interne fixe",
+          "bio": "Les palmiers résistent aux tempêtes par flexibilité",
+          "violation": "Changer la structure interne au lieu de s'adapter en surface"
+        }
+      },
+      "risques": [
+        "Si le méristème (core) meurt, TOUT meurt",
+        "Pas de branche de secours — single pipeline",
+        "Les blessures au tronc sont permanentes"
+      ],
+      "diagnostic_keywords": [
+        "audio",
+        "fft",
+        "pipeline",
+        "transform",
+        "conversion",
+        "traduction",
+        "narrow",
+        "processing"
+      ]
+    },
+    "baobab": {
+      "emoji": "🌳",
+      "nom": "Baobab",
+      "forme": "Tronc massif",
+      "desc": "Gros moteur, petite interface. Consolider le core avant d'étendre.",
+      "quand": "Gros moteur/solveur avec petite interface de sortie",
+      "exemples": "Solveur de contraintes, moteur de rendu, compilateur",
+      "regles": {
+        "TRUNK_IS_STORAGE": {
+          "desc": "Le core accumule les ressources — l'interface est petite relative au core",
+          "bio": "Tronc massif (10-14m diamètre), canopée petite (5-25m hauteur)",
+          "violation": "Interface aussi complexe que le core"
+        },
+        "CONSOLIDATE_BEFORE_EXPAND": {
+          "desc": "Remplir le tronc d'abord, puis faire pousser les branches",
+          "bio": "Le bois mou doit être massif pour ne pas s'effondrer",
+          "violation": "Ajouter des features avant que le core soit solide"
+        },
+        "SOFT_WOOD_PARADOX": {
+          "desc": "Le code n'a pas besoin d'hyper-optimisation — il a besoin de COUVERTURE",
+          "bio": "Densité 0.09-0.17 g/cm³, 69-88% parenchyme, 5% bois solide",
+          "violation": "Optimiser prématurément au lieu de couvrir tous les cas"
+        },
+        "BARK_REGENERATION": {
+          "desc": "L'interface peut être endommagée/régénérée ; le core est protégé",
+          "bio": "Écorce de 8cm qui régénère même après dommages sévères",
+          "violation": "Laisser un bug d'interface corrompre le core"
+        },
+        "SEASONAL_CYCLE": {
+          "desc": "Phase de dev intensive → phase de maintenance minimale",
+          "bio": "4 mois de pluie (croissance) → 8 mois secs (survie)",
+          "violation": "Développement continu sans phase de stabilisation"
+        },
+        "EXTREME_LONGEVITY": {
+          "desc": "Architecture zéro-dépendance pour survie multi-année",
+          "bio": "Longévité 1000+ ans, troncs multi-tiges fusionnés",
+          "violation": "Dépendances sur des libs/APIs instables"
+        }
+      },
+      "risques": [
+        "Tirer trop de ressources du core trop vite → collapse",
+        "Le transport interne est LENT (haute résistance)",
+        "Le tronc peut être creux — attention à la dette technique cachée"
+      ],
+      "diagnostic_keywords": [
+        "moteur",
+        "engine",
+        "solver",
+        "solveur",
+        "constraint",
+        "core",
+        "calcul",
+        "massif"
+      ]
+    },
+    "buisson": {
+      "emoji": "🌿",
+      "nom": "Buisson",
+      "forme": "Multi-tiges",
+      "desc": "Pas de tronc dominant. Collection d'outils indépendants.",
+      "quand": "Collection d'outils/scripts/templates indépendants",
+      "exemples": "Toolkit, dotfiles, collection de prompts, utils",
+      "regles": {
+        "NO_CENTRAL_TRUNK": {
+          "desc": "Pas de module principal — tous les composants sont au même niveau",
+          "bio": "Pas de tige dominante — toutes égales depuis la base",
+          "violation": "Créer une dépendance centrale dont tout dépend"
+        },
+        "REDUNDANCY_IS_RESILIENCE": {
+          "desc": "Si un outil meurt, les autres continuent — pas de single point of failure",
+          "bio": "Si une tige meurt, les autres continuent",
+          "violation": "Créer des dépendances entre les outils"
+        },
+        "HORIZONTAL_EXPANSION": {
+          "desc": "Ajouter de nouveaux outils, ne pas approfondir les existants",
+          "bio": "Suckering = expansion horizontale par les racines",
+          "violation": "Sur-développer un outil au détriment de la collection"
+        },
+        "REJUVENATION_BY_PRUNING": {
+          "desc": "Le refactoring radical est bénéfique, pas destructif",
+          "bio": "Taille radicale → regrowth vigoureux en une saison",
+          "violation": "Avoir peur de supprimer/réécrire un outil obsolète"
+        },
+        "LOW_INVESTMENT_PER_STEM": {
+          "desc": "Chaque outil petit, simple, jetable",
+          "bio": "Investissement faible par tige, remplacement facile",
+          "violation": "Un outil qui prend plus de temps que la somme des autres"
+        },
+        "SUCKERING_CLONAL_SPREAD": {
+          "desc": "Les bons patterns se propagent à travers les outils",
+          "bio": "Les rejets créent des colonies clonales",
+          "violation": "Chaque outil a ses propres conventions, pas de cohérence"
+        }
+      },
+      "risques": [
+        "Ne grandit jamais très haut — pas de produit impressionnant unique",
+        "Peut devenir un fouillis sans organisation",
+        "Manque de direction claire si pas de curation"
+      ],
+      "diagnostic_keywords": [
+        "toolkit",
+        "outils",
+        "collection",
+        "scripts",
+        "utils",
+        "prompts",
+        "templates",
+        "indépendant"
+      ]
+    },
+    "liane": {
+      "emoji": "🌿",
+      "nom": "Liane",
+      "forme": "Grimpe sur un hôte",
+      "desc": "Utilise l'infrastructure existante. Vitesse > structure.",
+      "quand": "Plugin, extension, wrapper d'API, migration legacy",
+      "exemples": "Chrome extension, Flutter plugin, API wrapper, legacy migration",
+      "regles": {
+        "HOST_REQUIRED": {
+          "desc": "L'hôte (API, framework, système legacy) doit exister d'abord",
+          "bio": "Germination dans l'hôte — pas d'existence autonome initiale",
+          "violation": "Développer le plugin avant que l'API hôte soit stable"
+        },
+        "SPEED_OVER_STRUCTURE": {
+          "desc": "Pas d'infrastructure propre nécessaire — investir en vitesse de dev",
+          "bio": "Tiges pleines de vasculaire (transport) mais pas de bois dur",
+          "violation": "Construire une infrastructure lourde pour un simple wrapper"
+        },
+        "CLIMBING_STRATEGIES": {
+          "desc": "Hooks, callbacks, wrappers — multiples points d'accroche",
+          "bio": "Vrilles, épines, racines adventives, poils adhésifs, enroulement",
+          "violation": "Un seul point d'accroche fragile"
+        },
+        "STRANGLER_PATTERN": {
+          "desc": "Coexister → progressivement remplacer → l'hôte meurt, la liane est autonome",
+          "bio": "Figuier étrangleur : coexistence → enveloppement → remplacement",
+          "violation": "Big bang rewrite au lieu de migration progressive"
+        },
+        "CONTAGION_SPREAD": {
+          "desc": "Un plugin peut s'étendre à travers plusieurs plateformes",
+          "bio": "Une liane peut s'étendre sur 49+ arbres hôtes",
+          "violation": "Limiter le plugin à un seul hôte quand il pourrait s'étendre"
+        },
+        "FRAGILE_WITHOUT_HOST": {
+          "desc": "Si l'hôte tombe, la liane tombe — changement d'API = mort",
+          "bio": "Si l'arbre hôte tombe, la liane tombe",
+          "violation": "Ignorer les risques de dépendance sur l'hôte (API deprecation, etc.)"
+        }
+      },
+      "risques": [
+        "Dépendance totale sur l'hôte — breaking changes = mort",
+        "Pas d'autonomie avant la phase finale du strangling",
+        "L'hôte peut vous couper l'accès à tout moment"
+      ],
+      "diagnostic_keywords": [
+        "plugin",
+        "extension",
+        "wrapper",
+        "api",
+        "migration",
+        "legacy",
+        "hook",
+        "addon"
+      ]
+    }
+  },
+  "anatomy": {
+    "+5": {
+      "zone": "Cime",
+      "bio": "Terminal buds / apex",
+      "bio_detail": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance",
+      "dev": "Tests, CI/CD, release, docs",
+      "dev_detail": "Ce qui se 'reproduit' : déploiement = reproduction de l'arbre",
+      "lifespan": "Saisonnier",
+      "color_logic": "green si tests pass + CI ok, yellow si partiel, red si absent",
+      "paradox": null
+    },
+    "+4": {
+      "zone": "Feuilles",
+      "bio": "Foliage / leaves",
+      "bio_detail": "5% de la masse totale mais produisent 100% de l'énergie via photosynthèse",
+      "dev": "UI, endpoints, outputs visibles",
+      "dev_detail": "Ce que l'utilisateur voit et touche — petit en code, 100% de la valeur perçue",
+      "lifespan": "Saisonnier",
+      "color_logic": "green si UI fonctionnelle, yellow si partielle, red si cassée",
+      "paradox": "5% mass → 100% energy. UI = small code → all perceived value."
+    },
+    "+3": {
+      "zone": "Rameaux",
+      "bio": "Twigs / branchlets",
+      "bio_detail": "Subdivisions des branches, <4 ans. Les plus flexibles, se plient au vent, premiers à casser",
+      "dev": "Sous-features, sous-modules, composants",
+      "dev_detail": "Flexibles, remplaçables, supportent les outputs directs",
+      "lifespan": "1-4 ans",
+      "color_logic": "green si implémenté, yellow si WIP, red si manquant et bloquant",
+      "paradox": null
+    },
+    "+2": {
+      "zone": "Branches",
+      "bio": "Scaffold branches / boughs",
+      "bio_detail": "Branches principales 4+ ans. DOIVENT être plus petites que le tronc sinon l'attache casse",
+      "dev": "Modules majeurs, features principales",
+      "dev_detail": "Structural, long-lived. Si une branche dépasse le tronc → co-dominance risk",
+      "lifespan": "Décennies",
+      "color_logic": "green si stable, yellow si en dev actif, red si conflit co-dominance",
+      "paradox": "Branch MUST be smaller than trunk. Module > core = structural failure."
+    },
+    "+1": {
+      "zone": "Tronc",
+      "bio": "Trunk / bole",
+      "bio_detail": "Duramen (heartwood) = MORT mais supporte 20 tonnes. Transport bidirectionnel eau↑ sucres↓",
+      "dev": "Core engine, pipeline principal",
+      "dev_detail": "Tout passe par lui — si le tronc casse, l'arbre meurt",
+      "lifespan": "Vie de l'arbre",
+      "color_logic": "green si core solide, yellow si dette technique, red si cassé",
+      "paradox": "Heartwood is DEAD but supports 20 tons. Legacy code = dead but load-bearing."
+    },
+    "0": {
+      "zone": "● SOL ●",
+      "bio": "Root collar / trunk flare",
+      "bio_detail": "Anneaux de croissance 2x plus larges. 93% des arbres urbains ont un collet enterré → mort lente",
+      "dev": "Interface Sky ↔ Claude",
+      "dev_detail": "Le point de communication. Doit être VISIBLE sinon le projet meurt lentement",
+      "lifespan": "Permanent",
+      "color_logic": "green si interface claire, yellow si ambiguë, red si enterrée/cachée",
+      "paradox": "93% of urban trees have buried collars → slow death. Hidden interface = slow project death."
+    },
+    "-1": {
+      "zone": "Racines structurelles",
+      "bio": "Structural / lateral roots",
+      "bio_detail": "5-15 racines principales, jusqu'à 30cm diamètre. Spread = 2-4x couronne. 80-90% dans top 60cm",
+      "dev": "Frameworks, APIs, contraintes techniques évidentes",
+      "dev_detail": "Visible quand on creuse un peu. Structurant, changeable avec effort",
+      "lifespan": "Décennies",
+      "color_logic": "green si documenté, yellow si implicite, red si inconnu",
+      "paradox": null
+    },
+    "-2": {
+      "zone": "Racines pivotantes",
+      "bio": "Taproot / sinker roots",
+      "bio_detail": "Racines verticales ~2cm depuis les latérales. Stockage eau + énergie. Souvent perdues à maturité",
+      "dev": "Décisions d'architecture profondes, choix structurants",
+      "dev_detail": "Décisions prises tôt qui ancrent le projet — difficiles à changer",
+      "lifespan": "Vie de l'arbre",
+      "color_logic": "green si explicite, yellow si implicite, red si contradictoire",
+      "paradox": "Often lost at maturity. Early architecture decisions get buried but still anchor."
+    },
+    "-3": {
+      "zone": "Radicelles",
+      "bio": "Fine / feeder roots",
+      "bio_detail": "≤2mm, non-ligneuses, éphémères (turnover = mois). Absorption directe eau + nutriments",
+      "dev": "Contraintes business (budget, deadline, marché, users)",
+      "dev_detail": "Changent constamment mais nourrissent tout le projet",
+      "lifespan": "Mois",
+      "color_logic": "green si alimenté, yellow si stress, red si coupé (plus de budget/users)",
+      "paradox": "Ephemeral but feed everything. Business constraints change but nourish the project."
+    },
+    "-4": {
+      "zone": "Poils absorbants",
+      "bio": "Root hairs",
+      "bio_detail": "Extensions microscopiques de l'épiderme. Cuticule très fine. Filtrent TOUT ce qui entre",
+      "dev": "Contraintes légales/réglementaires (GDPR, licences, EN 71, normes)",
+      "dev_detail": "Invisibles à l'œil nu mais filtrent tout ce qui peut entrer dans le projet",
+      "lifespan": "Jours",
+      "color_logic": "green si conforme, yellow si pas vérifié, red si violation",
+      "paradox": "Microscopic but filter EVERYTHING entering. Laws are invisible but non-negotiable."
+    },
+    "-5": {
+      "zone": "Mycorhizes",
+      "bio": "Mycorrhizae",
+      "bio_detail": "Champignons symbiotiques. Amplifient absorption x100. 2500+ espèces. SANS ELLES rien ne pousse",
+      "dev": "Lois physiques, mathématiques, contraintes hardware immuables",
+      "dev_detail": "Invisibles, symbiotiques. Tu ne les vois pas mais elles amplifient tout x100 quand comprises",
+      "lifespan": "Permanent",
+      "color_logic": "green si respecté, yellow si testé aux limites, red si violé (impossible)",
+      "paradox": "Amplify absorption 100x. Physics laws are not limits — they AMPLIFY when understood."
+    }
+  },
+  "bio_ratios": {
+    "root_shoot_weight": {
+      "value": "0.25-0.38",
+      "meaning": "Racines = 20-28% du poids total",
+      "source": "Mokany et al. 2006, Global Change Biology"
+    },
+    "root_surface_vs_leaf": {
+      "value": "2.5-4.5x",
+      "meaning": "Surface racinaire = 2.5-4.5x surface foliaire",
+      "source": "Perry (1989), ISA Arboriculture"
+    },
+    "root_spread_vs_crown": {
+      "value": "2-4x",
+      "meaning": "Spread latéral = 2-4x diamètre couronne (jusqu'à 7x)",
+      "source": "Colorado State University, Iowa State"
+    },
+    "roots_in_top_60cm": {
+      "value": "80-90%",
+      "meaning": "La plupart des racines sont proches de la surface",
+      "source": "Biology Insights 2025, ISA Arboriculture"
+    },
+    "structural_roots_count": {
+      "value": "5-15",
+      "meaning": "Nombre de racines structurelles par arbre",
+      "source": "ISA Arboriculture (Sutton & Tinus 1983)"
+    },
+    "mycorrhizae_amplification": {
+      "value": "100x",
+      "meaning": "Les mycorhizes amplifient la surface d'absorption x100",
+      "source": "Perry, cité par ISA Arboriculture"
+    },
+    "leaves_mass_percent": {
+      "value": "5%",
+      "meaning": "Les feuilles = 5% de la masse mais produisent 100% de l'énergie",
+      "source": "richardstreeservice.com"
+    },
+    "buried_collar_urban": {
+      "value": "93%",
+      "meaning": "93% des arbres urbains ont un collet enterré → mort lente",
+      "source": "Smiley 1991, Bartlett Tree Research"
+    }
+  },
+  "family_root_types": {
+    "conifere": {
+      "root_type": "Taproot + latérales",
+      "depth": "1-10m (pin jusqu'à 3.9m documenté)",
+      "spread": "2-3x rayon couronne",
+      "rs_ratio": "0.25-0.30",
+      "detail": "Racine pivotante profonde, latérales modérées. Moins de biomasse racinaire que feuillus."
+    },
+    "feuillu": {
+      "root_type": "Heart (oblique) + latérales massives",
+      "depth": "Chêne jusqu'à 9m",
+      "spread": "2-4x rayon couronne",
+      "rs_ratio": "0.25-0.38",
+      "detail": "Plus de biomasse racinaire totale que conifères. Racines en cœur, très plastiques."
+    },
+    "palmier": {
+      "root_type": "Adventives uniformes",
+      "depth": "1-2m (peu profondes)",
+      "spread": "Dense mais limité",
+      "rs_ratio": "N/A (monocot, pas de croissance secondaire)",
+      "detail": "PAS de racine pivotante. Toutes adventives, même diamètre. Diamètre tronc ≠ indicateur racines."
+    },
+    "baobab": {
+      "root_type": "Latérales massives, peu profondes",
+      "depth": "Peu profond",
+      "spread": "Jusqu'à 50m pour arbre de 14m diamètre",
+      "rs_ratio": "0.15-0.20 (tronc tellement massif)",
+      "detail": "Les racines vont chercher l'eau très loin horizontalement. Transport interne lent."
+    },
+    "buisson": {
+      "root_type": "Réseau large > partie aérienne",
+      "depth": "Peu profond (30-60cm)",
+      "spread": "2-3x largeur des tiges",
+      "rs_ratio": "0.40-0.68",
+      "detail": "Racines PLUS LARGES que partie visible. C'est pourquoi un buisson repousse après taille radicale."
+    },
+    "liane": {
+      "root_type": "Minimales → complètes (progression)",
+      "depth": "Variable (dépend de l'hôte)",
+      "spread": "Le long du tronc hôte puis au sol",
+      "rs_ratio": "Progresse de ~0 à normal",
+      "detail": "Racines aériennes d'abord, puis terrestres. Le figuier étrangleur développe un système complet seulement au sol."
+    }
+  }
+}
