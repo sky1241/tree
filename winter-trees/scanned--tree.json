@@ -1,0 +1,101 @@
+{
+  "idea": "[scanned] tree",
+  "domain": "audio",
+  "family": "baobab",
+  "family_name": "Baobab",
+  "family_emoji": "🌳",
+  "date": "2026-02-14T15:27:11.171774",
+  "phase": "CROISSANCE",
+  "scanned_from": "/home/claude/tree",
+  "stats": {
+    "total_files": 18,
+    "total_code_lines": 2777,
+    "languages": {
+      "Python": 2777
+    },
+    "biggest_file": {
+      "path": "engine.py",
+      "lines": 2777,
+      "lang": "Python"
+    }
+  },
+  "nodes": [
+    {
+      "id": "M1",
+      "level": "R",
+      "label": "Langage principal : Python (2777 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "depth": -5
+    },
+    {
+      "id": "T1",
+      "level": "T",
+      "label": "Core : engine.py (2777 lignes, Python)",
+      "status": "done",
+      "entry": "engine.py",
+      "depends": [],
+      "desc": ""
+    },
+    {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests/CI — ABSENT",
+      "status": "todo",
+      "entry": "~",
+      "depends": [],
+      "desc": ""
+    },
+    {
+      "id": "P1",
+      "level": "R",
+      "label": "Licence/Legal — ABSENT",
+      "status": "todo",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "depth": -4
+    }
+  ],
+  "build_order": [
+    {
+      "phase": 0,
+      "name": "Mycorhizes — lois physiques",
+      "ids": [
+        "M1"
+      ],
+      "action": "Identifier les lois physiques/math immuables du projet",
+      "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
+    },
+    {
+      "phase": 1,
+      "name": "Poils — contraintes légales",
+      "ids": [
+        "P1"
+      ],
+      "action": "Définir les contraintes de niveau -4",
+      "bio": "Extensions microscopiques de l'épiderme. Cuticule très fine. Filtrent TOUT ce qui entre"
+    },
+    {
+      "phase": 2,
+      "name": "Tronc — core engine MASSIF",
+      "ids": [
+        "T1"
+      ],
+      "action": "Construire et CONSOLIDER le core avant toute extension",
+      "bio": "Le baobab met toute son énergie dans le tronc d'abord"
+    },
+    {
+      "phase": 5,
+      "name": "Cime — tests et déploiement",
+      "ids": [
+        "C1"
+      ],
+      "action": "Implémenter cime — tests et déploiement",
+      "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
+    }
+  ],
+  "next_step": "Vérifier l'arbre scanné et compléter les nœuds manquants"
+}

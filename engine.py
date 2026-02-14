@@ -1710,6 +1710,401 @@ def save_planted_tree(result, filepath=None):
 
 
 # ============================================================================
+# 🔬 SCANNER DE REPO — Analyse un projet existant et génère l'arbre
+# ============================================================================
+
+# Patterns de détection par fichier/dossier
+SCAN_PATTERNS = {
+    # -1 Racines structurelles (frameworks, libs, stack)
+    "roots": {
+        "pubspec.yaml": {"label": "Flutter/Dart", "depth": -1},
+        "pubspec.lock": {"label": "Flutter deps lockfile", "depth": -1, "skip_node": True},
+        "package.json": {"label": "Node.js", "depth": -1},
+        "package-lock.json": {"label": "Node deps lockfile", "depth": -1, "skip_node": True},
+        "requirements.txt": {"label": "Python deps", "depth": -1},
+        "Pipfile": {"label": "Python Pipenv", "depth": -1},
+        "pyproject.toml": {"label": "Python project config", "depth": -1},
+        "setup.py": {"label": "Python package", "depth": -1},
+        "Cargo.toml": {"label": "Rust", "depth": -1},
+        "go.mod": {"label": "Go modules", "depth": -1},
+        "Gemfile": {"label": "Ruby", "depth": -1},
+        "composer.json": {"label": "PHP Composer", "depth": -1},
+        "build.gradle": {"label": "Java/Kotlin Gradle", "depth": -1},
+        "pom.xml": {"label": "Java Maven", "depth": -1},
+        "CMakeLists.txt": {"label": "C/C++ CMake", "depth": -1},
+        "Makefile": {"label": "Make build system", "depth": -1},
+        ".swift": {"label": "Swift/iOS", "depth": -1, "ext_match": True},
+    },
+    # -2 Architecture (config structurante)
+    "architecture": {
+        "docker-compose.yml": {"label": "Docker Compose (microservices)", "depth": -2},
+        "docker-compose.yaml": {"label": "Docker Compose (microservices)", "depth": -2},
+        "Dockerfile": {"label": "Docker containerisation", "depth": -2},
+        ".env": {"label": "Environment config", "depth": -2},
+        ".env.example": {"label": "Env template", "depth": -2},
+        "firebase.json": {"label": "Firebase backend", "depth": -2},
+        "supabase/": {"label": "Supabase backend", "depth": -2, "is_dir": True},
+        "prisma/": {"label": "Prisma ORM", "depth": -2, "is_dir": True},
+        "terraform/": {"label": "Terraform infra-as-code", "depth": -2, "is_dir": True},
+    },
+    # -4 Legal
+    "legal": {
+        "LICENSE": {"label": "Licence projet", "depth": -4},
+        "LICENSE.md": {"label": "Licence projet", "depth": -4},
+        "PRIVACY.md": {"label": "Privacy policy", "depth": -4},
+        "SECURITY.md": {"label": "Security policy", "depth": -4},
+    },
+    # +5 Cime (tests, CI)
+    "cime": {
+        "test/": {"label": "Tests (dossier test/)", "is_dir": True},
+        "tests/": {"label": "Tests (dossier tests/)", "is_dir": True},
+        "__tests__/": {"label": "Tests Jest", "is_dir": True},
+        "spec/": {"label": "Tests spec/", "is_dir": True},
+        ".github/workflows/": {"label": "GitHub Actions CI", "is_dir": True},
+        ".gitlab-ci.yml": {"label": "GitLab CI"},
+        "Jenkinsfile": {"label": "Jenkins CI"},
+        ".circleci/": {"label": "CircleCI", "is_dir": True},
+        "jest.config.js": {"label": "Jest config"},
+        "pytest.ini": {"label": "Pytest config"},
+        "tox.ini": {"label": "Tox test runner"},
+    },
+}
+
+# Extensions → langage
+EXT_LANG = {
+    ".py": "Python", ".dart": "Dart", ".js": "JavaScript", ".ts": "TypeScript",
+    ".jsx": "React JSX", ".tsx": "React TSX", ".vue": "Vue",
+    ".swift": "Swift", ".kt": "Kotlin", ".java": "Java",
+    ".rs": "Rust", ".go": "Go", ".rb": "Ruby", ".php": "PHP",
+    ".c": "C", ".cpp": "C++", ".h": "C/C++ header",
+    ".cs": "C#", ".r": "R", ".m": "MATLAB/Obj-C",
+    ".sh": "Shell", ".ps1": "PowerShell",
+}
+
+# Fichiers/dossiers à ignorer
+IGNORE = {
+    ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
+    ".idea", ".vscode", ".DS_Store", "build", "dist", ".next",
+    ".dart_tool", ".pub-cache", "coverage", ".gradle", "target",
+    "Pods", ".flutter-plugins", ".flutter-plugins-dependencies",
+}
+
+
+def scan_repo(path):
+    """🔬 Scanne un repo existant et génère un arbre Winter Tree.
+
+    Analyse :
+    1. Structure de fichiers → branches et rameaux
+    2. Fichiers de config → racines (-1 stack, -2 architecture)
+    3. Licences → racines légales (-4)
+    4. Tests/CI → cime (+5)
+    5. Taille des fichiers → détecte les troncs (plus gros fichier de code)
+    6. Langages → détecte le domaine
+
+    Args:
+        path: chemin vers le repo (dossier)
+
+    Returns:
+        dict — arbre complet prêt pour le gardien
+    """
+    path = Path(path).resolve()
+    if not path.is_dir():
+        print(f"  ❌ '{path}' n'est pas un dossier")
+        return None
+
+    project_name = path.name
+
+    # ── Collecter tous les fichiers ──
+    all_files = []
+    all_dirs = set()
+    lang_count = {}
+    total_code_lines = 0
+    biggest_file = {"path": "", "lines": 0, "lang": ""}
+
+    for root, dirs, files in os.walk(path):
+        # Filtrer les dossiers ignorés
+        dirs[:] = [d for d in dirs if d not in IGNORE]
+
+        rel_root = Path(root).relative_to(path)
+        for d in dirs:
+            all_dirs.add(str(rel_root / d))
+
+        for f in files:
+            fpath = Path(root) / f
+            rel = str(fpath.relative_to(path))
+            ext = fpath.suffix.lower()
+
+            # Compter les lignes de code
+            lines = 0
+            if ext in EXT_LANG:
+                try:
+                    lines = sum(1 for _ in open(fpath, "r", encoding="utf-8", errors="ignore"))
+                except:
+                    lines = 0
+
+                lang = EXT_LANG[ext]
+                lang_count[lang] = lang_count.get(lang, 0) + lines
+
+                if lines > biggest_file["lines"]:
+                    biggest_file = {"path": rel, "lines": lines, "lang": lang}
+
+                total_code_lines += lines
+
+            size = fpath.stat().st_size if fpath.exists() else 0
+            all_files.append({
+                "path": rel,
+                "name": f,
+                "ext": ext,
+                "size": size,
+                "lines": lines,
+                "lang": EXT_LANG.get(ext, ""),
+            })
+
+    # ── Détecter les nœuds ──
+    nodes = []
+    node_id_counter = {"M": 0, "P": 0, "D": 0, "A": 0, "R": 0,
+                       "T": 0, "B": 0, "b": 0, "F": 0, "C": 0}
+    found_patterns = set()
+
+    def add_node(prefix, level, depth, label, entry="~", status="done"):
+        node_id_counter[prefix] = node_id_counter.get(prefix, 0) + 1
+        nid = f"{prefix}{node_id_counter[prefix]}"
+        node = {
+            "id": nid, "level": level, "label": label,
+            "status": status, "entry": entry, "depends": [], "desc": "",
+        }
+        if depth is not None:
+            node["depth"] = depth
+        nodes.append(node)
+        return nid
+
+    # --- Scan patterns (racines, archi, legal, cime) ---
+    for category, patterns in SCAN_PATTERNS.items():
+        for pattern, info in patterns.items():
+            if info.get("skip_node"):
+                continue
+
+            matched = False
+            entry = "~"
+
+            if info.get("is_dir"):
+                dir_name = pattern.rstrip("/")
+                if dir_name in all_dirs or any(d.startswith(dir_name) for d in all_dirs):
+                    matched = True
+                    entry = dir_name + "/"
+            elif info.get("ext_match"):
+                ext = pattern
+                if any(f["ext"] == ext for f in all_files):
+                    matched = True
+            else:
+                if any(f["name"] == pattern or f["path"] == pattern for f in all_files):
+                    matched = True
+                    entry = pattern
+
+            if matched and pattern not in found_patterns:
+                found_patterns.add(pattern)
+                depth = info.get("depth")
+                label = info["label"]
+
+                if depth == -1:
+                    add_node("R", "R", -1, label, entry)
+                elif depth == -2:
+                    add_node("A", "R", -2, label, entry)
+                elif depth == -4:
+                    add_node("P", "R", -4, label, entry)
+                elif category == "cime":
+                    add_node("C", "C", None, label, entry)
+
+    # --- Détecter le langage principal → mycorhizes ---
+    if lang_count:
+        main_lang = max(lang_count, key=lang_count.get)
+        main_lines = lang_count[main_lang]
+        add_node("M", "R", -5, f"Langage principal : {main_lang} ({main_lines} lignes)")
+
+        if len(lang_count) > 1:
+            secondary = sorted(lang_count.items(), key=lambda x: -x[1])
+            for lang, lines in secondary[1:3]:
+                if lines > total_code_lines * 0.1:  # > 10% du code
+                    add_node("M", "R", -5, f"Langage secondaire : {lang} ({lines} lignes)")
+
+    # --- Tronc = le plus gros fichier de code ---
+    if biggest_file["lines"] > 0:
+        add_node("T", "T", None,
+                 f"Core : {biggest_file['path']} ({biggest_file['lines']} lignes, {biggest_file['lang']})",
+                 biggest_file["path"], "done")
+
+    # --- Branches = dossiers de premier niveau avec du code ---
+    top_dirs = {}
+    for f in all_files:
+        parts = f["path"].split(os.sep)
+        if len(parts) > 1 and f["lines"] > 0:
+            top_dir = parts[0]
+            if top_dir not in IGNORE:
+                if top_dir not in top_dirs:
+                    top_dirs[top_dir] = {"files": 0, "lines": 0, "langs": set()}
+                top_dirs[top_dir]["files"] += 1
+                top_dirs[top_dir]["lines"] += f["lines"]
+                if f["lang"]:
+                    top_dirs[top_dir]["langs"].add(f["lang"])
+
+    # Trier par lignes de code
+    sorted_dirs = sorted(top_dirs.items(), key=lambda x: -x[1]["lines"])
+    for dirname, info in sorted_dirs[:10]:
+        langs = ", ".join(list(info["langs"])[:2])
+        add_node("B", "B", None,
+                 f"{dirname}/ ({info['files']} fichiers, {info['lines']}L, {langs})",
+                 f"{dirname}/", "done")
+
+        # Rameaux = sous-dossiers
+        sub_dirs = {}
+        for f in all_files:
+            parts = f["path"].split(os.sep)
+            if len(parts) > 2 and parts[0] == dirname and f["lines"] > 0:
+                sub = parts[1]
+                if sub not in sub_dirs:
+                    sub_dirs[sub] = {"files": 0, "lines": 0}
+                sub_dirs[sub]["files"] += 1
+                sub_dirs[sub]["lines"] += f["lines"]
+
+        for subname, subinfo in sorted(sub_dirs.items(), key=lambda x: -x[1]["lines"])[:5]:
+            add_node("b", "b", None,
+                     f"{dirname}/{subname}/ ({subinfo['files']}f, {subinfo['lines']}L)",
+                     f"{dirname}/{subname}/", "done")
+
+    # --- Fichiers racine avec du code (pas dans un sous-dossier) ---
+    root_code_files = [f for f in all_files if os.sep not in f["path"]
+                       and f["lines"] > 50 and f["ext"] in EXT_LANG]
+    for f in sorted(root_code_files, key=lambda x: -x["lines"]):
+        # Pas un doublon du tronc
+        if f["path"] != biggest_file["path"]:
+            add_node("B", "B", None,
+                     f"{f['path']} ({f['lines']}L, {f['lang']})",
+                     f["path"], "done")
+
+    # --- Nœuds manquants (gaps) → todo ---
+    # Pas de tests ?
+    if not any(n["level"] == "C" for n in nodes):
+        add_node("C", "C", None, "Tests/CI — ABSENT", "~", "todo")
+
+    # Pas de licence ?
+    if not any(n.get("depth") == -4 for n in nodes):
+        add_node("P", "R", -4, "Licence/Legal — ABSENT", "~", "todo")
+
+    # Pas de README ?
+    has_readme = any(f["name"].lower().startswith("readme") for f in all_files)
+    if not has_readme:
+        add_node("F", "F", None, "README — ABSENT", "~", "todo")
+
+    # ── Classifier la famille ──
+    family_id = _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines)
+
+    # ── Détecter le domaine ──
+    # Utiliser les noms de fichiers et dossiers pour deviner
+    all_text = " ".join(f["path"] for f in all_files).lower()
+    domain = detect_domain(all_text + " " + project_name)
+
+    # ── Construire l'arbre ──
+    build_order = generate_build_order(family_id, nodes)
+
+    tree = {
+        "idea": f"[scanned] {project_name}",
+        "domain": domain,
+        "family": family_id,
+        "family_name": FAMILIES[family_id]["nom"],
+        "family_emoji": FAMILIES[family_id]["emoji"],
+        "date": datetime.now().isoformat(),
+        "phase": "MATURE",  # sera recalculé
+        "scanned_from": str(path),
+        "stats": {
+            "total_files": len(all_files),
+            "total_code_lines": total_code_lines,
+            "languages": lang_count,
+            "biggest_file": biggest_file,
+        },
+        "nodes": nodes,
+        "build_order": build_order,
+        "next_step": "Vérifier l'arbre scanné et compléter les nœuds manquants",
+    }
+
+    _update_phase(tree)
+
+    return tree
+
+
+def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines):
+    """Classifie la famille à partir des données scannées."""
+
+    trunk_nodes = [n for n in nodes if n["level"] == "T"]
+    branch_nodes = [n for n in nodes if n["level"] == "B"]
+    trunk_lines = biggest_file["lines"] if biggest_file else 0
+
+    # Ratio tronc / total
+    trunk_ratio = trunk_lines / total_code_lines if total_code_lines > 0 else 0
+
+    # Nombre de branches
+    n_branches = len(branch_nodes)
+
+    # Heuristiques
+    if trunk_ratio > 0.5:
+        # Un seul fichier = plus de 50% du code → baobab
+        return "baobab"
+
+    if n_branches == 0 or n_branches == 1:
+        # Très peu de structure → palmier (un seul chemin)
+        return "palmier"
+
+    if n_branches >= 6 and trunk_ratio < 0.15:
+        # Beaucoup de branches, petit tronc → buisson
+        return "buisson"
+
+    if trunk_ratio > 0.25 and n_branches <= 5:
+        # Tronc dominant, quelques branches subordonnées → conifère
+        return "conifere"
+
+    # Default : feuillu (multi-modules)
+    return "feuillu"
+
+
+def print_scan_report(tree):
+    """Affiche le rapport de scan."""
+    stats = tree["stats"]
+    fam = FAMILIES[tree["family"]]
+
+    print(f"\n{'=' * 60}")
+    print(f"  🔬 SCAN TERMINÉ — {tree['scanned_from']}")
+    print(f"{'=' * 60}")
+    print(f"  Famille  : {tree['family_emoji']} {tree['family_name']} ({fam['forme']})")
+    print(f"  Domaine  : {tree['domain']}")
+    print(f"  Fichiers : {stats['total_files']}")
+    print(f"  Code     : {stats['total_code_lines']} lignes")
+
+    if stats["languages"]:
+        langs = sorted(stats["languages"].items(), key=lambda x: -x[1])
+        lang_str = ", ".join(f"{l} ({n}L)" for l, n in langs[:5])
+        print(f"  Langages : {lang_str}")
+
+    if stats["biggest_file"]["path"]:
+        bf = stats["biggest_file"]
+        print(f"  Plus gros: {bf['path']} ({bf['lines']}L, {bf['lang']})")
+
+    print(f"  Nœuds    : {len(tree['nodes'])}")
+
+    # Résumé par niveau
+    done = sum(1 for n in tree["nodes"] if n["status"] == "done")
+    todo = sum(1 for n in tree["nodes"] if n["status"] == "todo")
+    print(f"  Trouvés  : {done} ✅  Manquants : {todo} 🔴")
+
+    # Gaps
+    gaps = [n for n in tree["nodes"] if n["status"] == "todo"]
+    if gaps:
+        print(f"\n  --- Manquants détectés ---")
+        for n in gaps:
+            print(f"    🔴 [{n['id']}] {n['label']}")
+
+    print(f"\n{'=' * 60}")
+
+
+# ============================================================================
 # 🛡️ GARDIEN — Protège l'ordre + maintient l'index
 # ============================================================================
 
@@ -2189,6 +2584,7 @@ def main():
 
 Usage:
   python engine.py plant "<idée>"     🌱 PLANTE UN ARBRE à partir d'une idée
+  python engine.py scan <dossier>     🔬 SCANNE un repo existant
   python engine.py guard <json>       🛡️ Rapport gardien (début de session)
   python engine.py check <json> <id>  🛡️ Peut-on bosser sur ce nœud ?
   python engine.py update <json> <id> <status> [entry]  📝 Update un nœud
@@ -2204,6 +2600,7 @@ Familles: conifere, feuillu, palmier, baobab, buisson, liane
 
 Exemples:
   python engine.py plant "je veux un Shazam pour piano"
+  python engine.py scan /path/to/my/repo
   python engine.py guard winter-trees/shazam.json
   python engine.py check winter-trees/shazam.json B1
   python engine.py update winter-trees/shazam.json T1 done "lib/engine.dart:40"
@@ -2227,6 +2624,21 @@ Exemples:
         filepath_json = save_tree_json(result)
         print(f"\n  💾 Arbre sauvé : {filepath_md}")
         print(f"  💾 JSON sauvé  : {filepath_json}")
+
+    elif cmd == "scan":
+        if len(sys.argv) < 3:
+            print("Usage: python engine.py scan <dossier>")
+            print("Exemple: python engine.py scan /path/to/my-project")
+            return
+        repo_path = sys.argv[2]
+        tree = scan_repo(repo_path)
+        if tree:
+            print_scan_report(tree)
+            print_planted_tree(tree)
+            filepath_json = save_tree_json(tree)
+            filepath_md = save_planted_tree(tree)
+            print(f"\n  💾 JSON sauvé : {filepath_json}")
+            print(f"  💾 MD sauvé   : {filepath_md}")
 
     elif cmd == "guard":
         if len(sys.argv) < 3:
