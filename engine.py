@@ -3907,7 +3907,7 @@ def _generate_forest_html(trees, image_base64_map):
         img_key = FAMILY_IMAGE_MAP.get(family, "winter_tree_planche_II.png")
         if img_key not in image_base64_map:
             img_key = "winter_tree_planche_II.png"
-        img_b64 = image_base64_map.get(img_key, "")
+        img_src = f"/assets/{img_key}"
 
         # Compteurs status
         done = sum(1 for n in nodes if n.get("status") == "done")
@@ -3930,7 +3930,7 @@ def _generate_forest_html(trees, image_base64_map):
         tree_cards.append(f'''
       <a href="/tree/{json_file}" class="tree-card" style="--tree-h: {tree_height}px; --tree-w: {tree_width}px;">
         <div class="tree-visual">
-          <img src="data:image/png;base64,{img_b64}" alt="{family_name}"
+          <img src="{img_src}" alt="{family_name}"
                style="height: {tree_height}px; width: {tree_width}px;"/>
         </div>
         <div class="tree-info">
@@ -4192,10 +4192,10 @@ def _generate_forest_html(trees, image_base64_map):
 
 
 def serve_tree(json_path=None):
-    """🌐 Lance un serveur local et ouvre la vue dans le navigateur.
+    """🌐 Lance un serveur local interactif.
 
     Sans argument → vue forêt (tous les scans/)
-    Avec argument → vue profil (un arbre)
+    Avec argument → vue profil interactive (un arbre)
     """
     import http.server
     import socketserver
@@ -4206,28 +4206,28 @@ def serve_tree(json_path=None):
     script_dir = Path(__file__).parent
     assets_dir = script_dir / "assets"
     scans_dir = script_dir / "scans"
+    templates_dir = script_dir / "templates"
 
-    # ── Charger toutes les images d'assets en base64 ──
-    image_base64_map = {}
+    # ── Charger les images en mémoire (raw bytes pour /assets/) ──
+    image_raw = {}
     if assets_dir.exists():
         for img_file in assets_dir.glob("*.png"):
             with open(img_file, "rb") as f:
-                image_base64_map[img_file.name] = base64.b64encode(f.read()).decode("utf-8")
+                image_raw[img_file.name] = f.read()
 
-    if "winter_tree_planche_II.png" not in image_base64_map:
+    if "winter_tree_planche_II.png" not in image_raw:
         print(f"  ❌ Image non trouvée : assets/winter_tree_planche_II.png")
         return
 
-    default_img = image_base64_map["winter_tree_planche_II.png"]
-
-    def _get_tree_image(tree):
-        """Retourne le base64 de l'image correspondant à la famille de l'arbre."""
+    def get_tree_image_name(tree):
         family_id = tree.get("family", "conifere")
-        img_file = FAMILY_IMAGE_MAP.get(family_id, "winter_tree_planche_II.png")
-        return image_base64_map.get(img_file, default_img)
+        img = FAMILY_IMAGE_MAP.get(family_id, "winter_tree_planche_II.png")
+        if img not in image_raw:
+            img = "winter_tree_planche_II.png"
+        return img
 
     # ── Charger les arbres ──
-    all_trees = {}  # filename → tree dict
+    all_trees = {}
     if scans_dir.exists():
         for jf in scans_dir.glob("*.json"):
             tree = load_tree(str(jf))
@@ -4235,27 +4235,18 @@ def serve_tree(json_path=None):
                 tree["_json_file"] = jf.name
                 all_trees[jf.name] = tree
 
-    # ── Générer les pages ──
-    # Page profil pour chaque arbre (avec image de SA famille)
-    profile_pages = {}
-    for fname, tree in all_trees.items():
-        profile_pages[fname] = _generate_profile_html(tree, _get_tree_image(tree))
+    # ── Charger le template interactif ──
+    interactive_tpl = ""
+    tpl_path = templates_dir / "interactive_profile.html"
+    if tpl_path.exists():
+        with open(tpl_path, "r", encoding="utf-8") as f:
+            interactive_tpl = f.read()
 
-    # Page forêt
+    # ── Générer le HTML forêt (avec base64 pour inline) ──
+    image_base64_map = {k: base64.b64encode(v).decode("utf-8") for k, v in image_raw.items()}
     forest_html = _generate_forest_html(list(all_trees.values()), image_base64_map)
 
-    # Si un json_path est donné, on l'ajoute aussi (même s'il est pas dans scans/)
-    single_tree_html = None
-    page_title = "La Forêt"
-    if json_path:
-        tree = load_tree(json_path)
-        if not tree:
-            print(f"  ❌ Impossible de charger : {json_path}")
-            return
-        single_tree_html = _generate_profile_html(tree, _get_tree_image(tree))
-        page_title = tree.get("idea", "Projet").replace("[scanned] ", "")
-
-    # ── Trouver un port dispo ──
+    # ── Port dispo ──
     port = 8420
     for attempt in range(20):
         try:
@@ -4266,56 +4257,129 @@ def serve_tree(json_path=None):
         except OSError:
             continue
 
+    # Si json spécifique
+    single_tree = None
+    page_title = "La Forêt"
+    if json_path:
+        single_tree = load_tree(json_path)
+        if not single_tree:
+            print(f"  ❌ Impossible de charger : {json_path}")
+            return
+        page_title = single_tree.get("idea", "Projet").replace("[scanned] ", "")
+
     # ── Handler avec routing ──
     class TreeHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             path = urllib.parse.unquote(self.path)
 
+            # Images: /assets/filename.png
+            if path.startswith("/assets/"):
+                fname = path[8:]
+                if fname in image_raw:
+                    self.send_response(200)
+                    self.send_header("Content-type", "image/png")
+                    self.send_header("Cache-Control", "max-age=3600")
+                    self.end_headers()
+                    self.wfile.write(image_raw[fname])
+                else:
+                    self._serve_404(fname)
+                return
+
+            # API: tree JSON
+            if path.startswith("/api/tree/"):
+                fname = path[10:]
+                tree = all_trees.get(fname)
+                if tree:
+                    self._serve_json(tree)
+                else:
+                    self._serve_404(fname)
+                return
+
+            # API: all trees
+            if path == "/api/trees":
+                trees_list = []
+                for fname, t in all_trees.items():
+                    trees_list.append({
+                        "file": fname,
+                        "name": t.get("idea", "?").replace("[scanned] ", ""),
+                        "family": t.get("family", "conifere"),
+                        "family_name": t.get("family_name", "?"),
+                        "family_emoji": t.get("family_emoji", "🌳"),
+                        "stats": t.get("stats", {}),
+                        "scale": t.get("scale", {}),
+                        "nodes_count": len(t.get("nodes", [])),
+                        "done": sum(1 for n in t.get("nodes", []) if n.get("status") == "done"),
+                        "image": f"/assets/{get_tree_image_name(t)}",
+                    })
+                self._serve_json({"trees": trees_list})
+                return
+
+            # Interactive profile: /tree/filename.json
             if path.startswith("/tree/") and path.endswith(".json"):
-                # Vue profil d'un arbre
-                fname = path[6:]  # enlever /tree/
-                html = profile_pages.get(fname)
-                if html:
+                fname = path[6:]
+                tree = all_trees.get(fname)
+                if tree and interactive_tpl:
+                    html = _build_interactive(tree)
                     self._serve_html(html)
                 else:
                     self._serve_404(fname)
+                return
 
-            elif path == "/forest" or (path == "/" and not single_tree_html):
-                # Vue forêt
-                self._serve_html(forest_html)
+            # Root → single tree or forest
+            if path == "/" and single_tree and interactive_tpl:
+                html = _build_interactive(single_tree)
+                self._serve_html(html)
+                return
 
-            elif path == "/" and single_tree_html:
-                # Vue profil directe (quand lancé avec un json)
-                self._serve_html(single_tree_html)
-
-            else:
-                self._serve_html(forest_html)
+            # Default: forest
+            self._serve_html(forest_html)
 
         def _serve_html(self, html):
+            data = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", len(data))
             self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
+            self.wfile.write(data)
+
+        def _serve_json(self, obj):
+            data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", len(data))
+            self.end_headers()
+            self.wfile.write(data)
 
         def _serve_404(self, name):
             self.send_response(404)
             self.send_header("Content-type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(f"<h1>Arbre non trouvé : {name}</h1>".encode("utf-8"))
+            self.wfile.write(f"<h1>404 — {name}</h1>".encode("utf-8"))
 
         def log_message(self, format, *args):
-            pass  # Silencieux
+            pass
+
+    def _build_interactive(tree):
+        tree_json = json.dumps(tree, ensure_ascii=False)
+        img_name = get_tree_image_name(tree)
+        html = interactive_tpl.replace(
+            '__TREE_JSON__', tree_json
+        ).replace(
+            '__IMG_SRC__',
+            f'"/assets/{img_name}"'
+        )
+        return html
 
     server = socketserver.TCPServer(("", port), TreeHandler)
 
     n_trees = len(all_trees)
-    if single_tree_html:
+    if single_tree:
         print(f"\n  🌲 WINTER TREE — {page_title}")
     else:
         print(f"\n  🌲 WINTER TREE — La Forêt ({n_trees} arbres)")
     print(f"  {'─' * 40}")
     print(f"  🌐 http://localhost:{port}")
-    if not single_tree_html and n_trees > 0:
+    if not single_tree and n_trees > 0:
         print(f"  🌐 http://localhost:{port}/forest")
         for fname in sorted(all_trees.keys()):
             name = all_trees[fname].get("idea", "?").replace("[scanned] ", "")
