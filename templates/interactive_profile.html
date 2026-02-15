@@ -850,25 +850,47 @@ function buildSVG(nodes) {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  R E N D E R  —  Structure conifère (RULE C1: trunk first)
+  //  R E N D E R  —  DEUX COUCHES DISTINCTES
   //
-  //  Tout part du TRONC. Trunk never divides.
-  //  Le tronc est la colonne vertébrale, les branches s'y attachent.
-  //  B, C, F → attachés au tronc à leur niveau Y
-  //  b → attachés à leur branche parente (B) par chemin d'entrée
-  //  R-1 → attachés au pied du tronc (SOL)
-  //  R-2+ → chaînés au niveau racinaire peuplé le plus proche
+  //  COUCHE 1 (ambre/doré): SQUELETTE PARFAIT
+  //    = Ce qu'un conifère SAIN devrait être
+  //    = Basé sur données botaniques PhD (ISA, Bebber, Boswell)
+  //    = Tronc 55-65% biomasse, branches < 0.6× tronc
+  //    = Racines spread 2-4× couronne, 80-90% dans top 60cm
+  //
+  //  COUCHE 2 (blanc/vert/rouge): REPO RÉEL
+  //    = Le code du repo mappé sur le squelette
+  //    = Vert = sain (passe subordination)
+  //    = Rouge = violation (branche > 0.6× tronc)
+  //    = MANQUE = position idéale non couverte
+  //
+  //  Le diagnostic compare les deux: où est-on bon, où manque-t-il,
+  //  où y a-t-il des problèmes structurels.
   // ═══════════════════════════════════════════════════════════
+
+  // Labels descriptifs pour chaque position idéale
+  const IDEAL_LABELS = {
+    "C":   ["Tests / CI", "Release"],
+    "F":   ["Endpoints", "UI", "Exports"],
+    "b":   ["Sub-mod 1", "Sub-mod 2", "Sub-mod 3", "Sub-mod 4", "Sub-mod 5", "Sub-mod 6"],
+    "B":   ["Module A", "Module B", "Module C", "Module D"],
+    "T":   ["Core pipeline"],
+    "R-1": ["Framework 1", "Framework 2", "Framework 3"],
+    "R-2": ["Archi DB", "Archi API"],
+    "R-3": ["Contrainte 1", "Contrainte 2", "Contrainte 3"],
+    "R-4": ["Licence", "Conformit\u00e9"],
+    "R-5": ["Algo fondamental", "Hardware"],
+  };
 
   const posMap = {};
   const idealPos = {};
 
-  // Pré-calcul positions idéales
+  // Pr\u00e9-calcul positions id\u00e9ales
   for (const [lk, lev] of Object.entries(LEVELS)) {
     idealPos[lk] = branchPositions(lk, lev.y, IDEAL[lk] || 0, lev.zone);
   }
 
-  // Pré-calcul positions réelles (triées par taille — subordination)
+  // Pr\u00e9-calcul positions r\u00e9elles (tri\u00e9es par taille — subordination)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
     if (group.length === 0) continue;
@@ -881,116 +903,148 @@ function buildSVG(nodes) {
     });
   }
 
-  // ── LAYER 1: TRONC — la colonne vertébrale du conifère ──
-  // RULE C1: "Extend pipeline (trunk) BEFORE adding branches. Trunk NEVER divides."
-  // Une ligne forte, continue, du sommet de la cime aux mycorhizes.
-  // C'est LE élément structurel dominant (40% biomasse).
-  svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 20}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 30}"
-    stroke="rgba(255,255,255,0.18)" stroke-width="2.5"/>`;
+  // ═══════════════════════════════════════════════════════
+  //  C O U C H E   1  —  SQUELETTE PARFAIT (ambre dor\u00e9)
+  //
+  //  Ordre de croissance naturel (graine → arbre):
+  //    R-5 Mycorhizes → R-4 Poils → R-3 Radicelles →
+  //    R-2 Pivot → R-1 Structurelles → T Tronc →
+  //    B Branches → b Rameaux → F Feuilles → C Cime
+  // ═══════════════════════════════════════════════════════
 
-  // Points d'attache sur le tronc à chaque niveau
+  // 1A. TRONC PARFAIT — la colonne vert\u00e9brale
+  //     55-65% biomasse totale, ne se divise JAMAIS (RULE C1)
+  //     Bois de c\u0153ur MORT mais supporte 20 tonnes (USFS data)
+  svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 30}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 40}"
+    stroke="rgba(218,165,32,0.3)" stroke-width="3.5"/>`;
+
+  // Points d'attache vertébraux (un par niveau anatomique)
   for (const [lk, lev] of Object.entries(LEVELS)) {
-    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="2.5"
-      fill="rgba(255,255,255,0.12)"/>`;
+    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="4"
+      fill="rgba(218,165,32,0.08)" stroke="rgba(218,165,32,0.25)" stroke-width="1.2"/>`;
   }
 
-  // ── LAYER 2: SQUELETTE FANTÔME (branches idéales depuis le tronc) ──
-  // Montre où les branches DEVRAIENT être pour un arbre sain.
-  // Chaque branche fantôme part du point d'attache sur le tronc.
+  // 1B. BRANCHES ID\u00c9ALES — courbes du tronc vers positions parfaites
+  //     Conif\u00e8re: branches verticill\u00e9es, angle 45-60\u00b0
+  //     Chaque branche < 0.6\u00d7 tronc (RULE C2)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     if (lk === "T") continue;
     const ghostP = idealPos[lk] || [];
-    const actualN = (grouped[lk] || []).length;
+    const actualCount = (grouped[lk] || []).length;
+    const levelMissing = actualCount === 0;
+    const labels = IDEAL_LABELS[lk] || [];
 
     ghostP.forEach((pos, i) => {
-      // Branche fantôme: du tronc vers la position idéale
-      const attachY = lev.y;
-      svgHTML += `<line x1="${CENTER_X}" y1="${attachY}" x2="${pos.x}" y2="${pos.y}"
-        stroke="${lev.color}" stroke-width="0.3" opacity="0.06"
-        stroke-dasharray="3,5"/>`;
+      const isGap = i >= actualCount;  // Pas de n\u0153ud r\u00e9el pour ce slot
 
-      // Nœud fantôme si pas de nœud réel à cette position
-      if (i >= actualN) {
-        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="5"
-          fill="none" stroke="${lev.color}" stroke-width="0.6" opacity="0.1"
-          stroke-dasharray="2,2"/>`;
+      // Branche idéale: courbe du tronc vers la position
+      const midX = (CENTER_X + pos.x) / 2;
+      const midY = (lev.y + pos.y) / 2 + (lev.zone === "aerial" ? -5 : 4);
+      const branchOpacity = levelMissing ? 0.22 : (isGap ? 0.15 : 0.06);
+
+      svgHTML += `<path d="M${CENTER_X},${lev.y} Q${midX},${midY} ${pos.x},${pos.y}"
+        fill="none" stroke="rgba(218,165,32,${branchOpacity})"
+        stroke-width="${levelMissing ? 1.5 : 1}"
+        stroke-dasharray="5,4"/>`;
+
+      // N\u0153ud id\u00e9al (point de r\u00e9f\u00e9rence)
+      if (isGap) {
+        // Position non couverte par un vrai n\u0153ud → fantôme visible
+        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="7"
+          fill="none" stroke="rgba(218,165,32,0.35)" stroke-width="1.3"
+          stroke-dasharray="3,3"/>`;
+
+        // Label de ce qui DEVRAIT \u00eatre l\u00e0
+        if (labels[i]) {
+          svgHTML += `<text x="${pos.x}" y="${pos.y + 18}" fill="rgba(218,165,32,0.4)"
+            font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle"
+            filter="url(#textSh)">${labels[i]}</text>`;
+        }
+      } else {
+        // Position couverte par un vrai n\u0153ud → juste un cercle tr\u00e8s discret
+        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="7"
+          fill="none" stroke="rgba(218,165,32,0.06)" stroke-width="0.5"/>`;
       }
     });
+
+    // 1C. DIAGNOSTIC par niveau (badge à droite)
+    const ideal = IDEAL[lk] || 0;
+    if (ideal > 0) {
+      if (levelMissing) {
+        svgHTML += `<text x="880" y="${lev.y + 4}" fill="#FF5252" font-size="9" font-weight="600"
+          font-family="JetBrains Mono, monospace" text-anchor="end" opacity="0.7"
+          filter="url(#textSh)">MANQUE</text>`;
+      } else if (actualCount < ideal) {
+        svgHTML += `<text x="880" y="${lev.y + 4}" fill="#FFA726" font-size="9"
+          font-family="JetBrains Mono, monospace" text-anchor="end" opacity="0.6"
+          filter="url(#textSh)">${actualCount}/${ideal}</text>`;
+      } else {
+        svgHTML += `<text x="880" y="${lev.y + 4}" fill="#28c862" font-size="9"
+          font-family="JetBrains Mono, monospace" text-anchor="end" opacity="0.5"
+          filter="url(#textSh)">\u2713 ${actualCount}</text>`;
+      }
+    }
   }
 
-  // ── LAYER 3: CONNEXIONS RÉELLES (lignes blanches — le réseau nerveux) ──
-  // Conifère: TOUT part du tronc.
-  //   B nodes → s'attachent au TRONC à leur niveau Y (branches principales)
-  //   C nodes → s'attachent au TRONC au sommet (bourgeons terminaux)
-  //   b nodes → s'attachent à leur BRANCHE PARENTE (identifiée par chemin)
-  //   R-1     → s'attachent au PIED DU TRONC (juste sous le sol)
-  //   R-2+    → chaînés au niveau racinaire PEUPLÉ le plus proche au-dessus
+  // ═══════════════════════════════════════════════════════
+  //  C O U C H E   2  —  REPO R\u00c9EL (blanc/vert/rouge)
+  //
+  //  Conif\u00e8re: TOUT part du tronc (RULE C1)
+  //    B → attach\u00e9s au TRONC \u00e0 leur niveau Y
+  //    b → attach\u00e9s \u00e0 leur BRANCHE PARENTE (chemin)
+  //    C,F → attach\u00e9s au TRONC au sommet
+  //    R-1 → pied du tronc
+  //    R-2+ → cha\u00een\u00e9s au niveau racinaire peupl\u00e9
+  // ═══════════════════════════════════════════════════════
+
+  // 2A. CONNEXIONS R\u00c9ELLES — lignes blanches
   function findParentPos(node) {
     const lk = nodeLevelKey(node);
     const entry = node.entry || "";
 
-    // Rameaux (b) → parent Branch par préfixe de chemin d'entrée
     if (lk === "b" && entry) {
       for (const bn of (grouped["B"] || [])) {
         if (bn.entry && entry.startsWith(bn.entry) && posMap[bn.id]) {
           return posMap[bn.id];
         }
       }
-      // Fallback: point d'attache tronc au niveau b
       return { x: CENTER_X, y: LEVELS["b"]?.y || 330 };
     }
-
-    // Branches (B) → point d'attache tronc au niveau BRANCHES
     if (lk === "B") return { x: CENTER_X, y: LEVELS["B"].y };
-
-    // Cime (C) → point d'attache tronc au niveau CIME
     if (lk === "C") return { x: CENTER_X, y: LEVELS["C"].y };
-
-    // Feuilles (F) → point d'attache tronc au niveau FEUILLES
     if (lk === "F") return { x: CENTER_X, y: LEVELS["F"].y };
-
-    // Racines structurelles (R-1) → pied du tronc
     if (lk === "R-1") return { x: CENTER_X, y: SOL_Y + 10 };
-
-    // Racines profondes (R-2+) → remonter au niveau peuplé le plus proche
     if (lk.startsWith("R-")) {
       const depth = parseInt(lk.split("-")[1]);
       for (let d = depth - 1; d >= 1; d--) {
         const above = grouped[`R-${d}`];
-        if (above?.length > 0 && posMap[above[0].id]) {
-          return posMap[above[0].id];
-        }
+        if (above?.length > 0 && posMap[above[0].id]) return posMap[above[0].id];
       }
       return { x: CENTER_X, y: SOL_Y + 10 };
     }
-
     return null;
   }
 
   nodes.forEach(n => {
     const lk = nodeLevelKey(n);
-    if (lk === "T") return;  // Le tronc EST la colonne — pas de connexion vers lui-même
+    if (lk === "T") return;
     const pos = posMap[n.id];
     if (!pos) return;
-
     const pp = findParentPos(n);
     if (!pp) return;
 
     const viol = isViolation(n);
     const zone = LEVELS[lk]?.zone || "aerial";
-
-    // Courbe de branche naturelle
-    // Conifère: branches s'inclinent légèrement vers le bas depuis le tronc
     const midX = (pp.x + pos.x) / 2;
     const midY = (pp.y + pos.y) / 2 + (zone === "aerial" ? -8 : 6);
 
     svgHTML += `<path d="M${pp.x},${pp.y} Q${midX},${midY} ${pos.x},${pos.y}"
       fill="none"
-      stroke="${viol ? 'rgba(255,82,82,0.5)' : 'rgba(255,255,255,0.35)'}"
-      stroke-width="${viol ? 2 : 1.2}"/>`;
+      stroke="${viol ? 'rgba(255,82,82,0.55)' : 'rgba(255,255,255,0.4)'}"
+      stroke-width="${viol ? 2.2 : 1.4}"/>`;
   });
 
-  // ── LAYER 4: NŒUDS RÉELS (taille = code, couleur = santé) ──
+  // 2B. N\u0152UDS R\u00c9ELS — taille = volume code, couleur = sant\u00e9
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
     group.forEach(n => {
@@ -1017,6 +1071,27 @@ function buildSVG(nodes) {
       </g>`;
     });
   }
+
+  // 2C. L\u00c9GENDE (en bas \u00e0 gauche)
+  const legX = 50, legY = 1100;
+  svgHTML += `
+    <rect x="${legX - 5}" y="${legY - 12}" width="180" height="64" rx="4"
+      fill="rgba(0,0,0,0.5)" stroke="rgba(218,165,32,0.15)" stroke-width="0.5"/>
+    <line x1="${legX}" y1="${legY}" x2="${legX + 18}" y2="${legY}"
+      stroke="rgba(218,165,32,0.35)" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="${legX + 24}" y="${legY + 3}" fill="rgba(218,165,32,0.5)" font-size="7"
+      font-family="JetBrains Mono, monospace">Squelette parfait</text>
+    <circle cx="${legX + 6}" cy="${legY + 16}" r="4" fill="#3d8a3a" opacity="0.85"/>
+    <text x="${legX + 24}" y="${legY + 19}" fill="rgba(255,255,255,0.5)" font-size="7"
+      font-family="JetBrains Mono, monospace">Sain (< 0.6\u00d7 tronc)</text>
+    <circle cx="${legX + 6}" cy="${legY + 32}" r="4" fill="#FF5252" opacity="0.85"/>
+    <text x="${legX + 24}" y="${legY + 35}" fill="rgba(255,82,82,0.5)" font-size="7"
+      font-family="JetBrains Mono, monospace">Violation subordination</text>
+    <circle cx="${legX + 6}" cy="${legY + 48}" r="5" fill="none"
+      stroke="rgba(218,165,32,0.4)" stroke-width="1" stroke-dasharray="2,2"/>
+    <text x="${legX + 24}" y="${legY + 51}" fill="rgba(218,165,32,0.5)" font-size="7"
+      font-family="JetBrains Mono, monospace">Manque (n\u0153ud attendu)</text>
+  `;
 
   // Footer
   svgHTML += `
