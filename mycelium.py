@@ -55,17 +55,44 @@ def graph_from_imports(import_graph: dict) -> nx.DiGraph:
     mais on ne DÉPEND PAS de engine.py. N'importe quel dict
     avec ce format marche.
 
+    ATTENTION : les clés (sources) utilisent des chemins fichier
+    (lib/utils.py) mais les valeurs (targets) utilisent des noms
+    de module Python (lib.utils). On normalise tout vers un format
+    commun pour éviter les nœuds fantômes.
+
+    Normalisation : tout en dot-notation, sans extension.
+        "lib/utils.py"  → "lib.utils"
+        "lib.utils"     → "lib.utils"
+        "src/core.dart" → "src.core"
+
     Args:
         import_graph: {str: set(str)} — fichier → ses imports
 
     Returns:
         nx.DiGraph — arêtes dirigées de importeur vers importé
     """
+    def normalize(name: str) -> str:
+        """Normalise un chemin ou module vers dot-notation sans extension."""
+        # Virer les extensions courantes
+        for ext in (".py", ".dart", ".js", ".ts", ".jsx", ".tsx"):
+            if name.endswith(ext):
+                name = name[:-len(ext)]
+        # Remplacer / et \ par .
+        name = name.replace("/", ".").replace("\\", ".")
+        # Virer __init__ en fin
+        if name.endswith(".__init__"):
+            name = name[:-9]
+        # Virer les . en début
+        name = name.lstrip(".")
+        return name
+
     G = nx.DiGraph()
     for source, targets in import_graph.items():
-        G.add_node(source)
+        src = normalize(source)
+        G.add_node(src)
         for target in targets:
-            G.add_edge(source, target)
+            tgt = normalize(target)
+            G.add_edge(src, tgt)
     return G
 
 
@@ -100,12 +127,28 @@ def meshedness(G: nx.Graph) -> float:
         Contrôle jour 39 : α = 0.11 ± 0.04
         Avec bait jour 39 : α = 0.20 ± 0.05
 
+    NOTE : Bebber 2007 ne calcule α que sur des graphes CONNEXES.
+    Si le graphe est déconnecté, on prend la plus grande composante
+    connexe. Un graphe déconnecté donnerait α négatif, ce qui n'a
+    pas de sens biologique.
+
     Args:
         G: graphe non-dirigé
 
     Returns:
         float — alpha entre 0 et 1 (peut dépasser 1 si non-planaire)
     """
+    N = G.number_of_nodes()
+    L = G.number_of_edges()
+
+    if N < 3:
+        return 0.0
+
+    # Forcer composante connexe (Bebber 2007 ne travaille que sur ça)
+    if not nx.is_connected(G):
+        largest_cc = max(nx.connected_components(G), key=len)
+        G = G.subgraph(largest_cc)
+
     N = G.number_of_nodes()
     L = G.number_of_edges()
 
@@ -836,6 +879,24 @@ def run_tests():
     check("Import graph: 3 nœuds", G_import.number_of_nodes(), 3)
     check("Import graph: 3 arêtes", G_import.number_of_edges(), 3)
 
+    # Test normalisation des noms (BUG FIX: lib/utils.py vs lib.utils)
+    G_norm = graph_from_imports({
+        "lib/utils.py": set(),
+        "lib/core.py": {"lib.utils"},
+        "main.py": {"lib.core", "lib.utils"},
+    })
+    check("Normalisation: 3 nœuds (pas de fantômes)", G_norm.number_of_nodes(), 3)
+    check("Normalisation: main→lib.core existe", G_norm.has_edge("main", "lib.core"), True)
+    check("Normalisation: lib.core→lib.utils existe", G_norm.has_edge("lib.core", "lib.utils"), True)
+
+    # Test avec paths et dots mélangés
+    G_mix = graph_from_imports({
+        "src/api/handler.py": {"src.api.models", "src.utils"},
+        "src/api/models.py": {"src.utils"},
+        "src/utils.py": set(),
+    })
+    check("Mix paths/dots: 3 nœuds", G_mix.number_of_nodes(), 3)
+
     # ── Brique 1 : Meshedness ──
     print("\n  BRIQUE 1 — Meshedness α")
     # Arbre pur : 4 nœuds, 3 arêtes → α = (3-4+1)/(2×4-5) = 0/3 = 0.0
@@ -849,6 +910,19 @@ def run_tests():
     # Carré : 4 nœuds, 4 arêtes → α = (4-4+1)/(2×4-5) = 1/3 ≈ 0.333
     G_sq = graph_from_edges([("a", "b"), ("b", "c"), ("c", "d"), ("d", "a")])
     check("Carré α=0.333", meshedness(G_sq), 0.333, tolerance=0.01)
+
+    # Edge cases (BUG FIX: graphes déconnectés et petits)
+    check("Graphe vide α=0", meshedness(nx.Graph()), 0.0)
+    G_one = nx.Graph(); G_one.add_node("a")
+    check("1 nœud α=0", meshedness(G_one), 0.0)
+    G_two = graph_from_edges([("a", "b")])
+    check("2 nœuds α=0", meshedness(G_two), 0.0)
+
+    # Graphe déconnecté → plus grande composante (pas de α négatif)
+    G_disco = nx.Graph()
+    G_disco.add_edges_from([("a", "b"), ("b", "c"), ("d", "e")])
+    alpha_disco = meshedness(G_disco)
+    check("Déconnecté α >= 0 (plus grande composante)", alpha_disco >= 0.0, True)
 
     # ── Brique 2 : E_global ──
     print("\n  BRIQUE 2 — Efficacité globale")
