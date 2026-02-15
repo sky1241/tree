@@ -1,0 +1,109 @@
+{
+  "idea": "[scanned] 3d-printer-automata",
+  "domain": "engineering",
+  "family": "baobab",
+  "family_name": "Baobab",
+  "family_emoji": "🌳",
+  "date": "2026-02-15",
+  "phase": "MATURE",
+  "scale": {
+    "lines": 18000,
+    "factor": 1.5,
+    "height_px": 500,
+    "data_mb": 417,
+    "density": 1.6,
+    "trunk_width": 1.5,
+    "category": "grand arbre",
+    "label": "🌲 Grand Arbre (18000 lignes)"
+  },
+  "stats": {
+    "total_files": 156,
+    "total_code_lines": 18000,
+    "data_weight_mb": 417,
+    "languages": {
+      "Python": 17500,
+      "JSON": 500
+    },
+    "biggest_file": {
+      "path": "automata.py",
+      "lines": 12000,
+      "lang": "Python"
+    }
+  },
+  "nodes": [
+    {
+      "id": "T1",
+      "level": "T",
+      "label": "Core: automata.py (12000L MONSTER)",
+      "status": "done",
+      "entry": "automata.py",
+      "confidence": 85,
+      "depends": []
+    },
+    {
+      "id": "B1",
+      "level": "B",
+      "label": "scene_builder/ (23f, 3200L)",
+      "status": "done",
+      "entry": "scene_builder/",
+      "confidence": 80,
+      "depends": []
+    },
+    {
+      "id": "B2",
+      "level": "B",
+      "label": "presets/ (12 figurines)",
+      "status": "done",
+      "entry": "presets/",
+      "confidence": 75,
+      "depends": []
+    },
+    {
+      "id": "b1",
+      "level": "b",
+      "label": "scene_builder/living_beings_db/",
+      "status": "done",
+      "entry": "scene_builder/living_beings_db/",
+      "confidence": 70,
+      "depends": []
+    },
+    {
+      "id": "R1",
+      "level": "R",
+      "depth": -1,
+      "label": "Stack: requirements.txt",
+      "status": "done",
+      "entry": "requirements.txt",
+      "confidence": 90,
+      "depends": []
+    },
+    {
+      "id": "R2",
+      "level": "R",
+      "depth": -2,
+      "label": "EN 71 toy safety compliance",
+      "status": "done",
+      "entry": "safety/",
+      "confidence": 65,
+      "depends": []
+    },
+    {
+      "id": "M1",
+      "level": "M",
+      "label": "Python (17500L)",
+      "status": "done",
+      "entry": "~",
+      "confidence": 90,
+      "depends": []
+    },
+    {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests 90+ validations",
+      "status": "done",
+      "entry": "tests/",
+      "confidence": 80,
+      "depends": []
+    }
+  ]
+}

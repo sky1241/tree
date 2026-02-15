@@ -1,0 +1,81 @@
+{
+  "idea": "[scanned] shazam-piano",
+  "domain": "audio",
+  "family": "buisson",
+  "family_name": "Buisson",
+  "family_emoji": "🌿",
+  "date": "2026-02-15",
+  "phase": "SEEDLING",
+  "scale": {
+    "lines": 2100,
+    "factor": 1.0,
+    "height_px": 400,
+    "data_mb": 5,
+    "density": 1.0,
+    "trunk_width": 1.0,
+    "category": "arbre",
+    "label": "🌳 Arbre (2100 lignes)"
+  },
+  "stats": {
+    "total_files": 18,
+    "total_code_lines": 2100,
+    "data_weight_mb": 5,
+    "languages": {
+      "Dart": 1800,
+      "Python": 300
+    },
+    "biggest_file": {
+      "path": "lib/engine.dart",
+      "lines": 800,
+      "lang": "Dart"
+    }
+  },
+  "nodes": [
+    {
+      "id": "T1",
+      "level": "T",
+      "label": "Core: lib/engine.dart (800L)",
+      "status": "wip",
+      "entry": "lib/engine.dart",
+      "confidence": 40,
+      "depends": []
+    },
+    {
+      "id": "B1",
+      "level": "B",
+      "label": "lib/ (12f, 1800L)",
+      "status": "wip",
+      "entry": "lib/",
+      "confidence": 35,
+      "depends": []
+    },
+    {
+      "id": "R1",
+      "level": "R",
+      "depth": -1,
+      "label": "Stack: pubspec.yaml",
+      "status": "done",
+      "entry": "pubspec.yaml",
+      "confidence": 80,
+      "depends": []
+    },
+    {
+      "id": "M1",
+      "level": "M",
+      "label": "Dart (1800L)",
+      "status": "done",
+      "entry": "~",
+      "confidence": 90,
+      "depends": []
+    },
+    {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests — ABSENT",
+      "status": "todo",
+      "entry": "~",
+      "confidence": 0,
+      "depends": []
+    }
+  ]
+}

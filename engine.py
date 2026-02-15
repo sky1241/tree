@@ -3466,6 +3466,8 @@ def _generate_profile_html(tree, image_base64):
 
 <div class="sidebar">
   <div>
+    <a href="/forest" style="text-decoration:none; color:#8B6914; font-size:10px;
+       letter-spacing:2px; opacity:0.6; display:block; margin-bottom:12px;">← LA FORÊT</a>
     <h1>Winter Tree</h1>
     <h2>{family_emoji} {project_name}</h2>
   </div>
@@ -3560,46 +3562,382 @@ def _generate_profile_html(tree, image_base64):
     return html
 
 
-def serve_tree(json_path=None):
-    """🌐 Lance un serveur local et ouvre la vue profil dans le navigateur.
+def _generate_forest_html(trees, image_base64_map):
+    """Génère le HTML de la vue forêt — tous les arbres côte à côte."""
 
-    Args:
-        json_path: chemin vers le JSON de l'arbre (ou None pour la forêt)
+    # Trier par taille (plus gros d'abord)
+    trees_sorted = sorted(trees, key=lambda t: t.get("stats", {}).get("total_code_lines", 0), reverse=True)
+
+    # Générer les cartes d'arbres
+    tree_cards = []
+    for tree in trees_sorted:
+        name = tree.get("idea", "?").replace("[scanned] ", "")
+        family = tree.get("family", "conifere")
+        family_name = tree.get("family_name", "Inconnu")
+        emoji = tree.get("family_emoji", "🌳")
+        scale = tree.get("scale", {})
+        stats = tree.get("stats", {})
+        nodes = tree.get("nodes", [])
+        json_file = tree.get("_json_file", "")
+
+        total_lines = stats.get("total_code_lines", 0)
+        data_mb = stats.get("data_weight_mb", 0)
+        scale_factor = scale.get("factor", 1.0)
+        density = scale.get("density", 1.0)
+        category = scale.get("category", "arbre")
+
+        # Dimensions visuelles de l'arbre
+        base_height = 180
+        tree_height = int(base_height * scale_factor)
+        tree_width = int(120 * density)
+
+        # Image de la famille (ou conifère par défaut)
+        img_key = f"winter_tree_planche_{family}.png"
+        if img_key not in image_base64_map:
+            img_key = "winter_tree_planche_II.png"
+        img_b64 = image_base64_map.get(img_key, "")
+
+        # Compteurs status
+        done = sum(1 for n in nodes if n.get("status") == "done")
+        total = len(nodes)
+        health_pct = int((done / total * 100)) if total > 0 else 0
+
+        # Couleur de santé
+        if health_pct >= 70:
+            health_color = "#28c862"
+        elif health_pct >= 40:
+            health_color = "#FFB74D"
+        else:
+            health_color = "#FF5252"
+
+        # Langages principaux
+        langs = stats.get("languages", {})
+        top_langs = sorted(langs.items(), key=lambda x: -x[1])[:3]
+        lang_str = " · ".join(l[0] for l in top_langs) if top_langs else "—"
+
+        tree_cards.append(f'''
+      <a href="/tree/{json_file}" class="tree-card" style="--tree-h: {tree_height}px; --tree-w: {tree_width}px;">
+        <div class="tree-visual">
+          <img src="data:image/png;base64,{img_b64}" alt="{family_name}"
+               style="height: {tree_height}px; width: {tree_width}px;"/>
+        </div>
+        <div class="tree-info">
+          <div class="tree-name">{emoji} {name}</div>
+          <div class="tree-meta">{total_lines:,}L · {data_mb:.0f}Mo · {family_name}</div>
+          <div class="tree-langs">{lang_str}</div>
+          <div class="tree-health">
+            <div class="health-bar">
+              <div class="health-fill" style="width: {health_pct}%; background: {health_color};"></div>
+            </div>
+            <span style="color: {health_color};">{done}/{total}</span>
+          </div>
+        </div>
+      </a>''')
+
+    cards_html = "\n".join(tree_cards)
+
+    # Stats globales
+    total_projects = len(trees)
+    total_all_lines = sum(t.get("stats", {}).get("total_code_lines", 0) for t in trees)
+    total_all_files = sum(t.get("stats", {}).get("total_files", 0) for t in trees)
+    total_all_data = sum(t.get("stats", {}).get("data_weight_mb", 0) for t in trees)
+
+    html = f'''<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Winter Tree — La Forêt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
+
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+
+  body {{
+    background: #050805;
+    color: #EDE5DB;
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+  }}
+
+  .header {{
+    text-align: center;
+    padding: 48px 24px 24px;
+    border-bottom: 1px solid rgba(139,105,20,0.15);
+  }}
+
+  .header h1 {{
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 10px;
+    text-transform: uppercase;
+    color: #EDE5DB;
+    margin-bottom: 8px;
+  }}
+
+  .header .subtitle {{
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: #8B6914;
+    opacity: 0.7;
+  }}
+
+  .global-stats {{
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }}
+
+  .global-stat {{
+    text-align: center;
+  }}
+
+  .global-stat .val {{
+    font-size: 20px;
+    font-weight: 300;
+    color: #EDE5DB;
+  }}
+
+  .global-stat .lbl {{
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.35;
+    margin-top: 4px;
+  }}
+
+  .forest-ground {{
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 60px 40px 0;
+    min-height: 60vh;
+  }}
+
+  /* Ligne de sol */
+  .forest-ground::after {{
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 5%;
+    right: 5%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #8B6914, transparent);
+    opacity: 0.4;
+  }}
+
+  .tree-card {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: #EDE5DB;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+  }}
+
+  .tree-card:hover {{
+    background: rgba(139,105,20,0.08);
+    transform: translateY(-4px);
+  }}
+
+  .tree-card:hover .tree-visual img {{
+    filter: brightness(1.2) saturate(1.1);
+  }}
+
+  .tree-visual {{
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    min-height: 100px;
+  }}
+
+  .tree-visual img {{
+    object-fit: cover;
+    object-position: top center;
+    border-radius: 4px;
+    filter: brightness(0.9);
+    transition: filter 0.3s ease;
+  }}
+
+  .tree-info {{
+    text-align: center;
+    padding: 10px 4px 6px;
+    max-width: 160px;
+  }}
+
+  .tree-name {{
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }}
+
+  .tree-meta {{
+    font-size: 9px;
+    opacity: 0.4;
+    margin-bottom: 2px;
+  }}
+
+  .tree-langs {{
+    font-size: 8px;
+    opacity: 0.3;
+    margin-bottom: 6px;
+  }}
+
+  .tree-health {{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+  }}
+
+  .health-bar {{
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 50px;
+  }}
+
+  .health-fill {{
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }}
+
+  .footer {{
+    text-align: center;
+    padding: 40px;
+    font-size: 9px;
+    opacity: 0.2;
+    letter-spacing: 3px;
+  }}
+
+  /* Sol texturé sous les arbres */
+  .soil-zone {{
+    width: 100%;
+    height: 80px;
+    background: linear-gradient(180deg,
+      rgba(90,60,30,0.15) 0%,
+      rgba(60,35,15,0.25) 50%,
+      rgba(40,20,8,0.3) 100%);
+    border-top: 2px solid rgba(139,105,20,0.2);
+  }}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌲 La Forêt</h1>
+  <div class="subtitle">Winter Tree Engine v1 — vue globale</div>
+  <div class="global-stats">
+    <div class="global-stat">
+      <div class="val">{total_projects}</div>
+      <div class="lbl">Projets</div>
+    </div>
+    <div class="global-stat">
+      <div class="val">{total_all_lines:,}</div>
+      <div class="lbl">Lignes de code</div>
+    </div>
+    <div class="global-stat">
+      <div class="val">{total_all_files:,}</div>
+      <div class="lbl">Fichiers</div>
+    </div>
+    <div class="global-stat">
+      <div class="val">{total_all_data:,.0f} Mo</div>
+      <div class="lbl">Données</div>
+    </div>
+  </div>
+</div>
+
+<div class="forest-ground">
+  {cards_html}
+</div>
+<div class="soil-zone"></div>
+
+<div class="footer">
+  racines &gt; arbre — sky1241 — 2026
+</div>
+
+</body>
+</html>'''
+
+    return html
+
+
+def serve_tree(json_path=None):
+    """🌐 Lance un serveur local et ouvre la vue dans le navigateur.
+
+    Sans argument → vue forêt (tous les scans/)
+    Avec argument → vue profil (un arbre)
     """
     import http.server
     import socketserver
-    import threading
     import webbrowser
     import base64
+    import urllib.parse
 
-    # Trouver l'image de la planche
     script_dir = Path(__file__).parent
-    image_path = script_dir / "assets" / "winter_tree_planche_II.png"
+    assets_dir = script_dir / "assets"
+    scans_dir = script_dir / "scans"
 
-    if not image_path.exists():
-        print(f"  ❌ Image non trouvée : {image_path}")
-        print(f"  Placez winter_tree_planche_II.png dans assets/")
+    # ── Charger toutes les images d'assets en base64 ──
+    image_base64_map = {}
+    if assets_dir.exists():
+        for img_file in assets_dir.glob("*.png"):
+            with open(img_file, "rb") as f:
+                image_base64_map[img_file.name] = base64.b64encode(f.read()).decode("utf-8")
+
+    if "winter_tree_planche_II.png" not in image_base64_map:
+        print(f"  ❌ Image non trouvée : assets/winter_tree_planche_II.png")
         return
 
-    # Encoder l'image en base64
-    with open(image_path, "rb") as f:
-        image_base64 = base64.b64encode(f.read()).decode("utf-8")
+    default_img = image_base64_map["winter_tree_planche_II.png"]
 
+    # ── Charger les arbres ──
+    all_trees = {}  # filename → tree dict
+    if scans_dir.exists():
+        for jf in scans_dir.glob("*.json"):
+            tree = load_tree(str(jf))
+            if tree:
+                tree["_json_file"] = jf.name
+                all_trees[jf.name] = tree
+
+    # ── Générer les pages ──
+    # Page profil pour chaque arbre
+    profile_pages = {}
+    for fname, tree in all_trees.items():
+        profile_pages[fname] = _generate_profile_html(tree, default_img)
+
+    # Page forêt
+    forest_html = _generate_forest_html(list(all_trees.values()), image_base64_map)
+
+    # Si un json_path est donné, on l'ajoute aussi (même s'il est pas dans scans/)
+    single_tree_html = None
+    page_title = "La Forêt"
     if json_path:
-        # Vue profil — un seul arbre
         tree = load_tree(json_path)
         if not tree:
             print(f"  ❌ Impossible de charger : {json_path}")
             return
-        html = _generate_profile_html(tree, image_base64)
+        single_tree_html = _generate_profile_html(tree, default_img)
         page_title = tree.get("idea", "Projet").replace("[scanned] ", "")
-    else:
-        # TODO Étape 2 : vue forêt
-        print("  🌲 Vue forêt — pas encore implémenté")
-        print("  Usage: python engine.py serve <fichier.json>")
-        return
 
-    # Trouver un port dispo
+    # ── Trouver un port dispo ──
     port = 8420
     for attempt in range(20):
         try:
@@ -3610,26 +3948,63 @@ def serve_tree(json_path=None):
         except OSError:
             continue
 
-    # Handler qui sert le HTML généré
+    # ── Handler avec routing ──
     class TreeHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
+            path = urllib.parse.unquote(self.path)
+
+            if path.startswith("/tree/") and path.endswith(".json"):
+                # Vue profil d'un arbre
+                fname = path[6:]  # enlever /tree/
+                html = profile_pages.get(fname)
+                if html:
+                    self._serve_html(html)
+                else:
+                    self._serve_404(fname)
+
+            elif path == "/forest" or (path == "/" and not single_tree_html):
+                # Vue forêt
+                self._serve_html(forest_html)
+
+            elif path == "/" and single_tree_html:
+                # Vue profil directe (quand lancé avec un json)
+                self._serve_html(single_tree_html)
+
+            else:
+                self._serve_html(forest_html)
+
+        def _serve_html(self, html):
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(html.encode("utf-8"))
+
+        def _serve_404(self, name):
+            self.send_response(404)
+            self.send_header("Content-type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(f"<h1>Arbre non trouvé : {name}</h1>".encode("utf-8"))
 
         def log_message(self, format, *args):
             pass  # Silencieux
 
     server = socketserver.TCPServer(("", port), TreeHandler)
 
-    print(f"\n  🌲 WINTER TREE — {page_title}")
+    n_trees = len(all_trees)
+    if single_tree_html:
+        print(f"\n  🌲 WINTER TREE — {page_title}")
+    else:
+        print(f"\n  🌲 WINTER TREE — La Forêt ({n_trees} arbres)")
     print(f"  {'─' * 40}")
     print(f"  🌐 http://localhost:{port}")
+    if not single_tree_html and n_trees > 0:
+        print(f"  🌐 http://localhost:{port}/forest")
+        for fname in sorted(all_trees.keys()):
+            name = all_trees[fname].get("idea", "?").replace("[scanned] ", "")
+            print(f"     └─ /tree/{fname}  ({name})")
     print(f"  Ctrl+C pour arrêter")
     print()
 
-    # Ouvrir le navigateur
     webbrowser.open(f"http://localhost:{port}")
 
     try:
