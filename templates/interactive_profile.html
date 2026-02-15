@@ -793,47 +793,11 @@ function buildSVG(nodes) {
     };
   }
 
-  // ── D. CALCUL POSITIONS (paires L/R, subordination) ──
-  function branchPositions(levelKey, levelY, count, zone) {
-    if (count === 0) return [];
-    if (levelKey === "T") return [{ x: CENTER_X, y: levelY }];
-
-    const bounds = zone === "aerial" ? canopyWidthAt(levelY) : rootWidthAt(levelY);
-    const halfR = Math.max(bounds.right - CENTER_X, 30);
-    const halfL = Math.max(CENTER_X - bounds.left, 30);
-
-    if (count === 1) {
-      return [{ x: Math.round(CENTER_X + halfR * 0.38), y: Math.round(levelY + 3) }];
-    }
-
-    const positions = [];
-    const rN = Math.ceil(count / 2), lN = count - rN;
-    const IN = 0.22, OUT = 0.85;
-    const slope = zone === "aerial" ? 20 : 14;
-
-    for (let i = 0; i < rN; i++) {
-      const t = rN === 1 ? 0.5 : i / (rN - 1);
-      const r = IN + t * (OUT - IN);
-      positions.push({
-        x: Math.round(CENTER_X + halfR * r),
-        y: Math.round(levelY + r * slope - slope * 0.25)
-      });
-    }
-    for (let i = 0; i < lN; i++) {
-      const t = lN === 1 ? 0.5 : i / (lN - 1);
-      const r = IN + t * (OUT - IN);
-      positions.push({
-        x: Math.round(CENTER_X - halfL * r),
-        y: Math.round(levelY + r * slope - slope * 0.25)
-      });
-    }
-    return positions;
-  }
-
-  // ── E. RAYON = sqrt(volume code) ──
-  // Plus le module a de lignes → plus le nœud est gros
-  // Tronc DOIT être le plus gros visuellement (40% biomasse)
+  // ── D. RAYON = sqrt(volume code) ──
+  // R-5 = m\u00e9ta-donn\u00e9es (langages), pas du vrai code → taille fixe
   function nodeR(id) {
+    const lk = nodeMetrics[id]?.levelKey || "";
+    if (lk === "R-5" || lk === "R-4") return 5;
     const lines = nodeMetrics[id]?.lines || 0;
     if (lines <= 0) return 5;
     return Math.round(4 + Math.sqrt(lines / maxLines) * 10);
@@ -850,25 +814,146 @@ function buildSVG(nodes) {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  R E N D E R  —  DEUX COUCHES DISTINCTES
+  //  POSITIONNEMENT — RULE: CHAQUE N\u0152UD H\u00c9RITE DU C\u00d4T\u00c9 DE SON PARENT
   //
-  //  COUCHE 1 (ambre/doré): SQUELETTE PARFAIT
-  //    = Ce qu'un conifère SAIN devrait être
-  //    = Basé sur données botaniques PhD (ISA, Bebber, Boswell)
-  //    = Tronc 55-65% biomasse, branches < 0.6× tronc
-  //    = Racines spread 2-4× couronne, 80-90% dans top 60cm
-  //
-  //  COUCHE 2 (blanc/vert/rouge): REPO RÉEL
-  //    = Le code du repo mappé sur le squelette
-  //    = Vert = sain (passe subordination)
-  //    = Rouge = violation (branche > 0.6× tronc)
-  //    = MANQUE = position idéale non couverte
-  //
-  //  Le diagnostic compare les deux: où est-on bon, où manque-t-il,
-  //  où y a-t-il des problèmes structurels.
+  //  Conif\u00e8re: tronc au centre, branches L/R, JAMAIS de croisement.
+  //  B nodes: altern\u00e9s L/R (plus gros en premier)
+  //  b nodes: M\u00caME c\u00f4t\u00e9 que leur parent B
+  //  C, F, R: altern\u00e9s L/R
   // ═══════════════════════════════════════════════════════════
 
-  // Labels descriptifs pour chaque position idéale
+  // \u00c9tape 1: Assigner un C\u00d4T\u00c9 (L/R) \u00e0 chaque n\u0153ud
+  const nodeSide = {};
+
+  // T → centre
+  (grouped["T"] || []).forEach(n => { nodeSide[n.id] = "C"; });
+
+  // B → alterner L/R, plus gros d'abord
+  const sortedB = [...(grouped["B"] || [])].sort((a, b) =>
+    (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0)
+  );
+  sortedB.forEach((n, i) => { nodeSide[n.id] = i % 2 === 0 ? "R" : "L"; });
+
+  // b → H\u00c9RITER du c\u00f4t\u00e9 du parent B (par chemin d'entr\u00e9e)
+  (grouped["b"] || []).forEach(n => {
+    const entry = n.entry || "";
+    for (const bn of sortedB) {
+      if (bn.entry && entry.startsWith(bn.entry)) {
+        nodeSide[n.id] = nodeSide[bn.id];
+        return;
+      }
+    }
+    nodeSide[n.id] = "R";
+  });
+
+  // C, F → alterner
+  ["C", "F"].forEach(lk => {
+    (grouped[lk] || []).forEach((n, i) => {
+      nodeSide[n.id] = i % 2 === 0 ? "R" : "L";
+    });
+  });
+
+  // Racines → alterner
+  ["R-1", "R-2", "R-3", "R-4", "R-5"].forEach(lk => {
+    (grouped[lk] || []).forEach((n, i) => {
+      nodeSide[n.id] = i % 2 === 0 ? "R" : "L";
+    });
+  });
+
+  // \u00c9tape 2: Calculer les positions
+  const posMap = {};
+
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const group = grouped[lk] || [];
+    if (group.length === 0) continue;
+
+    if (lk === "T") {
+      group.forEach(n => { posMap[n.id] = { x: CENTER_X, y: lev.y }; });
+      continue;
+    }
+
+    // b nodes: positionn\u00e9s apr\u00e8s les B (relatif au parent)
+    if (lk === "b") continue;
+
+    const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
+    const halfR = Math.max(bounds.right - CENTER_X, 40);
+    const halfL = Math.max(CENTER_X - bounds.left, 40);
+
+    const rightNodes = group.filter(n => nodeSide[n.id] === "R")
+      .sort((a, b) => (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0));
+    const leftNodes = group.filter(n => nodeSide[n.id] === "L")
+      .sort((a, b) => (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0));
+
+    rightNodes.forEach((n, i) => {
+      const t = rightNodes.length > 1 ? i / (rightNodes.length - 1) : 0.5;
+      const x = CENTER_X + halfR * (0.18 + t * 0.62);
+      posMap[n.id] = { x: Math.round(x), y: Math.round(lev.y + (i % 2) * 6 - 3) };
+    });
+
+    leftNodes.forEach((n, i) => {
+      const t = leftNodes.length > 1 ? i / (leftNodes.length - 1) : 0.5;
+      const x = CENTER_X - halfL * (0.18 + t * 0.62);
+      posMap[n.id] = { x: Math.round(x), y: Math.round(lev.y + (i % 2) * 6 - 3) };
+    });
+  }
+
+  // Positionner les b nodes RELATIVEMENT \u00e0 leur parent B
+  const bByParent = {};
+  (grouped["b"] || []).forEach(n => {
+    const entry = n.entry || "";
+    let pid = null;
+    for (const bn of sortedB) {
+      if (bn.entry && entry.startsWith(bn.entry)) { pid = bn.id; break; }
+    }
+    const key = pid || "__orphan";
+    if (!bByParent[key]) bByParent[key] = [];
+    bByParent[key].push(n);
+  });
+
+  const bLev = LEVELS["b"];
+  for (const [pid, children] of Object.entries(bByParent)) {
+    const parentPos = posMap[pid];
+    if (!parentPos) {
+      children.forEach((n, i) => {
+        const side = i % 2 === 0 ? 1 : -1;
+        posMap[n.id] = { x: CENTER_X + side * (50 + Math.floor(i / 2) * 35), y: bLev.y };
+      });
+      continue;
+    }
+    const dir = parentPos.x >= CENTER_X ? 1 : -1;
+    children.sort((a, b) => (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0));
+    children.forEach((n, i) => {
+      posMap[n.id] = {
+        x: Math.round(parentPos.x + dir * (20 + i * 28)),
+        y: Math.round(bLev.y + (i % 3) * 7 - 5)
+      };
+    });
+  }
+
+  // Positions id\u00e9ales (pour le squelette parfait)
+  const idealPos = {};
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const count = IDEAL[lk] || 0;
+    if (count === 0 || lk === "T") {
+      idealPos[lk] = lk === "T" ? [{ x: CENTER_X, y: lev.y }] : [];
+      continue;
+    }
+    const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
+    const halfR = Math.max(bounds.right - CENTER_X, 40);
+    const halfL = Math.max(CENTER_X - bounds.left, 40);
+    const rN = Math.ceil(count / 2), lN = count - rN;
+    const pos = [];
+    for (let i = 0; i < rN; i++) {
+      const t = rN > 1 ? i / (rN - 1) : 0.5;
+      pos.push({ x: Math.round(CENTER_X + halfR * (0.18 + t * 0.62)), y: Math.round(lev.y + (i % 2) * 6 - 3) });
+    }
+    for (let i = 0; i < lN; i++) {
+      const t = lN > 1 ? i / (lN - 1) : 0.5;
+      pos.push({ x: Math.round(CENTER_X - halfL * (0.18 + t * 0.62)), y: Math.round(lev.y + (i % 2) * 6 - 3) });
+    }
+    idealPos[lk] = pos;
+  }
+
   const IDEAL_LABELS = {
     "C":   ["Tests / CI", "Release"],
     "F":   ["Endpoints", "UI", "Exports"],
@@ -882,51 +967,20 @@ function buildSVG(nodes) {
     "R-5": ["Algo fondamental", "Hardware"],
   };
 
-  const posMap = {};
-  const idealPos = {};
-
-  // Pr\u00e9-calcul positions id\u00e9ales
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    idealPos[lk] = branchPositions(lk, lev.y, IDEAL[lk] || 0, lev.zone);
-  }
-
-  // Pr\u00e9-calcul positions r\u00e9elles (tri\u00e9es par taille — subordination)
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    const group = grouped[lk] || [];
-    if (group.length === 0) continue;
-    const sorted = [...group].sort((a, b) =>
-      (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0)
-    );
-    const positions = branchPositions(lk, lev.y, sorted.length, lev.zone);
-    sorted.forEach((n, i) => {
-      if (positions[i]) posMap[n.id] = positions[i];
-    });
-  }
-
   // ═══════════════════════════════════════════════════════
-  //  C O U C H E   1  —  SQUELETTE PARFAIT (ambre dor\u00e9)
-  //
-  //  Ordre de croissance naturel (graine → arbre):
-  //    R-5 Mycorhizes → R-4 Poils → R-3 Radicelles →
-  //    R-2 Pivot → R-1 Structurelles → T Tronc →
-  //    B Branches → b Rameaux → F Feuilles → C Cime
+  //  C O U C H E   1  —  SQUELETTE PARFAIT (ambre)
   // ═══════════════════════════════════════════════════════
 
-  // 1A. TRONC PARFAIT — la colonne vert\u00e9brale
-  //     55-65% biomasse totale, ne se divise JAMAIS (RULE C1)
-  //     Bois de c\u0153ur MORT mais supporte 20 tonnes (USFS data)
+  // TRONC — colonne vert\u00e9brale (55-65% biomasse)
   svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 30}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 40}"
     stroke="rgba(218,165,32,0.3)" stroke-width="3.5"/>`;
 
-  // Points d'attache vertébraux (un par niveau anatomique)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="4"
       fill="rgba(218,165,32,0.08)" stroke="rgba(218,165,32,0.25)" stroke-width="1.2"/>`;
   }
 
-  // 1B. BRANCHES ID\u00c9ALES — courbes du tronc vers positions parfaites
-  //     Conif\u00e8re: branches verticill\u00e9es, angle 45-60\u00b0
-  //     Chaque branche < 0.6\u00d7 tronc (RULE C2)
+  // BRANCHES ID\u00c9ALES — du tronc vers positions parfaites
   for (const [lk, lev] of Object.entries(LEVELS)) {
     if (lk === "T") continue;
     const ghostP = idealPos[lk] || [];
@@ -935,39 +989,25 @@ function buildSVG(nodes) {
     const labels = IDEAL_LABELS[lk] || [];
 
     ghostP.forEach((pos, i) => {
-      const isGap = i >= actualCount;  // Pas de n\u0153ud r\u00e9el pour ce slot
+      const isGap = i >= actualCount;
+      const branchOp = levelMissing ? 0.22 : (isGap ? 0.15 : 0.06);
 
-      // Branche idéale: courbe du tronc vers la position
-      const midX = (CENTER_X + pos.x) / 2;
-      const midY = (lev.y + pos.y) / 2 + (lev.zone === "aerial" ? -5 : 4);
-      const branchOpacity = levelMissing ? 0.22 : (isGap ? 0.15 : 0.06);
-
-      svgHTML += `<path d="M${CENTER_X},${lev.y} Q${midX},${midY} ${pos.x},${pos.y}"
-        fill="none" stroke="rgba(218,165,32,${branchOpacity})"
-        stroke-width="${levelMissing ? 1.5 : 1}"
+      svgHTML += `<line x1="${CENTER_X}" y1="${lev.y}" x2="${pos.x}" y2="${pos.y}"
+        stroke="rgba(218,165,32,${branchOp})" stroke-width="${levelMissing ? 1.5 : 1}"
         stroke-dasharray="5,4"/>`;
 
-      // N\u0153ud id\u00e9al (point de r\u00e9f\u00e9rence)
       if (isGap) {
-        // Position non couverte par un vrai n\u0153ud → fantôme visible
         svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="7"
-          fill="none" stroke="rgba(218,165,32,0.35)" stroke-width="1.3"
-          stroke-dasharray="3,3"/>`;
-
-        // Label de ce qui DEVRAIT \u00eatre l\u00e0
+          fill="none" stroke="rgba(218,165,32,0.35)" stroke-width="1.3" stroke-dasharray="3,3"/>`;
         if (labels[i]) {
           svgHTML += `<text x="${pos.x}" y="${pos.y + 18}" fill="rgba(218,165,32,0.4)"
             font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle"
             filter="url(#textSh)">${labels[i]}</text>`;
         }
-      } else {
-        // Position couverte par un vrai n\u0153ud → juste un cercle tr\u00e8s discret
-        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="7"
-          fill="none" stroke="rgba(218,165,32,0.06)" stroke-width="0.5"/>`;
       }
     });
 
-    // 1C. DIAGNOSTIC par niveau (badge à droite)
+    // Diagnostic badge
     const ideal = IDEAL[lk] || 0;
     if (ideal > 0) {
       if (levelMissing) {
@@ -987,69 +1027,47 @@ function buildSVG(nodes) {
   }
 
   // ═══════════════════════════════════════════════════════
-  //  C O U C H E   2  —  REPO R\u00c9EL (blanc/vert/rouge)
-  //
-  //  Conif\u00e8re: TOUT part du tronc (RULE C1)
-  //    B → attach\u00e9s au TRONC \u00e0 leur niveau Y
-  //    b → attach\u00e9s \u00e0 leur BRANCHE PARENTE (chemin)
-  //    C,F → attach\u00e9s au TRONC au sommet
-  //    R-1 → pied du tronc
-  //    R-2+ → cha\u00een\u00e9s au niveau racinaire peupl\u00e9
+  //  C O U C H E   2  —  REPO R\u00c9EL
   // ═══════════════════════════════════════════════════════
 
-  // 2A. CONNEXIONS R\u00c9ELLES — lignes blanches
-  function findParentPos(node) {
-    const lk = nodeLevelKey(node);
-    const entry = node.entry || "";
-
-    if (lk === "b" && entry) {
-      for (const bn of (grouped["B"] || [])) {
-        if (bn.entry && entry.startsWith(bn.entry) && posMap[bn.id]) {
-          return posMap[bn.id];
-        }
-      }
-      return { x: CENTER_X, y: LEVELS["b"]?.y || 330 };
-    }
-    if (lk === "B") return { x: CENTER_X, y: LEVELS["B"].y };
-    if (lk === "C") return { x: CENTER_X, y: LEVELS["C"].y };
-    if (lk === "F") return { x: CENTER_X, y: LEVELS["F"].y };
-    if (lk === "R-1") return { x: CENTER_X, y: SOL_Y + 10 };
-    if (lk.startsWith("R-")) {
-      const depth = parseInt(lk.split("-")[1]);
-      for (let d = depth - 1; d >= 1; d--) {
-        const above = grouped[`R-${d}`];
-        if (above?.length > 0 && posMap[above[0].id]) return posMap[above[0].id];
-      }
-      return { x: CENTER_X, y: SOL_Y + 10 };
-    }
-    return null;
-  }
-
+  // CONNEXIONS — tout part du tronc, z\u00e9ro croisement
   nodes.forEach(n => {
     const lk = nodeLevelKey(n);
     if (lk === "T") return;
     const pos = posMap[n.id];
     if (!pos) return;
-    const pp = findParentPos(n);
+
+    let pp = null;
+    if (lk === "b") {
+      const entry = n.entry || "";
+      for (const bn of sortedB) {
+        if (bn.entry && entry.startsWith(bn.entry) && posMap[bn.id]) { pp = posMap[bn.id]; break; }
+      }
+      if (!pp) pp = { x: CENTER_X, y: LEVELS["b"].y };
+    } else if (["B", "C", "F"].includes(lk)) {
+      pp = { x: CENTER_X, y: LEVELS[lk].y };
+    } else if (lk === "R-1") {
+      pp = { x: CENTER_X, y: SOL_Y + 10 };
+    } else if (lk.startsWith("R-")) {
+      const depth = parseInt(lk.split("-")[1]);
+      for (let d = depth - 1; d >= 1; d--) {
+        const above = grouped[`R-${d}`];
+        if (above?.length > 0 && posMap[above[0].id]) { pp = posMap[above[0].id]; break; }
+      }
+      if (!pp) pp = { x: CENTER_X, y: SOL_Y + 10 };
+    }
     if (!pp) return;
 
     const viol = isViolation(n);
-    const zone = LEVELS[lk]?.zone || "aerial";
-    const midX = (pp.x + pos.x) / 2;
-    const midY = (pp.y + pos.y) / 2 + (zone === "aerial" ? -8 : 6);
-
-    svgHTML += `<path d="M${pp.x},${pp.y} Q${midX},${midY} ${pos.x},${pos.y}"
-      fill="none"
+    svgHTML += `<line x1="${pp.x}" y1="${pp.y}" x2="${pos.x}" y2="${pos.y}"
       stroke="${viol ? 'rgba(255,82,82,0.55)' : 'rgba(255,255,255,0.4)'}"
       stroke-width="${viol ? 2.2 : 1.4}"/>`;
   });
 
-  // 2B. N\u0152UDS R\u00c9ELS — taille = volume code, couleur = sant\u00e9
+  // N\u0152UDS R\u00c9ELS — taille = code, couleur = sant\u00e9
   for (const [lk, lev] of Object.entries(LEVELS)) {
-    const group = grouped[lk] || [];
-    group.forEach(n => {
+    (grouped[lk] || []).forEach(n => {
       const pos = posMap[n.id] || { x: CENTER_X, y: lev.y };
-      const { x: nx, y: ny } = pos;
       const r = nodeR(n.id);
       const viol = isViolation(n);
       const fill = viol ? "#FF5252" :
@@ -1058,21 +1076,21 @@ function buildSVG(nodes) {
 
       svgHTML += `
       <g class="node-g" data-id="${n.id}" data-status="${n.status}">
-        <circle cx="${nx}" cy="${ny}" r="${r + 8}" fill="transparent"/>
-        <circle class="node-ring" cx="${nx}" cy="${ny}" r="${r + 5}"
+        <circle cx="${pos.x}" cy="${pos.y}" r="${r + 8}" fill="transparent"/>
+        <circle class="node-ring" cx="${pos.x}" cy="${pos.y}" r="${r + 5}"
                 fill="none" stroke="${fill}" stroke-width="1.5" opacity="0"/>
-        <circle cx="${nx}" cy="${ny}" r="${r}"
+        <circle cx="${pos.x}" cy="${pos.y}" r="${r}"
                 fill="${fill}" opacity="0.85" filter="url(#glow)"/>
-        <circle cx="${nx}" cy="${ny}" r="${Math.max(r * 0.2, 1.5)}"
+        <circle cx="${pos.x}" cy="${pos.y}" r="${Math.max(r * 0.2, 1.5)}"
                 fill="#fff" opacity="${n.status === 'done' ? 0.9 : 0.3}"/>
-        <text x="${nx}" y="${ny - r - 4}" fill="${viol ? '#FF5252' : lev.color}" font-size="7"
+        <text x="${pos.x}" y="${pos.y - r - 4}" fill="${viol ? '#FF5252' : lev.color}" font-size="7"
               font-family="JetBrains Mono, monospace" opacity="0.7" text-anchor="middle"
               filter="url(#textSh)">${n.id}${viol ? ' !' : ''}</text>
       </g>`;
     });
   }
 
-  // 2C. L\u00c9GENDE (en bas \u00e0 gauche)
+  // L\u00c9GENDE
   const legX = 50, legY = 1100;
   svgHTML += `
     <rect x="${legX - 5}" y="${legY - 12}" width="180" height="64" rx="4"
@@ -1083,14 +1101,14 @@ function buildSVG(nodes) {
       font-family="JetBrains Mono, monospace">Squelette parfait</text>
     <circle cx="${legX + 6}" cy="${legY + 16}" r="4" fill="#3d8a3a" opacity="0.85"/>
     <text x="${legX + 24}" y="${legY + 19}" fill="rgba(255,255,255,0.5)" font-size="7"
-      font-family="JetBrains Mono, monospace">Sain (< 0.6\u00d7 tronc)</text>
+      font-family="JetBrains Mono, monospace">Sain (< 0.6x tronc)</text>
     <circle cx="${legX + 6}" cy="${legY + 32}" r="4" fill="#FF5252" opacity="0.85"/>
     <text x="${legX + 24}" y="${legY + 35}" fill="rgba(255,82,82,0.5)" font-size="7"
       font-family="JetBrains Mono, monospace">Violation subordination</text>
     <circle cx="${legX + 6}" cy="${legY + 48}" r="5" fill="none"
       stroke="rgba(218,165,32,0.4)" stroke-width="1" stroke-dasharray="2,2"/>
     <text x="${legX + 24}" y="${legY + 51}" fill="rgba(218,165,32,0.5)" font-size="7"
-      font-family="JetBrains Mono, monospace">Manque (n\u0153ud attendu)</text>
+      font-family="JetBrains Mono, monospace">Manque (noeud attendu)</text>
   `;
 
   // Footer
