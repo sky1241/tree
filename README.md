@@ -71,17 +71,17 @@ Le scanner analyse automatiquement :
 
 ```bash
 # Rapport de session — à lancer au début de chaque conversation
-python engine.py guard winter-trees/mon-projet.json
+python engine.py guard scans/mon-projet.json
 
 # Vérifier avant de bosser sur un nœud
-python engine.py check winter-trees/mon-projet.json B1
+python engine.py check scans/mon-projet.json B1
 # → "⚠️ Aucune racine done — tu construis avant les racines"
 
 # Mettre à jour un nœud après avoir codé
-python engine.py update winter-trees/mon-projet.json T1 done "lib/engine.dart:340:matchNote()"
+python engine.py update scans/mon-projet.json T1 done "lib/engine.dart:340:matchNote()"
 
 # Chercher dans l'arbre par mot-clé
-python engine.py find winter-trees/mon-projet.json "FFT"
+python engine.py find scans/mon-projet.json "FFT"
 # → 5 résultats avec les entries code 📍
 ```
 
@@ -122,16 +122,30 @@ python engine.py export            # Export JSON de la knowledge base
 
 ```
 tree/
-├── engine.py                    # Moteur principal (2777 lignes)
-├── PROTOCOLE_PLANTATION.md      # Prompt pour Claude — quoi faire à chaque nouveau projet
-├── ANATOMIE_BIOLOGIQUE.md       # Documentation biologique 10 niveaux + sources
-├── GROWTH_PATTERNS_6_FAMILIES.md # Règles de croissance par famille
-├── RECHERCHE_APPROFONDIE_v2.md  # 87 recherches web compilées
-├── README.md                    # Ce fichier
+├── engine.py                    # Moteur principal (3401 lignes)
+├── README.md
+├── LICENSE
 ├── winter_tree_kb.json          # Knowledge base exportée
-├── winter-trees/                # Arbres plantés et scannés (JSON + MD)
+│
+├── assets/                      # Visuels & images
+│   └── winter_tree_planche_II.png
+│
+├── docs/                        # Documentation théorique
+│   ├── ANATOMIE_BIOLOGIQUE.md       # 10 niveaux biologiques + sources
+│   ├── GROWTH_PATTERNS_6_FAMILIES.md # Règles de croissance par famille
+│   ├── PROTOCOLE_PLANTATION.md      # Prompt Claude — plantation
+│   └── RECHERCHE_APPROFONDIE_v2.md  # 87 recherches web compilées
+│
+├── scans/                       # Arbres plantés & scannés (JSON + MD)
+│   ├── TEMPLATE_v2.md
+│   └── *.json / *_tree.md
+│
+├── mycelium/                    # [v2] Recherche réseau fongique
+│   └── formules, lectures, snipers
+│
 ├── prompts/                     # Templates de prompts
-└── workflows/                   # Workflows documentés
+│
+└── workflows/                   # Battle plans, handoffs, radar-sniper
 ```
 
 ## Références académiques

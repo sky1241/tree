@@ -1642,9 +1642,9 @@ def save_planted_tree(result, filepath=None):
         for char in " /'\"()[]{}!?,;:":
             name_slug = name_slug.replace(char, "-")
         name_slug = name_slug[:50].strip("-")
-        filepath = f"winter-trees/{name_slug}_tree.md"
+        filepath = f"scans/{name_slug}_tree.md"
 
-    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else "winter-trees", exist_ok=True)
+    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else "scans", exist_ok=True)
 
     lines = []
     lines.append(f"# WINTER TREE — {f['idea']}")
@@ -2716,9 +2716,9 @@ def save_tree_json(tree, filepath=None):
         for char in " /'\"()[]{}!?,;:":
             name_slug = name_slug.replace(char, "-")
         name_slug = name_slug[:50].strip("-")
-        filepath = f"winter-trees/{name_slug}.json"
+        filepath = f"scans/{name_slug}.json"
 
-    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else "winter-trees", exist_ok=True)
+    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else "scans", exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(tree, f, indent=2, ensure_ascii=False)
     return filepath
@@ -3208,10 +3208,10 @@ Familles: conifere, feuillu, palmier, baobab, buisson, liane
 Exemples:
   python engine.py plant "je veux un Shazam pour piano"
   python engine.py scan /path/to/my/repo
-  python engine.py guard winter-trees/shazam.json
-  python engine.py check winter-trees/shazam.json B1
-  python engine.py update winter-trees/shazam.json T1 done "lib/engine.dart:40"
-  python engine.py find winter-trees/shazam.json "matching"
+  python engine.py guard scans/shazam.json
+  python engine.py check scans/shazam.json B1
+  python engine.py update scans/shazam.json T1 done "lib/engine.dart:40"
+  python engine.py find scans/shazam.json "matching"
 """)
         return
 
@@ -3250,7 +3250,7 @@ Exemples:
     elif cmd == "research":
         if len(sys.argv) < 3:
             print("Usage: python engine.py research <fichier.json> [contexte]")
-            print("Exemple: python engine.py research winter-trees/impots.json \"suisse genève particuliers\"")
+            print("Exemple: python engine.py research scans/impots.json \"suisse genève particuliers\"")
             return
         tree = load_tree(sys.argv[2])
         context = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
@@ -3321,8 +3321,8 @@ Exemples:
             save = input("\nGénérer le template ? (o/n) : ").strip().lower()
             if save == "o":
                 template = generate_template(result)
-                filename = f"winter-trees/{result['name'].lower().replace(' ', '-')}_tree.md"
-                os.makedirs("winter-trees", exist_ok=True)
+                filename = f"scans/{result['name'].lower().replace(' ', '-')}_tree.md"
+                os.makedirs("scans", exist_ok=True)
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(template)
                 print(f"\n✅ Template sauvé : {filename}")
