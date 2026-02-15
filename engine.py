@@ -3184,6 +3184,16 @@ def print_all_families():
 # 🖼️ RENDERER — Vue profil (Planche II) + serveur local
 # ============================================================================
 
+# Mapping famille → fichier image dans assets/
+FAMILY_IMAGE_MAP = {
+    "conifere": "winter_tree_planche_II.png",
+    "baobab":   "winter_tree_planche_III_baobab.png",
+    "feuillu":  "winter_tree_planche_IV_chene.png",
+    "buisson":  "winter_tree_planche_V_buisson.png",
+    "liane":    "winter_tree_planche_VI_liane.png",
+    "palmier":  "winter_tree_planche_VII_palmier.png",
+}
+
 # Positions Y des niveaux sur l'image Planche II (922×1244px)
 LEVEL_Y_MAP = {
     "C":  {"y": 100, "label": "CIME",             "color": "#28c862", "zone": "aerial"},
@@ -3893,8 +3903,8 @@ def _generate_forest_html(trees, image_base64_map):
         tree_height = int(base_height * scale_factor)
         tree_width = int(120 * density)
 
-        # Image de la famille (ou conifère par défaut)
-        img_key = f"winter_tree_planche_{family}.png"
+        # Image de la famille
+        img_key = FAMILY_IMAGE_MAP.get(family, "winter_tree_planche_II.png")
         if img_key not in image_base64_map:
             img_key = "winter_tree_planche_II.png"
         img_b64 = image_base64_map.get(img_key, "")
@@ -4210,6 +4220,12 @@ def serve_tree(json_path=None):
 
     default_img = image_base64_map["winter_tree_planche_II.png"]
 
+    def _get_tree_image(tree):
+        """Retourne le base64 de l'image correspondant à la famille de l'arbre."""
+        family_id = tree.get("family", "conifere")
+        img_file = FAMILY_IMAGE_MAP.get(family_id, "winter_tree_planche_II.png")
+        return image_base64_map.get(img_file, default_img)
+
     # ── Charger les arbres ──
     all_trees = {}  # filename → tree dict
     if scans_dir.exists():
@@ -4220,10 +4236,10 @@ def serve_tree(json_path=None):
                 all_trees[jf.name] = tree
 
     # ── Générer les pages ──
-    # Page profil pour chaque arbre
+    # Page profil pour chaque arbre (avec image de SA famille)
     profile_pages = {}
     for fname, tree in all_trees.items():
-        profile_pages[fname] = _generate_profile_html(tree, default_img)
+        profile_pages[fname] = _generate_profile_html(tree, _get_tree_image(tree))
 
     # Page forêt
     forest_html = _generate_forest_html(list(all_trees.values()), image_base64_map)
@@ -4236,7 +4252,7 @@ def serve_tree(json_path=None):
         if not tree:
             print(f"  ❌ Impossible de charger : {json_path}")
             return
-        single_tree_html = _generate_profile_html(tree, default_img)
+        single_tree_html = _generate_profile_html(tree, _get_tree_image(tree))
         page_title = tree.get("idea", "Projet").replace("[scanned] ", "")
 
     # ── Trouver un port dispo ──
