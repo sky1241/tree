@@ -1,0 +1,117 @@
+{
+  "idea": "[scanned] tree",
+  "domain": "audio",
+  "family": "baobab",
+  "family_name": "Baobab",
+  "family_emoji": "🌳",
+  "date": "2026-02-15T18:14:37.324602",
+  "phase": "CROISSANCE",
+  "scanned_from": "https://github.com/sky1241/tree",
+  "scale": {
+    "lines": 4157,
+    "factor": 1.08,
+    "category": "arbre",
+    "height_px": 413,
+    "data_mb": 0.20958709716796875,
+    "density": 1.01,
+    "trunk_width": 1.01,
+    "data_category": "léger",
+    "label": "🌳 Arbre (4k lignes, 0Mo data)"
+  },
+  "stats": {
+    "total_files": 32,
+    "total_code_lines": 4157,
+    "data_weight_mb": 0.2,
+    "languages": {
+      "Python": 4157
+    },
+    "biggest_file": {
+      "path": "engine.py",
+      "lines": 4157,
+      "lang": "Python"
+    }
+  },
+  "nodes": [
+    {
+      "id": "P1",
+      "level": "R",
+      "label": "Licence projet",
+      "status": "done",
+      "entry": "LICENSE",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -4
+    },
+    {
+      "id": "M1",
+      "level": "R",
+      "label": "Langage principal : Python (4157 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "T1",
+      "level": "T",
+      "label": "Core : engine.py (~4157L, Python)",
+      "status": "done",
+      "entry": "engine.py",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests/CI — ABSENT",
+      "status": "todo",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 0
+    }
+  ],
+  "build_order": [
+    {
+      "phase": 0,
+      "name": "Mycorhizes — lois physiques",
+      "ids": [
+        "M1"
+      ],
+      "action": "Identifier les lois physiques/math immuables du projet",
+      "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
+    },
+    {
+      "phase": 1,
+      "name": "Poils — contraintes légales",
+      "ids": [
+        "P1"
+      ],
+      "action": "Définir les contraintes de niveau -4",
+      "bio": "Extensions microscopiques de l'épiderme. Cuticule très fine. Filtrent TOUT ce qui entre"
+    },
+    {
+      "phase": 2,
+      "name": "Tronc — core engine MASSIF",
+      "ids": [
+        "T1"
+      ],
+      "action": "Construire et CONSOLIDER le core avant toute extension",
+      "bio": "Le baobab met toute son énergie dans le tronc d'abord"
+    },
+    {
+      "phase": 5,
+      "name": "Cime — tests et déploiement",
+      "ids": [
+        "C1"
+      ],
+      "action": "Implémenter cime — tests et déploiement",
+      "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
+    }
+  ],
+  "next_step": "Vérifier l'arbre scanné"
+}

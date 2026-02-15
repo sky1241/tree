@@ -3562,6 +3562,308 @@ def _generate_profile_html(tree, image_base64):
     return html
 
 
+def scan_github_repo(owner, repo_name, token=None):
+    """🌐 Scanne un repo GitHub distant via l'API (sans cloner).
+
+    Utilise l'API GitHub pour :
+    - Récupérer l'arbre de fichiers complet
+    - Les langages et leur répartition
+    - Les métadonnées du repo
+
+    Args:
+        owner: nom d'utilisateur GitHub
+        repo_name: nom du repo
+        token: (optionnel) token GitHub pour repos privés
+
+    Returns:
+        dict — arbre Winter Tree
+    """
+    import urllib.request
+    import urllib.error
+
+    headers = {"Accept": "application/vnd.github.v3+json", "User-Agent": "WinterTree/1.0"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    def api_get(url):
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code == 403:
+                print(f"  ⚠️ Rate limit GitHub — attendez ou utilisez un token")
+            elif e.code == 404:
+                print(f"  ⚠️ Repo non trouvé : {owner}/{repo_name}")
+            return None
+        except Exception as e:
+            print(f"  ⚠️ Erreur API : {e}")
+            return None
+
+    # ── Métadonnées du repo ──
+    repo_info = api_get(f"https://api.github.com/repos/{owner}/{repo_name}")
+    if not repo_info:
+        return None
+
+    default_branch = repo_info.get("default_branch", "main")
+    description = repo_info.get("description", "") or ""
+    repo_size_kb = repo_info.get("size", 0)
+
+    # ── Langages ──
+    languages = api_get(f"https://api.github.com/repos/{owner}/{repo_name}/languages") or {}
+
+    # Convertir bytes → lignes approximatives (1 ligne ≈ 40 bytes)
+    lang_lines = {lang: max(1, bytes_count // 40) for lang, bytes_count in languages.items()}
+    total_code_lines = sum(lang_lines.values())
+
+    # ── Arbre de fichiers ──
+    tree_data = api_get(f"https://api.github.com/repos/{owner}/{repo_name}/git/trees/{default_branch}?recursive=1")
+
+    all_files = []
+    all_dirs = set()
+    biggest_file = {"path": "", "lines": 0, "lang": ""}
+
+    if tree_data and "tree" in tree_data:
+        for item in tree_data["tree"]:
+            path = item.get("path", "")
+            item_type = item.get("type", "")
+            size = item.get("size", 0) or 0
+
+            # Filtrer les dossiers ignorés
+            parts = path.split("/")
+            if any(p in IGNORE for p in parts):
+                continue
+
+            if item_type == "tree":
+                all_dirs.add(path)
+            elif item_type == "blob":
+                ext = os.path.splitext(path)[1].lower()
+                lang = EXT_LANG.get(ext, "")
+                # Estimer les lignes depuis la taille
+                lines = max(1, size // 40) if ext in EXT_LANG else 0
+
+                all_files.append({
+                    "path": path,
+                    "name": os.path.basename(path),
+                    "ext": ext,
+                    "size": size,
+                    "lines": lines,
+                    "lang": lang,
+                })
+
+                if lines > biggest_file["lines"]:
+                    biggest_file = {"path": path, "lines": lines, "lang": lang}
+
+    # ── Construire les nœuds (même logique que scan_repo) ──
+    nodes = []
+    node_id_counter = {"M": 0, "P": 0, "D": 0, "A": 0, "R": 0,
+                       "T": 0, "B": 0, "b": 0, "F": 0, "C": 0}
+    found_patterns = set()
+
+    def add_node(prefix, level, depth, label, entry="~", status="done", confidence=0):
+        node_id_counter[prefix] = node_id_counter.get(prefix, 0) + 1
+        nid = f"{prefix}{node_id_counter[prefix]}"
+        if confidence == 0 and status == "done":
+            confidence = 80
+        node = {
+            "id": nid, "level": level, "label": label,
+            "status": status, "entry": entry, "depends": [], "desc": "",
+            "confidence": confidence,
+        }
+        if depth is not None:
+            node["depth"] = depth
+        nodes.append(node)
+        return nid
+
+    # Scan patterns
+    for category, patterns in SCAN_PATTERNS.items():
+        for pattern, info in patterns.items():
+            if info.get("skip_node"):
+                continue
+            matched = False
+            entry = "~"
+            if info.get("is_dir"):
+                dir_name = pattern.rstrip("/")
+                if dir_name in all_dirs or any(d.startswith(dir_name) for d in all_dirs):
+                    matched = True
+                    entry = dir_name + "/"
+            elif info.get("ext_match"):
+                ext = pattern
+                if any(f["ext"] == ext for f in all_files):
+                    matched = True
+            else:
+                if any(f["name"] == pattern or f["path"] == pattern for f in all_files):
+                    matched = True
+                    entry = pattern
+            if matched and pattern not in found_patterns:
+                found_patterns.add(pattern)
+                depth = info.get("depth")
+                label = info["label"]
+                if depth == -1:
+                    add_node("R", "R", -1, label, entry)
+                elif depth == -2:
+                    add_node("A", "R", -2, label, entry)
+                elif depth == -4:
+                    add_node("P", "R", -4, label, entry)
+                elif category == "cime":
+                    add_node("C", "C", None, label, entry)
+
+    # Langages → mycorhizes
+    if lang_lines:
+        main_lang = max(lang_lines, key=lang_lines.get)
+        add_node("M", "R", -5, f"Langage principal : {main_lang} ({lang_lines[main_lang]} lignes)")
+        for lang, lines in sorted(lang_lines.items(), key=lambda x: -x[1])[1:3]:
+            if lines > total_code_lines * 0.1:
+                add_node("M", "R", -5, f"Langage secondaire : {lang} ({lines} lignes)")
+
+    # Tronc
+    if biggest_file["lines"] > 0:
+        add_node("T", "T", None,
+                 f"Core : {biggest_file['path']} (~{biggest_file['lines']}L, {biggest_file['lang']})",
+                 biggest_file["path"])
+
+    # Branches = dossiers de premier niveau
+    top_dirs = {}
+    for f in all_files:
+        parts = f["path"].split("/")
+        if len(parts) > 1 and f["lines"] > 0:
+            top_dir = parts[0]
+            if top_dir not in IGNORE:
+                if top_dir not in top_dirs:
+                    top_dirs[top_dir] = {"files": 0, "lines": 0, "langs": set()}
+                top_dirs[top_dir]["files"] += 1
+                top_dirs[top_dir]["lines"] += f["lines"]
+                if f["lang"]:
+                    top_dirs[top_dir]["langs"].add(f["lang"])
+
+    for dirname, info in sorted(top_dirs.items(), key=lambda x: -x[1]["lines"])[:10]:
+        langs = ", ".join(list(info["langs"])[:2])
+        add_node("B", "B", None,
+                 f"{dirname}/ ({info['files']}f, ~{info['lines']}L, {langs})",
+                 f"{dirname}/")
+        # Rameaux
+        sub_dirs = {}
+        for f in all_files:
+            parts = f["path"].split("/")
+            if len(parts) > 2 and parts[0] == dirname and f["lines"] > 0:
+                sub = parts[1]
+                if sub not in sub_dirs:
+                    sub_dirs[sub] = {"files": 0, "lines": 0}
+                sub_dirs[sub]["files"] += 1
+                sub_dirs[sub]["lines"] += f["lines"]
+        for subname, subinfo in sorted(sub_dirs.items(), key=lambda x: -x[1]["lines"])[:5]:
+            add_node("b", "b", None,
+                     f"{dirname}/{subname}/ ({subinfo['files']}f, ~{subinfo['lines']}L)",
+                     f"{dirname}/{subname}/")
+
+    # Gaps
+    if not any(n["level"] == "C" for n in nodes):
+        add_node("C", "C", None, "Tests/CI — ABSENT", "~", "todo")
+    if not any(n.get("depth") == -4 for n in nodes):
+        add_node("P", "R", -4, "Licence/Legal — ABSENT", "~", "todo")
+    has_readme = any(f["name"].lower().startswith("readme") for f in all_files)
+    if not has_readme:
+        add_node("F", "F", None, "README — ABSENT", "~", "todo")
+
+    # Classifier
+    family_id = _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines)
+    domain = detect_domain((description + " " + repo_name + " " + " ".join(f["path"] for f in all_files[:50])).lower())
+    build_order = generate_build_order(family_id, nodes)
+
+    data_weight_mb = max(0, (repo_size_kb / 1024) - (total_code_lines * 40 / 1024 / 1024))
+    scale = calculate_scale(total_code_lines, data_weight_mb)
+
+    tree = {
+        "idea": f"[scanned] {repo_name}",
+        "domain": domain,
+        "family": family_id,
+        "family_name": FAMILIES[family_id]["nom"],
+        "family_emoji": FAMILIES[family_id]["emoji"],
+        "date": datetime.now().isoformat(),
+        "phase": "MATURE",
+        "scanned_from": f"https://github.com/{owner}/{repo_name}",
+        "scale": scale,
+        "stats": {
+            "total_files": len(all_files),
+            "total_code_lines": total_code_lines,
+            "data_weight_mb": round(data_weight_mb, 1),
+            "languages": lang_lines,
+            "biggest_file": biggest_file,
+        },
+        "nodes": nodes,
+        "build_order": build_order,
+        "next_step": "Vérifier l'arbre scanné",
+    }
+    _update_phase(tree)
+    return tree
+
+
+def scan_github_user(username, token=None, max_repos=20):
+    """🌐 Scanne tous les repos d'un utilisateur GitHub.
+
+    Args:
+        username: nom d'utilisateur GitHub
+        token: (optionnel) token pour repos privés
+        max_repos: nombre max de repos à scanner
+
+    Returns:
+        list[dict] — liste d'arbres Winter Tree
+    """
+    import urllib.request
+    import urllib.error
+
+    headers = {"Accept": "application/vnd.github.v3+json", "User-Agent": "WinterTree/1.0"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    # Lister les repos
+    url = f"https://api.github.com/users/{username}/repos?per_page={max_repos}&sort=updated"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            repos = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  ❌ Impossible de lister les repos de {username}: {e}")
+        return []
+
+    if not isinstance(repos, list):
+        print(f"  ❌ Réponse inattendue de l'API GitHub")
+        return []
+
+    # Filtrer les forks (optionnel)
+    repos = [r for r in repos if not r.get("fork", False)]
+
+    print(f"\n  🌐 GitHub : {username} — {len(repos)} repos trouvés")
+    print(f"  {'─' * 50}")
+
+    trees = []
+    for i, repo in enumerate(repos[:max_repos]):
+        name = repo["name"]
+        print(f"  [{i+1}/{min(len(repos), max_repos)}] Scan de {name}...", end="", flush=True)
+
+        tree = scan_github_repo(username, name, token)
+        if tree:
+            # Sauvegarder le scan
+            script_dir = Path(__file__).parent
+            scans_dir = script_dir / "scans"
+            scans_dir.mkdir(exist_ok=True)
+            filepath = scans_dir / f"{name}.json"
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(tree, f, indent=2, ensure_ascii=False)
+
+            lines = tree.get("stats", {}).get("total_code_lines", 0)
+            emoji = tree.get("family_emoji", "🌳")
+            print(f" {emoji} {lines:,}L ✅")
+            trees.append(tree)
+        else:
+            print(f" ⚠️ skip")
+
+    print(f"\n  {'─' * 50}")
+    print(f"  ✅ {len(trees)} arbres scannés et sauvés dans scans/")
+
+    return trees
+
+
 def _generate_forest_html(trees, image_base64_map):
     """Génère le HTML de la vue forêt — tous les arbres côte à côte."""
 
@@ -4023,6 +4325,10 @@ def main():
 
 Usage:
   python engine.py serve [json]        🌐 VISUALISE l'arbre dans le navigateur
+  python engine.py serve               🌲 FORÊT — tous les scans côte à côte
+  python engine.py serve --github <user>  🌐 Scanne GitHub + ouvre la forêt
+  python engine.py github <user>       🌐 SCANNE tous les repos GitHub d'un user
+  python engine.py github <user/repo>  🌐 SCANNE un repo GitHub spécifique
   python engine.py plant "<idée>"     🌱 PLANTE UN ARBRE à partir d'une idée
   python engine.py scan <dossier>     🔬 SCANNE un repo existant
   python engine.py research <json> [contexte]  🔍 Prompts de recherche
@@ -4042,6 +4348,10 @@ Familles: conifere, feuillu, palmier, baobab, buisson, liane
 
 Exemples:
   python engine.py serve scans/hsbc.json
+  python engine.py serve                          # vue forêt
+  python engine.py serve --github sky1241          # scan GitHub + forêt
+  python engine.py github sky1241                  # scan tous les repos
+  python engine.py github sky1241/hsbc-algo        # scan un repo
   python engine.py plant "je veux un Shazam pour piano"
   python engine.py scan /path/to/my/repo
   python engine.py guard scans/shazam.json
@@ -4221,8 +4531,56 @@ Exemples:
             print(f"Famille inconnue : {fid}")
 
     elif cmd == "serve":
-        json_path = sys.argv[2] if len(sys.argv) > 2 else None
-        serve_tree(json_path)
+        # Check for --github flag
+        if len(sys.argv) > 2 and sys.argv[2] == "--github":
+            username = sys.argv[3] if len(sys.argv) > 3 else None
+            if not username:
+                print("Usage: python engine.py serve --github <username>")
+                return
+            token = None
+            # Check for token file
+            token_file = Path(__file__).parent / "CLEGITJAMAISTOUCHER.txt"
+            if token_file.exists():
+                token = token_file.read_text().strip()
+            print(f"  🌐 Scan GitHub de {username}...")
+            scan_github_user(username, token)
+            serve_tree(None)
+        else:
+            json_path = sys.argv[2] if len(sys.argv) > 2 else None
+            serve_tree(json_path)
+
+    elif cmd == "github":
+        if len(sys.argv) < 3:
+            print("Usage: python engine.py github <username> [--token <token>]")
+            print("       python engine.py github <username>/<repo>")
+            print("\nScanne les repos GitHub et génère les arbres dans scans/")
+            return
+        target = sys.argv[2]
+        token = None
+        if "--token" in sys.argv:
+            idx = sys.argv.index("--token")
+            if idx + 1 < len(sys.argv):
+                token = sys.argv[idx + 1]
+        # Check for token file
+        if not token:
+            token_file = Path(__file__).parent / "CLEGITJAMAISTOUCHER.txt"
+            if token_file.exists():
+                token = token_file.read_text().strip()
+
+        if "/" in target:
+            # Scan un repo spécifique
+            owner, repo_name = target.split("/", 1)
+            tree = scan_github_repo(owner, repo_name, token)
+            if tree:
+                print_scan_report(tree)
+                filepath = save_tree_json(tree)
+                print(f"\n  💾 JSON sauvé : {filepath}")
+        else:
+            # Scan tous les repos d'un utilisateur
+            trees = scan_github_user(target, token)
+            if trees:
+                print(f"\n  🌲 Lance: python engine.py serve")
+                print(f"  pour voir ta forêt !")
 
     elif cmd == "export":
         path = export_knowledge_base()

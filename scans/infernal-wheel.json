@@ -1,0 +1,274 @@
+{
+  "idea": "[scanned] infernal-wheel",
+  "domain": "audio",
+  "family": "buisson",
+  "family_name": "Buisson",
+  "family_emoji": "🌿",
+  "date": "2026-02-15T18:14:37.869487",
+  "phase": "CROISSANCE",
+  "scanned_from": "https://github.com/sky1241/infernal-wheel",
+  "scale": {
+    "lines": 22512,
+    "factor": 1.59,
+    "category": "grand arbre",
+    "height_px": 515,
+    "data_mb": 1.4000244140625,
+    "density": 1.04,
+    "trunk_width": 1.04,
+    "data_category": "léger",
+    "label": "🌲 Grand Arbre (22k lignes, 1Mo data)"
+  },
+  "stats": {
+    "total_files": 184,
+    "total_code_lines": 22512,
+    "data_weight_mb": 1.4,
+    "languages": {
+      "PowerShell": 10953,
+      "HTML": 6026,
+      "Dart": 4765,
+      "C++": 483,
+      "CMake": 262,
+      "C": 18,
+      "Batchfile": 5
+    },
+    "biggest_file": {
+      "path": "hellwell/dashboard/Dashboard.Page.ps1",
+      "lines": 4506,
+      "lang": "PowerShell"
+    }
+  },
+  "nodes": [
+    {
+      "id": "R1",
+      "level": "R",
+      "label": "Flutter/Dart",
+      "status": "done",
+      "entry": "pubspec.yaml",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -1
+    },
+    {
+      "id": "R2",
+      "level": "R",
+      "label": "C/C++ CMake",
+      "status": "done",
+      "entry": "CMakeLists.txt",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -1
+    },
+    {
+      "id": "M1",
+      "level": "R",
+      "label": "Langage principal : PowerShell (10953 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "M2",
+      "level": "R",
+      "label": "Langage secondaire : HTML (6026 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "M3",
+      "level": "R",
+      "label": "Langage secondaire : Dart (4765 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "T1",
+      "level": "T",
+      "label": "Core : hellwell/dashboard/Dashboard.Page.ps1 (~4506L, PowerShell)",
+      "status": "done",
+      "entry": "hellwell/dashboard/Dashboard.Page.ps1",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B1",
+      "level": "B",
+      "label": "hellwell/ (8f, ~10634L, PowerShell)",
+      "status": "done",
+      "entry": "hellwell/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b1",
+      "level": "b",
+      "label": "hellwell/dashboard/ (2f, ~6007L)",
+      "status": "done",
+      "entry": "hellwell/dashboard/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b2",
+      "level": "b",
+      "label": "hellwell/engine/ (1f, ~361L)",
+      "status": "done",
+      "entry": "hellwell/engine/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B2",
+      "level": "B",
+      "label": "infernal-app/ (43f, ~5234L, C/C++ header, C++)",
+      "status": "done",
+      "entry": "infernal-app/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b3",
+      "level": "b",
+      "label": "infernal-app/lib/ (33f, ~4723L)",
+      "status": "done",
+      "entry": "infernal-app/lib/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b4",
+      "level": "b",
+      "label": "infernal-app/windows/ (9f, ~485L)",
+      "status": "done",
+      "entry": "infernal-app/windows/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b5",
+      "level": "b",
+      "label": "infernal-app/test/ (1f, ~26L)",
+      "status": "done",
+      "entry": "infernal-app/test/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B3",
+      "level": "B",
+      "label": "infernal-migration/ (1f, ~142L, PowerShell)",
+      "status": "done",
+      "entry": "infernal-migration/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests/CI — ABSENT",
+      "status": "todo",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 0
+    },
+    {
+      "id": "P1",
+      "level": "R",
+      "label": "Licence/Legal — ABSENT",
+      "status": "todo",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 0,
+      "depth": -4
+    }
+  ],
+  "build_order": [
+    {
+      "phase": 0,
+      "name": "Mycorhizes — lois physiques",
+      "ids": [
+        "M1",
+        "M2",
+        "M3"
+      ],
+      "action": "Identifier les lois physiques/math immuables du projet",
+      "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
+    },
+    {
+      "phase": 1,
+      "name": "Poils — contraintes légales",
+      "ids": [
+        "P1"
+      ],
+      "action": "Définir les contraintes de niveau -4",
+      "bio": "Extensions microscopiques de l'épiderme. Cuticule très fine. Filtrent TOUT ce qui entre"
+    },
+    {
+      "phase": 1,
+      "name": "Structurelles — stack technique",
+      "ids": [
+        "R1",
+        "R2"
+      ],
+      "action": "Définir les contraintes de niveau -1",
+      "bio": "5-15 racines principales, jusqu'à 30cm diamètre. Spread = 2-4x couronne. 80-90% dans top 60cm"
+    },
+    {
+      "phase": 2,
+      "name": "Tiges — lancer en parallèle",
+      "ids": [
+        "B1",
+        "B2",
+        "B3"
+      ],
+      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
+      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+    },
+    {
+      "phase": 4,
+      "name": "Rameaux — sous-features",
+      "ids": [
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5"
+      ],
+      "action": "Implémenter rameaux — sous-features",
+      "bio": "Subdivisions des branches, <4 ans. Les plus flexibles, se plient au vent, premiers à casser"
+    },
+    {
+      "phase": 5,
+      "name": "Cime — tests et déploiement",
+      "ids": [
+        "C1"
+      ],
+      "action": "Implémenter cime — tests et déploiement",
+      "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
+    }
+  ],
+  "next_step": "Vérifier l'arbre scanné"
+}
