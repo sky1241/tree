@@ -135,32 +135,16 @@ Quand on fait `python engine.py scan /chemin/repo`, on obtient un JSON avec :
 
 ## ROADMAP RENDERER
 
-### Étape 1 — Vue profil (un seul arbre)
+### Étape 1 — Vue profil (un seul arbre) ✅ DONE
 `python engine.py serve scans/hsbc.json`
-→ Ouvre localhost sur premier port dispo
-→ HTML/SVG : Planche II en fond + overlay des nodes du JSON
-→ Axe central avec les nodes positionnés sur le squelette
-→ Labels à gauche (noms niveaux), descriptions à droite (ce que le scanner a trouvé)
-→ Couleurs par niveau, confidence visible, status (done/wip/todo)
 
-**Technique** : `http.server` Python natif, zéro dépendance.
-Le HTML est généré par engine.py avec l'image en base64 inline.
-
-### Étape 2 — Vue forêt (multi-arbres)
+### Étape 2 — Vue forêt (multi-arbres) ✅ DONE
 `python engine.py serve` (sans argument = tous les scans/)
-→ Page d'accueil : tous les arbres côte à côte
-→ Taille visuelle = scale (hauteur=code, épaisseur=data)
-→ Clic sur un arbre → zoom vue profil (étape 1)
-→ Chaque arbre a le style Planche II
 
-**Pour ça il faut** : générer une image par famille (conifère, baobab, feuillu, buisson)
-via ChatGPT/DALL-E avec le même style. Sky doit fournir les images.
-→ Prompt à adapter : même style Planche II mais forme baobab/feuillu/buisson
-
-### Étape 3 — Connexion GitHub API
+### Étape 3 — Connexion GitHub API ✅ DONE
 `python engine.py serve --github sky1241`
-→ Scanne tous les repos du compte GitHub
-→ Génère la forêt automatiquement
+`python engine.py github sky1241`
+`python engine.py github sky1241/hsbc-algo`
 
 ---
 
