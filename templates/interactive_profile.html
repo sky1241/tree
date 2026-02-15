@@ -705,43 +705,149 @@ function buildSVG(nodes) {
     grouped[key].push(n);
   });
 
-  // Render nodes
+  // ── TREE SILHOUETTE GEOMETRY ──
+  // Calibré sur Planche II (922×1244) en observant l'image réelle.
+  // Canopée = triangle (apex → base). Racines = entonnoir inversé.
+  // Les nodes se placent en PAIRES gauche/droite sur les branches,
+  // entre le tronc (25%) et l'extrémité (82%), comme de vraies branches.
+
+  const family = TREE_DATA.family || "conifere";
+
+  // ── Silhouette du conifère (tracée sur l'image) ──
+  const APEX   = { x: 461, y: 78 };    // pointe de la cime
+  const BASE_L = { x: 200, y: 558 };   // bord gauche canopée à la base
+  const BASE_R = { x: 722, y: 558 };   // bord droit canopée à la base
+
+  const ROOT_TOP_L = { x: 355, y: 592 };
+  const ROOT_TOP_R = { x: 567, y: 592 };
+  const ROOT_BOT_L = { x: 100, y: 1080 };
+  const ROOT_BOT_R = { x: 822, y: 1080 };
+
+  function canopyWidthAt(y) {
+    const t = Math.max(0, Math.min(1, (y - APEX.y) / (BASE_L.y - APEX.y)));
+    return {
+      left:  APEX.x + (BASE_L.x - APEX.x) * t,
+      right: APEX.x + (BASE_R.x - APEX.x) * t
+    };
+  }
+
+  function rootWidthAt(y) {
+    const t = Math.max(0, Math.min(1, (y - ROOT_TOP_L.y) / (ROOT_BOT_L.y - ROOT_TOP_L.y)));
+    return {
+      left:  ROOT_TOP_L.x + (ROOT_BOT_L.x - ROOT_TOP_L.x) * t,
+      right: ROOT_TOP_R.x + (ROOT_BOT_R.x - ROOT_TOP_R.x) * t
+    };
+  }
+
+  // ── Placement naturel des nodes sur les branches ──
+  // Distribue en paires gauche/droite autour du tronc.
+  // Chaque node est à 25-82% du chemin tronc→bord (pas au tronc, pas à l'extrémité).
+  // Y suit la pente de branche : plus loin du tronc = légèrement plus bas.
+  function computeBranchPositions(levelKey, levelY, count, zone) {
+    if (count === 0) return [];
+
+    // Tronc: centré
+    if (levelKey === "T") {
+      if (count === 1) return [{ x: CENTER_X, y: levelY }];
+      return Array.from({length: count}, (_, i) => ({
+        x: CENTER_X + (i % 2 === 0 ? -12 : 12),
+        y: levelY - 8 + (i / (count - 1)) * 16
+      }));
+    }
+
+    const bounds = zone === "aerial" ? canopyWidthAt(levelY) : rootWidthAt(levelY);
+    const halfR = Math.max(bounds.right - CENTER_X, 30);  // minimum 30px
+    const halfL = Math.max(CENTER_X - bounds.left, 30);
+
+    // Node unique: sur une branche à droite
+    if (count === 1) {
+      const ratio = 0.4;
+      const slopeMax = zone === "aerial" ? 15 : 10;
+      return [{
+        x: Math.round(CENTER_X + halfR * ratio),
+        y: Math.round(levelY + ratio * slopeMax - slopeMax * 0.25)
+      }];
+    }
+
+    // Paires gauche/droite
+    const rightCount = Math.ceil(count / 2);
+    const leftCount = count - rightCount;
+    const positions = [];
+
+    const INNER = 0.25;   // début de branche (25% du tronc)
+    const OUTER = 0.82;   // fin de branche (82%, pas à l'extrême)
+    const slopeMax = zone === "aerial" ? 18 : 12;
+
+    // Côté droit
+    for (let i = 0; i < rightCount; i++) {
+      const t = rightCount === 1 ? 0.5 : i / (rightCount - 1);
+      const ratio = INNER + t * (OUTER - INNER);
+      positions.push({
+        x: Math.round(CENTER_X + halfR * ratio),
+        y: Math.round(levelY + ratio * slopeMax - slopeMax * 0.25)
+      });
+    }
+
+    // Côté gauche (miroir)
+    for (let i = 0; i < leftCount; i++) {
+      const t = leftCount === 1 ? 0.5 : i / (leftCount - 1);
+      const ratio = INNER + t * (OUTER - INNER);
+      positions.push({
+        x: Math.round(CENTER_X - halfL * ratio),
+        y: Math.round(levelY + ratio * slopeMax - slopeMax * 0.25)
+      });
+    }
+
+    return positions;
+  }
+
+  // ── Render: skeleton (lignes de branches) puis nodes par-dessus ──
+
+  // Skeleton: lignes du tronc vers chaque node
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
-    const count = group.length;
+    const positions = computeBranchPositions(lk, lev.y, group.length, lev.zone);
 
     group.forEach((n, i) => {
-      const offsetY = (i - (count - 1) / 2) * 28;
-      const ny = lev.y + offsetY;
+      if (!positions[i] || lk === "T") return;
+      const { x: nx, y: ny } = positions[i];
+      const trunkY = lev.zone === "aerial" ? lev.y - 3 : SOL_Y + 15;
+
+      // Courbe quadratique: le point de contrôle crée un arc naturel
+      const midX = CENTER_X + (nx - CENTER_X) * 0.4;
+      const midY = (trunkY + ny) / 2 + (lev.zone === "aerial" ? -8 : 5);
+
+      svgHTML += `<path d="M${CENTER_X},${trunkY} Q${midX},${midY} ${nx},${ny}"
+        fill="none" stroke="${lev.color}" stroke-width="0.8" opacity="0.2"
+        stroke-dasharray="${lev.zone === 'under' ? '3,2' : 'none'}"/>`;
+    });
+  }
+
+  // Nodes par-dessus
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const group = grouped[lk] || [];
+    const positions = computeBranchPositions(lk, lev.y, group.length, lev.zone);
+
+    group.forEach((n, i) => {
+      if (!positions[i]) return;
+      const { x: nx, y: ny } = positions[i];
       const conf = n.confidence || 0;
-      const r = 6 + (conf / 100) * 4; // 6-10px
+      const r = 5 + (conf / 100) * 4;
       const fill = n.status === "done" ? lev.color :
                    n.status === "wip" ? "var(--orange)" : "var(--red)";
 
       svgHTML += `
       <g class="node-g" data-id="${n.id}" data-status="${n.status}">
-        <!-- Hit area -->
-        <circle cx="${CENTER_X}" cy="${ny}" r="18" fill="transparent"/>
-        <!-- Ring (hover/selected) -->
-        <circle class="node-ring" cx="${CENTER_X}" cy="${ny}" r="14"
-                fill="none" stroke="${fill}" stroke-width="1" opacity="0"/>
-        <!-- Glow -->
-        <circle cx="${CENTER_X}" cy="${ny}" r="${r}"
-                fill="${fill}" opacity="0.7" filter="url(#glow)"/>
-        <!-- Core -->
-        <circle cx="${CENTER_X}" cy="${ny}" r="${r * 0.4}"
-                fill="#fff" opacity="${n.status === 'done' ? 0.8 : 0.4}"/>
-        <!-- Label line -->
-        <line x1="${CENTER_X + r + 4}" y1="${ny}" x2="530" y2="${ny}"
-              stroke="${lev.color}" stroke-width="0.5" opacity="0.2" stroke-dasharray="3,3"/>
-        <!-- Label text -->
-        <text x="538" y="${ny - 2}" fill="${lev.color}" font-size="9" font-weight="400"
-              font-family="JetBrains Mono, monospace" opacity="0.7"
-              filter="url(#textSh)">${statusIcon(n.status)} ${n.id} ${(n.label || "").substring(0, 42)}</text>
-        <!-- Confidence bar -->
-        <rect x="538" y="${ny + 5}" width="50" height="2" rx="1" fill="#111" opacity="0.5"/>
-        <rect x="538" y="${ny + 5}" width="${(conf / 100) * 50}" height="2" rx="1"
-              fill="${fill}" opacity="0.5"/>
+        <circle cx="${nx}" cy="${ny}" r="16" fill="transparent"/>
+        <circle class="node-ring" cx="${nx}" cy="${ny}" r="13"
+                fill="none" stroke="${fill}" stroke-width="1.5" opacity="0"/>
+        <circle cx="${nx}" cy="${ny}" r="${r}"
+                fill="${fill}" opacity="0.8" filter="url(#glow)"/>
+        <circle cx="${nx}" cy="${ny}" r="${r * 0.3}"
+                fill="#fff" opacity="${n.status === 'done' ? 0.9 : 0.3}"/>
+        <text x="${nx}" y="${ny - r - 3}" fill="${lev.color}" font-size="7"
+              font-family="JetBrains Mono, monospace" opacity="0.6" text-anchor="middle"
+              filter="url(#textSh)">${n.id}</text>
       </g>`;
     });
   }
@@ -783,20 +889,12 @@ function selectNode(id) {
   const svgNode = document.querySelector(`.node-g[data-id="${id}"]`);
   if (svgNode) svgNode.classList.add("selected");
 
-  // Pan to node
-  const lk = nodeLevelKey(node);
-  const lev = LEVELS[lk];
-  if (lev) {
-    const grouped = {};
-    TREE_DATA.nodes.forEach(n => {
-      const k = nodeLevelKey(n);
-      if (!grouped[k]) grouped[k] = [];
-      grouped[k].push(n);
-    });
-    const group = grouped[lk] || [];
-    const idx = group.findIndex(n => n.id === id);
-    const offsetY = (idx - (group.length - 1) / 2) * 28;
-    panToPoint(CENTER_X, lev.y + offsetY);
+  // Pan to node — find its actual SVG position
+  if (svgNode) {
+    const circle = svgNode.querySelector("circle:nth-child(4)"); // glow circle
+    if (circle) {
+      panToPoint(parseFloat(circle.getAttribute("cx")), parseFloat(circle.getAttribute("cy")));
+    }
   }
 
   // Open detail

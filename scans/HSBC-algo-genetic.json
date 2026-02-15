@@ -1,9 +1,9 @@
 {
   "idea": "[scanned] HSBC-algo-genetic",
   "domain": "trading",
-  "family": "buisson",
-  "family_name": "Buisson",
-  "family_emoji": "🌿",
+  "family": "conifere",
+  "family_name": "Conifère",
+  "family_emoji": "🌲",
   "date": "2026-02-15T18:14:39.095725",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/HSBC-algo-genetic",

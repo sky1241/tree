@@ -4242,6 +4242,13 @@ def serve_tree(json_path=None):
         with open(tpl_path, "r", encoding="utf-8") as f:
             interactive_tpl = f.read()
 
+    # ── Charger le template cube 3D ──
+    cube_tpl = ""
+    cube_path = templates_dir / "cube_forest.html"
+    if cube_path.exists():
+        with open(cube_path, "r", encoding="utf-8") as f:
+            cube_tpl = f.read()
+
     # ── Générer le HTML forêt (avec base64 pour inline) ──
     image_base64_map = {k: base64.b64encode(v).decode("utf-8") for k, v in image_raw.items()}
     forest_html = _generate_forest_html(list(all_trees.values()), image_base64_map)
@@ -4323,6 +4330,11 @@ def serve_tree(json_path=None):
                     self._serve_html(html)
                 else:
                     self._serve_404(fname)
+                return
+
+            # Cube 3D (dispo sur /cube si besoin)
+            if path == "/cube" and cube_tpl:
+                self._serve_html(cube_tpl)
                 return
 
             # Root → single tree or forest
