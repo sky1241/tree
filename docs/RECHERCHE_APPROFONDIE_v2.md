@@ -498,3 +498,39 @@ Vacances dans les forêts tropicales du Queensland (Australie) en 2001. Fowler o
 
 **Statut** : zone de recherche ouverte. Le sujet a beau être vieux, y'a encore des choses à découvrir.
 
+
+---
+
+## BREAKTHROUGH MYCELIUM — Modèle "Pluie sur Sol" 🌧️🍄
+
+> Sky, 2026-02-15 22h. Idée brute, noter tel quel.
+
+**Le concept :**
+- Le TERRAIN = un carré qui représente le repo Git
+- Chaque GIT PUSH = une GOUTTE DE PLUIE qui tombe à un endroit précis du terrain
+- L'endroit dépend de QUOI a été modifié (quel fichier, quel module, quel niveau de l'arbre)
+- Après l'impact, le MYCELIUM se génère depuis le point d'impact
+- Les connexions mycorhiziennes POUSSENT entre les points d'impact au fil du temps
+- Plus un endroit reçoit de gouttes (commits fréquents), plus le réseau est dense
+- Les chemins entre zones fréquentes deviennent des HYPHES PRINCIPALES (autoroutes)
+- Les zones négligées restent sèches (pas de réseau)
+
+**Ce que ça donne visuellement :**
+- Animation temporelle : on voit l'historique git se jouer comme une pluie
+- Le mycelium pousse en temps réel entre les points d'impact
+- Les connexions inter-projets = quand deux repos partagent des gouttes proches
+- Le réseau final = la carte de santé du projet
+
+**Données source :**
+- `git log` = liste des gouttes (quand, où, quoi)
+- Fichiers modifiés par commit = position de la goutte
+- Fréquence = densité du réseau
+- Co-modifications = connexions directes
+
+**Lien avec les formules existantes :**
+- Meškauskas 2004 (neighbour-sensing) = comment une goutte influence ses voisines
+- Boswell 2003 (diffusion-advection) = comment le réseau se propage après impact
+- Small-world 2025 = topologie émergente du réseau final
+
+**Statut** : idée brute, à formaliser. Potentiellement le cœur de v2.
+
