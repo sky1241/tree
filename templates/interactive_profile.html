@@ -849,20 +849,26 @@ function buildSVG(nodes) {
     return lines > trunkLines * 0.6;
   }
 
-  // ═══════════════════════════════════════════
-  //           R E N D E R
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  //  R E N D E R  —  Structure conifère (RULE C1: trunk first)
+  //
+  //  Tout part du TRONC. Trunk never divides.
+  //  Le tronc est la colonne vertébrale, les branches s'y attachent.
+  //  B, C, F → attachés au tronc à leur niveau Y
+  //  b → attachés à leur branche parente (B) par chemin d'entrée
+  //  R-1 → attachés au pied du tronc (SOL)
+  //  R-2+ → chaînés au niveau racinaire peuplé le plus proche
+  // ═══════════════════════════════════════════════════════════
 
-  // ── Pré-calcul: positions idéales + positions réelles ──
   const posMap = {};
   const idealPos = {};
 
-  // Positions idéales (le squelette parfait)
+  // Pré-calcul positions idéales
   for (const [lk, lev] of Object.entries(LEVELS)) {
     idealPos[lk] = branchPositions(lk, lev.y, IDEAL[lk] || 0, lev.zone);
   }
 
-  // Positions réelles (triées par taille — subordination)
+  // Pré-calcul positions réelles (triées par taille — subordination)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
     if (group.length === 0) continue;
@@ -875,96 +881,116 @@ function buildSVG(nodes) {
     });
   }
 
-  // ── LAYER 1: SQUELETTE PARFAIT (l'arbre idéal si tout était sain) ──
-  // On part de la graine (tronc) et ça pousse dans toutes les directions.
-  // Canopée: T → B → b → F → C (du tronc vers la cime)
-  // Racines: T → R-1 → R-2 → R-3 → R-4 → R-5 (du tronc vers les profondeurs)
-  // Chaque connexion = une branche/racine du réseau idéal.
-  const ghostEdges = [
-    ["T", "B"], ["B", "b"], ["b", "F"], ["F", "C"],
-    ["T", "R-1"], ["R-1", "R-2"], ["R-2", "R-3"], ["R-3", "R-4"], ["R-4", "R-5"]
-  ];
+  // ── LAYER 1: TRONC — la colonne vertébrale du conifère ──
+  // RULE C1: "Extend pipeline (trunk) BEFORE adding branches. Trunk NEVER divides."
+  // Une ligne forte, continue, du sommet de la cime aux mycorhizes.
+  // C'est LE élément structurel dominant (40% biomasse).
+  svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 20}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 30}"
+    stroke="rgba(255,255,255,0.18)" stroke-width="2.5"/>`;
 
-  ghostEdges.forEach(([from, to]) => {
-    const fPos = idealPos[from] || [];
-    const tPos = idealPos[to] || [];
-    if (fPos.length === 0 || tPos.length === 0) return;
-
-    tPos.forEach(tp => {
-      // Chaque enfant connecté au parent le plus proche
-      let best = fPos[0], bestD = Infinity;
-      fPos.forEach(fp => {
-        const d = Math.hypot(fp.x - tp.x, fp.y - tp.y);
-        if (d < bestD) { bestD = d; best = fp; }
-      });
-      const midX = (best.x + tp.x) / 2;
-      const midY = (best.y + tp.y) / 2 + (LEVELS[from]?.zone === "aerial" ? -12 : 8);
-      svgHTML += `<path d="M${best.x},${best.y} Q${midX},${midY} ${tp.x},${tp.y}"
-        fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>`;
-    });
-  });
-
-  // Nœuds fantômes pour les positions non couvertes (= lacunes du projet)
+  // Points d'attache sur le tronc à chaque niveau
   for (const [lk, lev] of Object.entries(LEVELS)) {
+    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="2.5"
+      fill="rgba(255,255,255,0.12)"/>`;
+  }
+
+  // ── LAYER 2: SQUELETTE FANTÔME (branches idéales depuis le tronc) ──
+  // Montre où les branches DEVRAIENT être pour un arbre sain.
+  // Chaque branche fantôme part du point d'attache sur le tronc.
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    if (lk === "T") continue;
     const ghostP = idealPos[lk] || [];
     const actualN = (grouped[lk] || []).length;
+
     ghostP.forEach((pos, i) => {
+      // Branche fantôme: du tronc vers la position idéale
+      const attachY = lev.y;
+      svgHTML += `<line x1="${CENTER_X}" y1="${attachY}" x2="${pos.x}" y2="${pos.y}"
+        stroke="${lev.color}" stroke-width="0.3" opacity="0.06"
+        stroke-dasharray="3,5"/>`;
+
+      // Nœud fantôme si pas de nœud réel à cette position
       if (i >= actualN) {
-        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="6"
-          fill="none" stroke="${lev.color}" stroke-width="0.7" opacity="0.12"
-          stroke-dasharray="3,2"/>`;
+        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="5"
+          fill="none" stroke="${lev.color}" stroke-width="0.6" opacity="0.1"
+          stroke-dasharray="2,2"/>`;
       }
     });
   }
 
-  // ── LAYER 2: CONNEXIONS RÉELLES (lignes blanches reliant les nœuds) ──
-  // Hiérarchie inférée depuis les chemins d'entrée (entry paths).
-  // Rameaux → parent Branch (par préfixe de chemin)
-  // Branches → Tronc
-  // Cime → Tronc
-  // Racines → niveau peuplé le plus proche au-dessus
-  function findParentId(node) {
+  // ── LAYER 3: CONNEXIONS RÉELLES (lignes blanches — le réseau nerveux) ──
+  // Conifère: TOUT part du tronc.
+  //   B nodes → s'attachent au TRONC à leur niveau Y (branches principales)
+  //   C nodes → s'attachent au TRONC au sommet (bourgeons terminaux)
+  //   b nodes → s'attachent à leur BRANCHE PARENTE (identifiée par chemin)
+  //   R-1     → s'attachent au PIED DU TRONC (juste sous le sol)
+  //   R-2+    → chaînés au niveau racinaire PEUPLÉ le plus proche au-dessus
+  function findParentPos(node) {
     const lk = nodeLevelKey(node);
     const entry = node.entry || "";
 
-    // Rameaux → trouver la branche parente par chemin de fichier
+    // Rameaux (b) → parent Branch par préfixe de chemin d'entrée
     if (lk === "b" && entry) {
       for (const bn of (grouped["B"] || [])) {
-        if (bn.entry && entry.startsWith(bn.entry)) return bn.id;
+        if (bn.entry && entry.startsWith(bn.entry) && posMap[bn.id]) {
+          return posMap[bn.id];
+        }
       }
+      // Fallback: point d'attache tronc au niveau b
+      return { x: CENTER_X, y: LEVELS["b"]?.y || 330 };
     }
-    // Branches, Cime, Feuilles → tronc
-    if (lk === "B" || lk === "C" || lk === "F") return trunkGroup[0]?.id;
-    // R-1 → tronc
-    if (lk === "R-1") return trunkGroup[0]?.id;
-    // Racines profondes → remonter jusqu'au premier niveau peuplé
+
+    // Branches (B) → point d'attache tronc au niveau BRANCHES
+    if (lk === "B") return { x: CENTER_X, y: LEVELS["B"].y };
+
+    // Cime (C) → point d'attache tronc au niveau CIME
+    if (lk === "C") return { x: CENTER_X, y: LEVELS["C"].y };
+
+    // Feuilles (F) → point d'attache tronc au niveau FEUILLES
+    if (lk === "F") return { x: CENTER_X, y: LEVELS["F"].y };
+
+    // Racines structurelles (R-1) → pied du tronc
+    if (lk === "R-1") return { x: CENTER_X, y: SOL_Y + 10 };
+
+    // Racines profondes (R-2+) → remonter au niveau peuplé le plus proche
     if (lk.startsWith("R-")) {
       const depth = parseInt(lk.split("-")[1]);
       for (let d = depth - 1; d >= 1; d--) {
         const above = grouped[`R-${d}`];
-        if (above?.length > 0) return above[0].id;
+        if (above?.length > 0 && posMap[above[0].id]) {
+          return posMap[above[0].id];
+        }
       }
-      return trunkGroup[0]?.id;
+      return { x: CENTER_X, y: SOL_Y + 10 };
     }
+
     return null;
   }
 
   nodes.forEach(n => {
-    const pid = findParentId(n);
-    if (!pid || pid === n.id) return;
-    const cp = posMap[n.id], pp = posMap[pid];
-    if (!cp || !pp) return;
+    const lk = nodeLevelKey(n);
+    if (lk === "T") return;  // Le tronc EST la colonne — pas de connexion vers lui-même
+    const pos = posMap[n.id];
+    if (!pos) return;
+
+    const pp = findParentPos(n);
+    if (!pp) return;
 
     const viol = isViolation(n);
-    // Courbe organique entre parent et enfant
-    const midX = (pp.x + cp.x) / 2 + (cp.x > pp.x ? -15 : 15);
-    const midY = (pp.y + cp.y) / 2;
-    svgHTML += `<path d="M${pp.x},${pp.y} Q${midX},${midY} ${cp.x},${cp.y}"
-      fill="none" stroke="${viol ? 'rgba(255,82,82,0.45)' : 'rgba(255,255,255,0.3)'}"
-      stroke-width="${viol ? 1.8 : 1.2}"/>`;
+    const zone = LEVELS[lk]?.zone || "aerial";
+
+    // Courbe de branche naturelle
+    // Conifère: branches s'inclinent légèrement vers le bas depuis le tronc
+    const midX = (pp.x + pos.x) / 2;
+    const midY = (pp.y + pos.y) / 2 + (zone === "aerial" ? -8 : 6);
+
+    svgHTML += `<path d="M${pp.x},${pp.y} Q${midX},${midY} ${pos.x},${pos.y}"
+      fill="none"
+      stroke="${viol ? 'rgba(255,82,82,0.5)' : 'rgba(255,255,255,0.35)'}"
+      stroke-width="${viol ? 2 : 1.2}"/>`;
   });
 
-  // ── LAYER 3: NŒUDS RÉELS (taille = code, couleur = santé) ──
+  // ── LAYER 4: NŒUDS RÉELS (taille = code, couleur = santé) ──
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
     group.forEach(n => {
