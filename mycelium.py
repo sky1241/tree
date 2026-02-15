@@ -160,7 +160,10 @@ def meshedness(G: nx.Graph) -> float:
         G: graphe non-dirigé
 
     Returns:
-        float — alpha entre 0 et 1 (peut dépasser 1 si non-planaire)
+        float — alpha. 0 = arbre pur. 1 = réseau planaire maximal.
+        Peut dépasser 1 sur des graphes non-planaires (normal).
+        Bebber travaille sur des réseaux 2D (planaires) → α ∈ [0,1].
+        Pour du code avec beaucoup de dépendances croisées, α > 1 est possible.
     """
     N = G.number_of_nodes()
     L = G.number_of_edges()
@@ -235,6 +238,10 @@ def root_efficiency(G: nx.Graph, root: str) -> float:
     Différence avec E_global :
         E_global = communication entre tous les paires
         E_root = propagation depuis UN point
+
+    NOTE : E_root peut DÉPASSER E_global si le root est un hub
+    bien connecté, car E_global moyenne sur toutes les paires
+    (y compris les nœuds périphériques mal connectés entre eux).
 
     Résultat Bebber 2007 : E_root(réseau fongique) > E_root(MST)
     Le champignon fait MIEUX que le minimum spanning tree.
@@ -351,7 +358,8 @@ def find_bottlenecks(G: nx.Graph, top_n: int = 5) -> list:
 # Source : Bebber 2007, Bloc D7
 # ============================================================================
 
-def robustness_test(G: nx.Graph, attack: str = "betweenness", steps: int = 20) -> list:
+def robustness_test(G: nx.Graph, attack: str = "betweenness", steps: int = 20,
+                    seed: int = None) -> list:
     """Simule une attaque séquentielle et mesure la dégradation.
 
     Protocole Bebber 2007 :
@@ -368,6 +376,7 @@ def robustness_test(G: nx.Graph, attack: str = "betweenness", steps: int = 20) -
         G: graphe non-dirigé
         attack: "betweenness" ou "random"
         steps: nombre de nœuds à supprimer (ou % si < 1)
+        seed: graine aléatoire pour attack="random" (reproductibilité)
 
     Returns:
         liste de (fraction_removed, fraction_giant_component)
@@ -380,6 +389,7 @@ def robustness_test(G: nx.Graph, attack: str = "betweenness", steps: int = 20) -
     if N == 0:
         return [(0.0, 0.0)]
 
+    rng = random.Random(seed)
     results = [(0.0, 1.0)]  # Avant attaque : 100% connecté
 
     n_to_remove = min(steps, N - 1)
@@ -393,7 +403,7 @@ def robustness_test(G: nx.Graph, attack: str = "betweenness", steps: int = 20) -
             bc = nx.betweenness_centrality(H)
             target = max(bc, key=bc.get)
         elif attack == "random":
-            target = random.choice(list(H.nodes()))
+            target = rng.choice(list(H.nodes()))
         else:
             raise ValueError(f"Attack type inconnu : {attack}")
 
@@ -980,6 +990,19 @@ def run_tests():
     alpha_sl = meshedness(G_selfloop)
     check("Self-loop ignoré dans α (triangle=1.0)", alpha_sl, 1.0)
 
+    # Monotonie : ajouter une arête augmente α
+    G_mono = graph_from_edges([("a","b"),("b","c"),("c","d"),("d","e"),("e","a")])
+    a1 = meshedness(G_mono)
+    G_mono.add_edge("a","c")
+    a2 = meshedness(G_mono)
+    check("Monotonie: +arête → α augmente", a2 > a1, True)
+
+    # K_n: α correspond au calcul théorique
+    G_k5 = nx.complete_graph(5)
+    a_k5 = meshedness(G_k5)
+    a_k5_theo = (10 - 5 + 1) / (2*5 - 5)  # 6/5 = 1.2
+    check("K5 α=théorique (1.2)", a_k5, a_k5_theo, tolerance=0.001)
+
     # ── Brique 2 : E_global ──
     print("\n  BRIQUE 2 — Efficacité globale")
     # Complet K4 : E_global = 1.0
@@ -1007,6 +1030,12 @@ def run_tests():
     G_iso.add_edges_from([("a", "b")])
     G_iso.add_node("z")
     check("Root isolé → 0.0", root_efficiency(G_iso, "z"), 0.0)
+
+    # Cycle: tous les nœuds symétriques → E_root identique
+    G_cyc = nx.cycle_graph(6)
+    e_roots = [root_efficiency(G_cyc, i) for i in range(6)]
+    check("Cycle symétrique: E_root identiques",
+          all(abs(e - e_roots[0]) < 0.0001 for e in e_roots), True)
 
     # ── Brique 4 : Volume-MST ──
     print("\n  BRIQUE 4 — Volume-MST ratio")
@@ -1036,6 +1065,11 @@ def run_tests():
     bns = find_bottlenecks(G_star, top_n=1)
     check("Étoile bottleneck=centre", bns[0][0], 0)
 
+    # Cycle: tous les nœuds ont la même BC
+    bns_cyc = find_bottlenecks(G_cyc, top_n=6)
+    bc_vals = set(round(s, 4) for _, s in bns_cyc)
+    check("Cycle: BC identiques pour tous", len(bc_vals), 1)
+
     # ── Brique 6 : Robustesse ──
     print("\n  BRIQUE 6 — Robustesse")
     rob_tree = robustness_test(G_tree, steps=3)
@@ -1059,6 +1093,13 @@ def run_tests():
     rob_p7 = robustness_test(G_p7, steps=1)
     check("Path(7): après centre → ~43%",
           rob_p7[1][1], 0.43, tolerance=0.05)
+
+    # Random attack reproductible avec seed
+    G_rand = nx.watts_strogatz_graph(20, 4, 0.3, seed=42)
+    rob_a = robustness_test(G_rand, attack="random", steps=5, seed=123)
+    rob_b = robustness_test(G_rand, attack="random", steps=5, seed=123)
+    check("Random attack reproductible (même seed)",
+          rob_a, rob_b)
 
     # ── Brique 7 : Small-world σ ──
     print("\n  BRIQUE 7 — Small-world σ")
