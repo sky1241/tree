@@ -534,3 +534,68 @@ Vacances dans les forêts tropicales du Queensland (Australie) en 2001. Fowler o
 
 **Statut** : idée brute, à formaliser. Potentiellement le cœur de v2.
 
+
+---
+
+## VISION COMPLÈTE — Architecture 3 couches 🌌🌧️🌳🍄
+
+> Sky, 2026-02-15 22h+. Flow state. Tout est connecté.
+
+### Les 3 couches (de haut en bas) :
+
+```
+╔══════════════════════════════════════════╗
+║  CIEL — limites définies par            ║
+║  patterns de Turing (réaction-diffusion) ║
+║  = la frontière du calculable           ║
+╠══════════════════════════════════════════╣
+║  NUAGES → PLUIE                         ║
+║  chaque commit = une goutte             ║
+║  tombe sur le sol                       ║
+╠══════════════════════════════════════════╣
+║  ARBRE — structure visible du projet    ║
+║  (v1 = ce qu'on a déjà)                ║
+╠══════════════════════════════════════════╣
+║  SOL ═══════════════════════════════════ ║
+╠══════════════════════════════════════════╣
+║  MYCELIUM — réseau souterrain           ║
+║  pousse depuis les impacts de pluie     ║
+║  (v2 = prochaine étape)                ║
+╚══════════════════════════════════════════╝
+```
+
+### Séquence animée (time-lapse accéléré) :
+1. Carré GitHub se génère (le terrain)
+2. Nuages arrivent (les commits dans le temps)
+3. Pluie tombe, touche le sol (chaque push = impact)
+4. Le tout commence à germer (mycelium pousse entre les impacts)
+5. L'arbre émerge du sol (structure du projet se forme)
+
+### DANGER — Ne PAS indexer arbre et mycelium ensemble
+- L'arbre = structure VISIBLE (fichiers, modules, dossiers)
+- Le mycelium = réseau INVISIBLE (connexions, co-modifications, fréquences)
+- Si on les mélange dans le même index → gangrène, tout se pollue
+- Deux couches SÉPARÉES qui se TOUCHENT au SOL mais ne se mélangent PAS
+
+### Ciel — Patterns de Turing
+- Réaction-diffusion de Turing = les motifs naturels (taches, rayures)
+- Appliqué ici : les patterns de Turing DÉLIMITENT le ciel
+- Le ciel = la frontière entre le calculable et l'incalculable
+- Les nuages se forment DANS ces limites
+- Lien avec P=NP : les strates bornées du ciel
+
+### Vision produit — Site web
+- Site basique
+- Bouton côté gauche : demande d'accréditation GitHub
+- Après auth : visualisation 3D du repo
+- Sélection souris : clic sur un arbre
+- Vue de face : squelette + chair (Planche II style)
+- Navigation entre arbres (forêt)
+- Sous le sol : mycelium visible en transparence
+
+### Stack séparation stricte :
+- **v1** (FAIT) : l'arbre, le scanner, le serve
+- **v2** (NEXT) : le mycelium, git log, réseau souterrain
+- **v3** (FUTURE) : la forêt 3D, le ciel, Turing patterns
+- JAMAIS mélanger les couches dans le même code
+
