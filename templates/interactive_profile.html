@@ -705,19 +705,73 @@ function buildSVG(nodes) {
     grouped[key].push(n);
   });
 
-  // ── TREE SILHOUETTE GEOMETRY ──
-  // Calibré sur Planche II (922×1244) en observant l'image réelle.
-  // Canopée = triangle (apex → base). Racines = entonnoir inversé.
-  // Les nodes se placent en PAIRES gauche/droite sur les branches,
-  // entre le tronc (25%) et l'extrémité (82%), comme de vraies branches.
+  // ═══════════════════════════════════════════════════════════════
+  // SQUELETTE STRUCTUREL — DONNÉES BOTANIQUES RÉELLES
+  //
+  // Sources: Bebber 2007, Boswell PDEs, Fricker 2017, ISA arbo
+  //
+  // Principe:
+  //   1. Le SQUELETTE FANTÔME montre l'arbre IDÉAL (ce que le repo DEVRAIT être)
+  //   2. Les VRAIS NŒUDS se placent par-dessus (ce que le repo EST)
+  //   3. La TAILLE de chaque nœud = volume de code réel (lignes)
+  //   4. L'ORDRE = subordination: gros modules proches du tronc
+  //   5. Les VIOLATIONS sont en rouge (branch > 0.6× tronc = danger)
+  //   6. Les NIVEAUX VIDES montrent les fantômes = lacunes du projet
+  // ═══════════════════════════════════════════════════════════════
 
   const family = TREE_DATA.family || "conifere";
 
-  // ── Silhouette du conifère (tracée sur l'image) ──
-  const APEX   = { x: 461, y: 78 };    // pointe de la cime
-  const BASE_L = { x: 200, y: 558 };   // bord gauche canopée à la base
-  const BASE_R = { x: 722, y: 558 };   // bord droit canopée à la base
+  // ── A. MÉTRIQUES CODE — extraire les lignes depuis les labels ──
+  function extractLines(label) {
+    let m = label.match(/~([\d,]+)\s*L/i);
+    if (m) return parseInt(m[1].replace(/,/g, ''));
+    m = label.match(/([\d,]+)\s*lignes/i);
+    if (m) return parseInt(m[1].replace(/,/g, ''));
+    return 0;
+  }
 
+  const nodeMetrics = {};
+  let maxLines = 1;
+  nodes.forEach(n => {
+    const lk = nodeLevelKey(n);
+    const lines = extractLines(n.label || "");
+    nodeMetrics[n.id] = { lines, levelKey: lk };
+    // Exclure mycorhizes du max (méta-données, pas des vrais modules)
+    if (lk !== "R-5" && lines > maxLines) maxLines = lines;
+  });
+
+  // Référence tronc (pour calcul subordination)
+  const trunkGroup = grouped["T"] || [];
+  const trunkLines = trunkGroup.reduce((s, n) =>
+    s + (nodeMetrics[n.id]?.lines || 0), 0) || 1;
+
+  // ── B. SQUELETTE IDÉAL DU CONIFÈRE ──
+  // Basé sur la vraie botanique documentée dans docs/
+  //
+  // Ratios biomasse réels (recherche ISA):
+  //   Tronc = 40% masse   → dominant visuellement
+  //   Branches = 35%      → subordonnées (< 0.6× tronc)
+  //   Feuilles = 5%       → petit mais 100% énergie
+  //   Racines = 20-23%    → root:shoot = 0.25-0.30
+  //   Root spread = 2-4× diamètre couronne
+  //   80-90% racines dans top 60cm → R-1, R-2 dominants
+  const IDEAL = {
+    "C":   2,   // Bourgeons terminaux — produisent auxines, contrôlent TOUTE croissance
+    "F":   3,   // Feuilles — 5% masse → 100% énergie (photosynthèse)
+    "b":   6,   // Rameaux — <4 ans, flexibles, premiers à casser
+    "B":   4,   // Branches — MUST be < 0.6× tronc sinon attachement échoue
+    "T":   1,   // Tronc — bois de cœur MORT mais supporte 20 tonnes; transport bidirectionnel
+    "R-1": 3,   // Structurelles — 5-15 racines, ∅30cm, spread 2-4× couronne
+    "R-2": 2,   // Pivotantes — ancrage + stockage, 60cm-2m profond
+    "R-3": 3,   // Radicelles — ≤2mm, éphémères (turnover = mois), sites d'absorption
+    "R-4": 2,   // Poils — cuticule microscopique, filtrent TOUT ce qui entre
+    "R-5": 2,   // Mycorhizes — symbiose, amplifient absorption ×100
+  };
+
+  // ── C. SILHOUETTE GÉOMÉTRIQUE (calibrée sur Planche II) ──
+  const APEX   = { x: 461, y: 78 };
+  const BASE_L = { x: 200, y: 558 };
+  const BASE_R = { x: 722, y: 558 };
   const ROOT_TOP_L = { x: 355, y: 592 };
   const ROOT_TOP_R = { x: 567, y: 592 };
   const ROOT_BOT_L = { x: 100, y: 1080 };
@@ -739,115 +793,152 @@ function buildSVG(nodes) {
     };
   }
 
-  // ── Placement naturel des nodes sur les branches ──
-  // Distribue en paires gauche/droite autour du tronc.
-  // Chaque node est à 25-82% du chemin tronc→bord (pas au tronc, pas à l'extrémité).
-  // Y suit la pente de branche : plus loin du tronc = légèrement plus bas.
-  function computeBranchPositions(levelKey, levelY, count, zone) {
+  // ── D. CALCUL POSITIONS (paires L/R, subordination) ──
+  function branchPositions(levelKey, levelY, count, zone) {
     if (count === 0) return [];
-
-    // Tronc: centré
-    if (levelKey === "T") {
-      if (count === 1) return [{ x: CENTER_X, y: levelY }];
-      return Array.from({length: count}, (_, i) => ({
-        x: CENTER_X + (i % 2 === 0 ? -12 : 12),
-        y: levelY - 8 + (i / (count - 1)) * 16
-      }));
-    }
+    if (levelKey === "T") return [{ x: CENTER_X, y: levelY }];
 
     const bounds = zone === "aerial" ? canopyWidthAt(levelY) : rootWidthAt(levelY);
-    const halfR = Math.max(bounds.right - CENTER_X, 30);  // minimum 30px
+    const halfR = Math.max(bounds.right - CENTER_X, 30);
     const halfL = Math.max(CENTER_X - bounds.left, 30);
 
-    // Node unique: sur une branche à droite
     if (count === 1) {
-      const ratio = 0.4;
-      const slopeMax = zone === "aerial" ? 15 : 10;
-      return [{
-        x: Math.round(CENTER_X + halfR * ratio),
-        y: Math.round(levelY + ratio * slopeMax - slopeMax * 0.25)
-      }];
+      return [{ x: Math.round(CENTER_X + halfR * 0.38), y: Math.round(levelY + 3) }];
     }
 
-    // Paires gauche/droite
-    const rightCount = Math.ceil(count / 2);
-    const leftCount = count - rightCount;
     const positions = [];
+    const rN = Math.ceil(count / 2), lN = count - rN;
+    const IN = 0.22, OUT = 0.85;
+    const slope = zone === "aerial" ? 20 : 14;
 
-    const INNER = 0.25;   // début de branche (25% du tronc)
-    const OUTER = 0.82;   // fin de branche (82%, pas à l'extrême)
-    const slopeMax = zone === "aerial" ? 18 : 12;
-
-    // Côté droit
-    for (let i = 0; i < rightCount; i++) {
-      const t = rightCount === 1 ? 0.5 : i / (rightCount - 1);
-      const ratio = INNER + t * (OUTER - INNER);
+    for (let i = 0; i < rN; i++) {
+      const t = rN === 1 ? 0.5 : i / (rN - 1);
+      const r = IN + t * (OUT - IN);
       positions.push({
-        x: Math.round(CENTER_X + halfR * ratio),
-        y: Math.round(levelY + ratio * slopeMax - slopeMax * 0.25)
+        x: Math.round(CENTER_X + halfR * r),
+        y: Math.round(levelY + r * slope - slope * 0.25)
       });
     }
-
-    // Côté gauche (miroir)
-    for (let i = 0; i < leftCount; i++) {
-      const t = leftCount === 1 ? 0.5 : i / (leftCount - 1);
-      const ratio = INNER + t * (OUTER - INNER);
+    for (let i = 0; i < lN; i++) {
+      const t = lN === 1 ? 0.5 : i / (lN - 1);
+      const r = IN + t * (OUT - IN);
       positions.push({
-        x: Math.round(CENTER_X - halfL * ratio),
-        y: Math.round(levelY + ratio * slopeMax - slopeMax * 0.25)
+        x: Math.round(CENTER_X - halfL * r),
+        y: Math.round(levelY + r * slope - slope * 0.25)
       });
     }
-
     return positions;
   }
 
-  // ── Render: skeleton (lignes de branches) puis nodes par-dessus ──
+  // ── E. RAYON = sqrt(volume code) ──
+  // Plus le module a de lignes → plus le nœud est gros
+  // Tronc DOIT être le plus gros visuellement (40% biomasse)
+  function nodeR(id) {
+    const lines = nodeMetrics[id]?.lines || 0;
+    if (lines <= 0) return 5;
+    return Math.round(4 + Math.sqrt(lines / maxLines) * 10);
+  }
 
-  // Skeleton: lignes du tronc vers chaque node
+  // ── F. SANTÉ — Subordination conifère (RULE C2) ──
+  // "branch.size < 0.6 × trunk.size TOUJOURS"
+  // Si une branche dépasse → violation structurelle → ROUGE
+  function isViolation(node) {
+    const lk = nodeLevelKey(node);
+    if (lk === "T" || lk.startsWith("R")) return false;
+    const lines = nodeMetrics[node.id]?.lines || 0;
+    return lines > trunkLines * 0.6;
+  }
+
+  // ═══════════════════════════════════════════
+  //           R E N D E R
+  // ═══════════════════════════════════════════
+
+  const posMap = {};  // nodeId → {x, y}
+
+  // ── LAYER 1: SQUELETTE FANTÔME (l'arbre idéal en transparence) ──
+  // Montre ce que le repo DEVRAIT avoir à chaque niveau.
+  // Les branches fantômes = la cible. Les trous = les lacunes.
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const idealN = IDEAL[lk] || 0;
+    const ghostPos = branchPositions(lk, lev.y, idealN, lev.zone);
+    const actualN = (grouped[lk] || []).length;
+
+    ghostPos.forEach((pos, i) => {
+      // Branche fantôme (ligne du tronc vers la position idéale)
+      if (lk !== "T") {
+        const ty = lev.zone === "aerial" ? lev.y - 3 : SOL_Y + 15;
+        svgHTML += `<line x1="${CENTER_X}" y1="${ty}" x2="${pos.x}" y2="${pos.y}"
+          stroke="${lev.color}" stroke-width="0.4" opacity="0.07"
+          stroke-dasharray="4,6"/>`;
+      }
+
+      // Nœud fantôme — visible seulement pour les positions NON couvertes
+      // = les lacunes du projet (ce qui manque)
+      if (i >= actualN) {
+        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="6"
+          fill="none" stroke="${lev.color}" stroke-width="0.7" opacity="0.12"
+          stroke-dasharray="3,2"/>`;
+      }
+    });
+  }
+
+  // ── LAYER 2: BRANCHES RÉELLES (courbes Bézier vers les vrais nœuds) ──
+  // Les nœuds sont TRIÉS par taille: les plus gros PROCHES du tronc (subordination)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
-    const positions = computeBranchPositions(lk, lev.y, group.length, lev.zone);
+    if (group.length === 0) continue;
 
-    group.forEach((n, i) => {
-      if (!positions[i] || lk === "T") return;
+    // Tri par volume de code descendant → gros modules proches du tronc
+    const sorted = [...group].sort((a, b) =>
+      (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0)
+    );
+    const positions = branchPositions(lk, lev.y, sorted.length, lev.zone);
+
+    sorted.forEach((n, i) => {
+      if (!positions[i]) return;
+      posMap[n.id] = positions[i];
+
+      if (lk === "T") return;
       const { x: nx, y: ny } = positions[i];
-      const trunkY = lev.zone === "aerial" ? lev.y - 3 : SOL_Y + 15;
-
-      // Courbe quadratique: le point de contrôle crée un arc naturel
+      const ty = lev.zone === "aerial" ? lev.y - 3 : SOL_Y + 15;
       const midX = CENTER_X + (nx - CENTER_X) * 0.4;
-      const midY = (trunkY + ny) / 2 + (lev.zone === "aerial" ? -8 : 5);
+      const midY = (ty + ny) / 2 + (lev.zone === "aerial" ? -8 : 5);
+      const viol = isViolation(n);
 
-      svgHTML += `<path d="M${CENTER_X},${trunkY} Q${midX},${midY} ${nx},${ny}"
-        fill="none" stroke="${lev.color}" stroke-width="0.8" opacity="0.2"
+      svgHTML += `<path d="M${CENTER_X},${ty} Q${midX},${midY} ${nx},${ny}"
+        fill="none" stroke="${viol ? '#FF5252' : lev.color}"
+        stroke-width="${viol ? 1.5 : 0.8}" opacity="${viol ? 0.35 : 0.22}"
         stroke-dasharray="${lev.zone === 'under' ? '3,2' : 'none'}"/>`;
     });
   }
 
-  // Nodes par-dessus
+  // ── LAYER 3: NŒUDS RÉELS (taille = code, couleur = santé) ──
+  // Chaque nœud représente un module/composant du repo.
+  // La taille reflète le volume de code réel (sqrt scaling).
+  // ROUGE = violation subordination (branch > 0.6× tronc)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
-    const positions = computeBranchPositions(lk, lev.y, group.length, lev.zone);
-
-    group.forEach((n, i) => {
-      if (!positions[i]) return;
-      const { x: nx, y: ny } = positions[i];
-      const conf = n.confidence || 0;
-      const r = 5 + (conf / 100) * 4;
-      const fill = n.status === "done" ? lev.color :
+    group.forEach(n => {
+      const pos = posMap[n.id] || { x: CENTER_X, y: lev.y };
+      const { x: nx, y: ny } = pos;
+      const r = nodeR(n.id);
+      const viol = isViolation(n);
+      const fill = viol ? "#FF5252" :
+                   n.status === "done" ? lev.color :
                    n.status === "wip" ? "var(--orange)" : "var(--red)";
 
       svgHTML += `
       <g class="node-g" data-id="${n.id}" data-status="${n.status}">
-        <circle cx="${nx}" cy="${ny}" r="16" fill="transparent"/>
-        <circle class="node-ring" cx="${nx}" cy="${ny}" r="13"
+        <circle cx="${nx}" cy="${ny}" r="${r + 8}" fill="transparent"/>
+        <circle class="node-ring" cx="${nx}" cy="${ny}" r="${r + 5}"
                 fill="none" stroke="${fill}" stroke-width="1.5" opacity="0"/>
         <circle cx="${nx}" cy="${ny}" r="${r}"
-                fill="${fill}" opacity="0.8" filter="url(#glow)"/>
-        <circle cx="${nx}" cy="${ny}" r="${r * 0.3}"
+                fill="${fill}" opacity="0.85" filter="url(#glow)"/>
+        <circle cx="${nx}" cy="${ny}" r="${Math.max(r * 0.2, 1.5)}"
                 fill="#fff" opacity="${n.status === 'done' ? 0.9 : 0.3}"/>
-        <text x="${nx}" y="${ny - r - 3}" fill="${lev.color}" font-size="7"
-              font-family="JetBrains Mono, monospace" opacity="0.6" text-anchor="middle"
-              filter="url(#textSh)">${n.id}</text>
+        <text x="${nx}" y="${ny - r - 4}" fill="${viol ? '#FF5252' : lev.color}" font-size="7"
+              font-family="JetBrains Mono, monospace" opacity="0.7" text-anchor="middle"
+              filter="url(#textSh)">${n.id}${viol ? ' !' : ''}</text>
       </g>`;
     });
   }
