@@ -814,301 +814,162 @@ function buildSVG(nodes) {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  POSITIONNEMENT — RULE: CHAQUE N\u0152UD H\u00c9RITE DU C\u00d4T\u00c9 DE SON PARENT
+  //  SQUELETTE PARFAIT DU CONIF\u00c8RE — 28 n\u0153uds
   //
-  //  Conif\u00e8re: tronc au centre, branches L/R, JAMAIS de croisement.
-  //  B nodes: altern\u00e9s L/R (plus gros en premier)
-  //  b nodes: M\u00caME c\u00f4t\u00e9 que leur parent B
-  //  C, F, R: altern\u00e9s L/R
+  //  L'arbre ID\u00c9AL, ce qu'il DEVRAIT \u00eatre.
+  //  Bas\u00e9 sur donn\u00e9es botaniques PhD (ISA, Bebber, Boswell).
+  //  Chaque n\u0153ud a un parent explicite → z\u00e9ro croisement.
+  //  Connexions: tronc \u2192 B \u2192 b (a\u00e9rien), tronc \u2192 R-1 \u2192 R-2\u2026 (souterrain)
   // ═══════════════════════════════════════════════════════════
 
-  // \u00c9tape 1: Assigner un C\u00d4T\u00c9 (L/R) \u00e0 chaque n\u0153ud
-  const nodeSide = {};
-
-  // T → centre
-  (grouped["T"] || []).forEach(n => { nodeSide[n.id] = "C"; });
-
-  // B → alterner L/R, plus gros d'abord
-  const sortedB = [...(grouped["B"] || [])].sort((a, b) =>
-    (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0)
-  );
-  sortedB.forEach((n, i) => { nodeSide[n.id] = i % 2 === 0 ? "R" : "L"; });
-
-  // b → H\u00c9RITER du c\u00f4t\u00e9 du parent B (par chemin d'entr\u00e9e)
-  (grouped["b"] || []).forEach(n => {
-    const entry = n.entry || "";
-    for (const bn of sortedB) {
-      if (bn.entry && entry.startsWith(bn.entry)) {
-        nodeSide[n.id] = nodeSide[bn.id];
-        return;
-      }
-    }
-    nodeSide[n.id] = "R";
-  });
-
-  // C, F → alterner
-  ["C", "F"].forEach(lk => {
-    (grouped[lk] || []).forEach((n, i) => {
-      nodeSide[n.id] = i % 2 === 0 ? "R" : "L";
-    });
-  });
-
-  // Racines → alterner
-  ["R-1", "R-2", "R-3", "R-4", "R-5"].forEach(lk => {
-    (grouped[lk] || []).forEach((n, i) => {
-      nodeSide[n.id] = i % 2 === 0 ? "R" : "L";
-    });
-  });
-
-  // \u00c9tape 2: Calculer les positions
-  const posMap = {};
-
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    const group = grouped[lk] || [];
-    if (group.length === 0) continue;
-
-    if (lk === "T") {
-      group.forEach(n => { posMap[n.id] = { x: CENTER_X, y: lev.y }; });
-      continue;
-    }
-
-    // b nodes: positionn\u00e9s apr\u00e8s les B (relatif au parent)
-    if (lk === "b") continue;
-
+  function idealX(lk, side, ratio) {
+    const lev = LEVELS[lk];
     const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
-    const halfR = Math.max(bounds.right - CENTER_X, 40);
-    const halfL = Math.max(CENTER_X - bounds.left, 40);
-
-    const rightNodes = group.filter(n => nodeSide[n.id] === "R")
-      .sort((a, b) => (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0));
-    const leftNodes = group.filter(n => nodeSide[n.id] === "L")
-      .sort((a, b) => (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0));
-
-    rightNodes.forEach((n, i) => {
-      const t = rightNodes.length > 1 ? i / (rightNodes.length - 1) : 0.5;
-      const x = CENTER_X + halfR * (0.18 + t * 0.62);
-      posMap[n.id] = { x: Math.round(x), y: Math.round(lev.y + (i % 2) * 6 - 3) };
-    });
-
-    leftNodes.forEach((n, i) => {
-      const t = leftNodes.length > 1 ? i / (leftNodes.length - 1) : 0.5;
-      const x = CENTER_X - halfL * (0.18 + t * 0.62);
-      posMap[n.id] = { x: Math.round(x), y: Math.round(lev.y + (i % 2) * 6 - 3) };
-    });
+    const half = side === "R" ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
+    return Math.round(side === "R" ? CENTER_X + half * ratio : CENTER_X - half * ratio);
   }
 
-  // Positionner les b nodes RELATIVEMENT \u00e0 leur parent B
-  const bByParent = {};
-  (grouped["b"] || []).forEach(n => {
-    const entry = n.entry || "";
-    let pid = null;
-    for (const bn of sortedB) {
-      if (bn.entry && entry.startsWith(bn.entry)) { pid = bn.id; break; }
-    }
-    const key = pid || "__orphan";
-    if (!bByParent[key]) bByParent[key] = [];
-    bByParent[key].push(n);
+  // 28 n\u0153uds id\u00e9aux — structure explicite
+  const idealTree = [
+    // CIME (2) — bourgeons terminaux, auxines
+    { id:"iC1", lk:"C", label:"Tests / CI",     side:"R", ratio:0.45, pid:null },
+    { id:"iC2", lk:"C", label:"Release / CD",   side:"L", ratio:0.45, pid:null },
+
+    // FEUILLES (3) — 5% biomasse, 100% \u00e9nergie
+    { id:"iF1", lk:"F", label:"API endpoints",  side:"R", ratio:0.32, pid:null },
+    { id:"iF2", lk:"F", label:"UI composants",  side:"L", ratio:0.32, pid:null },
+    { id:"iF3", lk:"F", label:"Exports / CLI",  side:"R", ratio:0.62, pid:null },
+
+    // BRANCHES (4) — scaffold, < 0.6\u00d7 tronc
+    { id:"iB1", lk:"B", label:"Module A",       side:"R", ratio:0.30, pid:null },
+    { id:"iB2", lk:"B", label:"Module B",       side:"L", ratio:0.30, pid:null },
+    { id:"iB3", lk:"B", label:"Module C",       side:"R", ratio:0.62, pid:null },
+    { id:"iB4", lk:"B", label:"Module D",       side:"L", ratio:0.62, pid:null },
+
+    // RAMEAUX (6) — sub-branches de B, < 4 ans
+    { id:"ib1", lk:"b", label:"Sub-mod 1",      side:"R", ratio:0.28, pid:"iB1" },
+    { id:"ib2", lk:"b", label:"Sub-mod 2",      side:"R", ratio:0.44, pid:"iB1" },
+    { id:"ib3", lk:"b", label:"Sub-mod 3",      side:"L", ratio:0.28, pid:"iB2" },
+    { id:"ib4", lk:"b", label:"Sub-mod 4",      side:"L", ratio:0.44, pid:"iB2" },
+    { id:"ib5", lk:"b", label:"Sub-mod 5",      side:"R", ratio:0.60, pid:"iB3" },
+    { id:"ib6", lk:"b", label:"Sub-mod 6",      side:"L", ratio:0.60, pid:"iB4" },
+
+    // TRONC (1) — 55-65% biomasse, ne divise JAMAIS
+    { id:"iT1", lk:"T", label:"Core pipeline",  side:"C", ratio:0, pid:null },
+
+    // R-1 STRUCTURELLES (3) — 5-15 racines, \u224830cm
+    { id:"iR11", lk:"R-1", label:"Framework web",  side:"R", ratio:0.28, pid:null },
+    { id:"iR12", lk:"R-1", label:"Framework data", side:"L", ratio:0.28, pid:null },
+    { id:"iR13", lk:"R-1", label:"Framework test", side:"R", ratio:0.55, pid:null },
+
+    // R-2 PIVOTANTES (2) — ancrage 60cm-2m
+    { id:"iR21", lk:"R-2", label:"Archi DB",    side:"R", ratio:0.35, pid:"iR11" },
+    { id:"iR22", lk:"R-2", label:"Archi API",   side:"L", ratio:0.35, pid:"iR12" },
+
+    // R-3 RADICELLES (3) — \u00e9ph\u00e9m\u00e8res, absorption
+    { id:"iR31", lk:"R-3", label:"Contrainte 1", side:"R", ratio:0.40, pid:"iR21" },
+    { id:"iR32", lk:"R-3", label:"Contrainte 2", side:"L", ratio:0.40, pid:"iR22" },
+    { id:"iR33", lk:"R-3", label:"Contrainte 3", side:"R", ratio:0.68, pid:"iR21" },
+
+    // R-4 POILS (2) — filtrent tout
+    { id:"iR41", lk:"R-4", label:"Licence",      side:"R", ratio:0.45, pid:"iR31" },
+    { id:"iR42", lk:"R-4", label:"Conformit\u00e9",  side:"L", ratio:0.45, pid:"iR32" },
+
+    // R-5 MYCORHIZES (2) — symbiose \u00d7100
+    { id:"iR51", lk:"R-5", label:"Algorithmes",  side:"R", ratio:0.50, pid:"iR41" },
+    { id:"iR52", lk:"R-5", label:"Hardware",     side:"L", ratio:0.50, pid:"iR42" },
+  ];
+
+  // Calculer positions id\u00e9ales
+  const iPos = {};
+  idealTree.forEach(n => {
+    if (n.side === "C") { iPos[n.id] = { x: CENTER_X, y: LEVELS[n.lk].y }; }
+    else { iPos[n.id] = { x: idealX(n.lk, n.side, n.ratio), y: LEVELS[n.lk].y }; }
   });
 
-  const bLev = LEVELS["b"];
-  for (const [pid, children] of Object.entries(bByParent)) {
-    const parentPos = posMap[pid];
-    if (!parentPos) {
-      children.forEach((n, i) => {
-        const side = i % 2 === 0 ? 1 : -1;
-        posMap[n.id] = { x: CENTER_X + side * (50 + Math.floor(i / 2) * 35), y: bLev.y };
-      });
-      continue;
-    }
-    const dir = parentPos.x >= CENTER_X ? 1 : -1;
-    children.sort((a, b) => (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0));
-    children.forEach((n, i) => {
-      posMap[n.id] = {
-        x: Math.round(parentPos.x + dir * (20 + i * 28)),
-        y: Math.round(bLev.y + (i % 3) * 7 - 5)
-      };
-    });
-  }
-
-  // Positions id\u00e9ales (pour le squelette parfait)
-  const idealPos = {};
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    const count = IDEAL[lk] || 0;
-    if (count === 0 || lk === "T") {
-      idealPos[lk] = lk === "T" ? [{ x: CENTER_X, y: lev.y }] : [];
-      continue;
-    }
-    const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
-    const halfR = Math.max(bounds.right - CENTER_X, 40);
-    const halfL = Math.max(CENTER_X - bounds.left, 40);
-    const rN = Math.ceil(count / 2), lN = count - rN;
-    const pos = [];
-    for (let i = 0; i < rN; i++) {
-      const t = rN > 1 ? i / (rN - 1) : 0.5;
-      pos.push({ x: Math.round(CENTER_X + halfR * (0.18 + t * 0.62)), y: Math.round(lev.y + (i % 2) * 6 - 3) });
-    }
-    for (let i = 0; i < lN; i++) {
-      const t = lN > 1 ? i / (lN - 1) : 0.5;
-      pos.push({ x: Math.round(CENTER_X - halfL * (0.18 + t * 0.62)), y: Math.round(lev.y + (i % 2) * 6 - 3) });
-    }
-    idealPos[lk] = pos;
-  }
-
-  const IDEAL_LABELS = {
-    "C":   ["Tests / CI", "Release"],
-    "F":   ["Endpoints", "UI", "Exports"],
-    "b":   ["Sub-mod 1", "Sub-mod 2", "Sub-mod 3", "Sub-mod 4", "Sub-mod 5", "Sub-mod 6"],
-    "B":   ["Module A", "Module B", "Module C", "Module D"],
-    "T":   ["Core pipeline"],
-    "R-1": ["Framework 1", "Framework 2", "Framework 3"],
-    "R-2": ["Archi DB", "Archi API"],
-    "R-3": ["Contrainte 1", "Contrainte 2", "Contrainte 3"],
-    "R-4": ["Licence", "Conformit\u00e9"],
-    "R-5": ["Algo fondamental", "Hardware"],
-  };
-
-  // ═══════════════════════════════════════════════════════
-  //  C O U C H E   1  —  SQUELETTE PARFAIT (ambre)
-  // ═══════════════════════════════════════════════════════
-
-  // TRONC — colonne vert\u00e9brale (55-65% biomasse)
+  // ────── RENDER: TRONC ──────
   svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 30}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 40}"
-    stroke="rgba(218,165,32,0.3)" stroke-width="3.5"/>`;
+    stroke="rgba(218,165,32,0.45)" stroke-width="4"/>`;
 
+  // Points d'attache
   for (const [lk, lev] of Object.entries(LEVELS)) {
-    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="4"
-      fill="rgba(218,165,32,0.08)" stroke="rgba(218,165,32,0.25)" stroke-width="1.2"/>`;
+    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="4.5"
+      fill="rgba(218,165,32,0.12)" stroke="rgba(218,165,32,0.35)" stroke-width="1.3"/>`;
   }
 
-  // BRANCHES ID\u00c9ALES — du tronc vers positions parfaites
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    if (lk === "T") continue;
-    const ghostP = idealPos[lk] || [];
-    const actualCount = (grouped[lk] || []).length;
-    const levelMissing = actualCount === 0;
-    const labels = IDEAL_LABELS[lk] || [];
+  // ────── RENDER: CONNEXIONS ──────
+  idealTree.forEach(n => {
+    const pos = iPos[n.id];
+    if (!pos || n.lk === "T") return;
+    let pp;
+    if (n.pid && iPos[n.pid]) { pp = iPos[n.pid]; }
+    else if (n.lk === "R-1") { pp = { x: CENTER_X, y: SOL_Y + 10 }; }
+    else { pp = { x: CENTER_X, y: LEVELS[n.lk].y }; }
 
-    ghostP.forEach((pos, i) => {
-      const isGap = i >= actualCount;
-      const branchOp = levelMissing ? 0.22 : (isGap ? 0.15 : 0.06);
-
-      svgHTML += `<line x1="${CENTER_X}" y1="${lev.y}" x2="${pos.x}" y2="${pos.y}"
-        stroke="rgba(218,165,32,${branchOp})" stroke-width="${levelMissing ? 1.5 : 1}"
-        stroke-dasharray="5,4"/>`;
-
-      if (isGap) {
-        svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="7"
-          fill="none" stroke="rgba(218,165,32,0.35)" stroke-width="1.3" stroke-dasharray="3,3"/>`;
-        if (labels[i]) {
-          svgHTML += `<text x="${pos.x}" y="${pos.y + 18}" fill="rgba(218,165,32,0.4)"
-            font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle"
-            filter="url(#textSh)">${labels[i]}</text>`;
-        }
-      }
-    });
-
-    // Diagnostic badge
-    const ideal = IDEAL[lk] || 0;
-    if (ideal > 0) {
-      if (levelMissing) {
-        svgHTML += `<text x="880" y="${lev.y + 4}" fill="#FF5252" font-size="9" font-weight="600"
-          font-family="JetBrains Mono, monospace" text-anchor="end" opacity="0.7"
-          filter="url(#textSh)">MANQUE</text>`;
-      } else if (actualCount < ideal) {
-        svgHTML += `<text x="880" y="${lev.y + 4}" fill="#FFA726" font-size="9"
-          font-family="JetBrains Mono, monospace" text-anchor="end" opacity="0.6"
-          filter="url(#textSh)">${actualCount}/${ideal}</text>`;
-      } else {
-        svgHTML += `<text x="880" y="${lev.y + 4}" fill="#28c862" font-size="9"
-          font-family="JetBrains Mono, monospace" text-anchor="end" opacity="0.5"
-          filter="url(#textSh)">\u2713 ${actualCount}</text>`;
-      }
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════
-  //  C O U C H E   2  —  REPO R\u00c9EL
-  // ═══════════════════════════════════════════════════════
-
-  // CONNEXIONS — tout part du tronc, z\u00e9ro croisement
-  nodes.forEach(n => {
-    const lk = nodeLevelKey(n);
-    if (lk === "T") return;
-    const pos = posMap[n.id];
-    if (!pos) return;
-
-    let pp = null;
-    if (lk === "b") {
-      const entry = n.entry || "";
-      for (const bn of sortedB) {
-        if (bn.entry && entry.startsWith(bn.entry) && posMap[bn.id]) { pp = posMap[bn.id]; break; }
-      }
-      if (!pp) pp = { x: CENTER_X, y: LEVELS["b"].y };
-    } else if (["B", "C", "F"].includes(lk)) {
-      pp = { x: CENTER_X, y: LEVELS[lk].y };
-    } else if (lk === "R-1") {
-      pp = { x: CENTER_X, y: SOL_Y + 10 };
-    } else if (lk.startsWith("R-")) {
-      const depth = parseInt(lk.split("-")[1]);
-      for (let d = depth - 1; d >= 1; d--) {
-        const above = grouped[`R-${d}`];
-        if (above?.length > 0 && posMap[above[0].id]) { pp = posMap[above[0].id]; break; }
-      }
-      if (!pp) pp = { x: CENTER_X, y: SOL_Y + 10 };
-    }
-    if (!pp) return;
-
-    const viol = isViolation(n);
     svgHTML += `<line x1="${pp.x}" y1="${pp.y}" x2="${pos.x}" y2="${pos.y}"
-      stroke="${viol ? 'rgba(255,82,82,0.55)' : 'rgba(255,255,255,0.4)'}"
-      stroke-width="${viol ? 2.2 : 1.4}"/>`;
+      stroke="rgba(218,165,32,0.45)" stroke-width="1.6"/>`;
   });
 
-  // N\u0152UDS R\u00c9ELS — taille = code, couleur = sant\u00e9
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    (grouped[lk] || []).forEach(n => {
-      const pos = posMap[n.id] || { x: CENTER_X, y: lev.y };
-      const r = nodeR(n.id);
-      const viol = isViolation(n);
-      const fill = viol ? "#FF5252" :
-                   n.status === "done" ? lev.color :
-                   n.status === "wip" ? "var(--orange)" : "var(--red)";
+  // ────── RENDER: N\u0152UDS ID\u00c9AUX ──────
+  idealTree.forEach(n => {
+    const pos = iPos[n.id];
+    if (!pos) return;
+    const lev = LEVELS[n.lk];
+    const isT = n.lk === "T";
+    const r = isT ? 9 : 6;
 
-      svgHTML += `
-      <g class="node-g" data-id="${n.id}" data-status="${n.status}">
-        <circle cx="${pos.x}" cy="${pos.y}" r="${r + 8}" fill="transparent"/>
-        <circle class="node-ring" cx="${pos.x}" cy="${pos.y}" r="${r + 5}"
-                fill="none" stroke="${fill}" stroke-width="1.5" opacity="0"/>
-        <circle cx="${pos.x}" cy="${pos.y}" r="${r}"
-                fill="${fill}" opacity="0.85" filter="url(#glow)"/>
-        <circle cx="${pos.x}" cy="${pos.y}" r="${Math.max(r * 0.2, 1.5)}"
-                fill="#fff" opacity="${n.status === 'done' ? 0.9 : 0.3}"/>
-        <text x="${pos.x}" y="${pos.y - r - 4}" fill="${viol ? '#FF5252' : lev.color}" font-size="7"
-              font-family="JetBrains Mono, monospace" opacity="0.7" text-anchor="middle"
-              filter="url(#textSh)">${n.id}${viol ? ' !' : ''}</text>
-      </g>`;
+    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}"
+      fill="rgba(218,165,32,0.18)" stroke="rgba(218,165,32,0.6)" stroke-width="1.5"
+      filter="url(#glow)"/>`;
+    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="1.5"
+      fill="rgba(218,165,32,0.9)"/>`;
+    svgHTML += `<text x="${pos.x}" y="${pos.y - r - 4}" fill="rgba(218,165,32,0.7)" font-size="7"
+      font-family="JetBrains Mono, monospace" text-anchor="middle"
+      filter="url(#textSh)">${n.label}</text>`;
+  });
+
+  // ────── BADGES DIAGNOSTIC ──────
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const count = idealTree.filter(n => n.lk === lk).length;
+    if (count > 0 && lk !== "T") {
+      svgHTML += `<text x="880" y="${lev.y + 4}" fill="rgba(218,165,32,0.5)" font-size="8"
+        font-family="JetBrains Mono, monospace" text-anchor="end"
+        filter="url(#textSh)">${count} id\u00e9al</text>`;
+    }
+  }
+
+  // ────── REPO NODES (invisibles, pour sidebar) ──────
+  const posMap = {};
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    (grouped[lk] || []).forEach((n, i) => {
+      const side = i % 2 === 0 ? 1 : -1;
+      const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
+      const half = side > 0 ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
+      const x = lk === "T" ? CENTER_X : CENTER_X + side * half * (0.2 + (i * 0.12));
+      posMap[n.id] = { x: Math.round(x), y: lev.y };
     });
   }
+  nodes.forEach(n => {
+    const pos = posMap[n.id] || { x: CENTER_X, y: 500 };
+    svgHTML += `
+    <g class="node-g" data-id="${n.id}" data-status="${n.status}">
+      <circle cx="${pos.x}" cy="${pos.y}" r="8" fill="transparent"/>
+    </g>`;
+  });
 
   // L\u00c9GENDE
-  const legX = 50, legY = 1100;
+  const legX = 50, legY = 1110;
   svgHTML += `
-    <rect x="${legX - 5}" y="${legY - 12}" width="180" height="64" rx="4"
-      fill="rgba(0,0,0,0.5)" stroke="rgba(218,165,32,0.15)" stroke-width="0.5"/>
-    <line x1="${legX}" y1="${legY}" x2="${legX + 18}" y2="${legY}"
-      stroke="rgba(218,165,32,0.35)" stroke-width="1.5" stroke-dasharray="4,3"/>
-    <text x="${legX + 24}" y="${legY + 3}" fill="rgba(218,165,32,0.5)" font-size="7"
-      font-family="JetBrains Mono, monospace">Squelette parfait</text>
-    <circle cx="${legX + 6}" cy="${legY + 16}" r="4" fill="#3d8a3a" opacity="0.85"/>
-    <text x="${legX + 24}" y="${legY + 19}" fill="rgba(255,255,255,0.5)" font-size="7"
-      font-family="JetBrains Mono, monospace">Sain (< 0.6x tronc)</text>
-    <circle cx="${legX + 6}" cy="${legY + 32}" r="4" fill="#FF5252" opacity="0.85"/>
-    <text x="${legX + 24}" y="${legY + 35}" fill="rgba(255,82,82,0.5)" font-size="7"
-      font-family="JetBrains Mono, monospace">Violation subordination</text>
-    <circle cx="${legX + 6}" cy="${legY + 48}" r="5" fill="none"
-      stroke="rgba(218,165,32,0.4)" stroke-width="1" stroke-dasharray="2,2"/>
-    <text x="${legX + 24}" y="${legY + 51}" fill="rgba(218,165,32,0.5)" font-size="7"
-      font-family="JetBrains Mono, monospace">Manque (noeud attendu)</text>
+    <rect x="${legX-5}" y="${legY-12}" width="220" height="48" rx="4"
+      fill="rgba(0,0,0,0.5)" stroke="rgba(218,165,32,0.2)" stroke-width="0.5"/>
+    <circle cx="${legX+6}" cy="${legY+4}" r="5"
+      fill="rgba(218,165,32,0.18)" stroke="rgba(218,165,32,0.6)" stroke-width="1.5"/>
+    <text x="${legX+18}" y="${legY+7}" fill="rgba(218,165,32,0.6)" font-size="7"
+      font-family="JetBrains Mono, monospace">N\u0153ud id\u00e9al (ce que l'arbre devrait avoir)</text>
+    <line x1="${legX}" y1="${legY+22}" x2="${legX+14}" y2="${legY+22}"
+      stroke="rgba(218,165,32,0.45)" stroke-width="1.6"/>
+    <text x="${legX+18}" y="${legY+25}" fill="rgba(218,165,32,0.6)" font-size="7"
+      font-family="JetBrains Mono, monospace">Connexion structurelle (hi\u00e9rarchie r\u00e9elle)</text>
   `;
 
   // Footer
