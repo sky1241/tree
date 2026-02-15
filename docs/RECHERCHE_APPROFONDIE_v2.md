@@ -481,3 +481,20 @@ Vacances dans les forêts tropicales du Queensland (Australie) en 2001. Fowler o
 *Recherche compilée le 14 février 2026*
 *Sources : 87 résultats web analysés, 5 références académiques vérifiées*
 *Méthode : sniper workflow (recherche ciblée par sujet)*
+
+---
+
+## Zone abstraite — 7ème famille : Saule Pleureur 🌊
+
+> Idée de Sky, 2026-02-15. À explorer comme kiff du dimanche.
+
+**Concept** : Projet à forte cascade descendante. Core central solide (tronc) mais tout retombe — les modules, l'héritage, les dépendances coulent vers le bas comme les branches du saule. Props drilling, ORM cascades, event propagation descendante.
+
+**Pistes** :
+- Frameworks avec héritage profond (React props flow, Django ORM)
+- Projets où l'output cascade depuis un point central
+- Architecture pub/sub avec propagation descendante
+- Visuellement : tronc qui monte, branches qui redescendent, feuilles qui touchent le sol
+
+**Statut** : zone de recherche ouverte. Le sujet a beau être vieux, y'a encore des choses à découvrir.
+
