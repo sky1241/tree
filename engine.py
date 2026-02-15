@@ -3180,6 +3180,465 @@ def print_all_families():
         print(f"\n  {fam['emoji']} {fam['nom']:10s} | {fam['forme']:20s} | {fam['quand']}")
 
 
+# ============================================================================
+# 🖼️ RENDERER — Vue profil (Planche II) + serveur local
+# ============================================================================
+
+# Positions Y des niveaux sur l'image Planche II (922×1244px)
+LEVEL_Y_MAP = {
+    "C":  {"y": 100, "label": "CIME",             "color": "#28c862", "zone": "aerial"},
+    "F":  {"y": 215, "label": "FEUILLES",          "color": "#32b555", "zone": "aerial"},
+    "b":  {"y": 330, "label": "RAMEAUX",            "color": "#38a048", "zone": "aerial"},
+    "B":  {"y": 440, "label": "BRANCHES",           "color": "#3d8a3a", "zone": "aerial"},
+    "T":  {"y": 530, "label": "TRONC",              "color": "#5a9a35", "zone": "aerial"},
+    # SOL = 575
+    "R-1": {"y": 650, "label": "R.STRUCTURELLES",   "color": "#9a7453", "zone": "underground"},
+    "R-2": {"y": 760, "label": "R.PIVOTANTES",      "color": "#8a6344", "zone": "underground"},
+    "R-3": {"y": 870, "label": "RADICELLES",        "color": "#7a5235", "zone": "underground"},
+    "R-4": {"y": 960, "label": "POILS ABSORBANTS",  "color": "#6b4226", "zone": "underground"},
+    "R-5": {"y": 1060, "label": "MYCORHIZES",       "color": "#5c3317", "zone": "underground"},
+}
+
+
+def _node_level_key(node):
+    """Convertit un noeud en clé pour LEVEL_Y_MAP."""
+    level = node.get("level", "")
+    depth = node.get("depth")
+    if level == "R" and depth is not None:
+        return f"R{depth}"
+    if level == "M":
+        return "R-5"
+    return level
+
+
+def _generate_profile_html(tree, image_base64):
+    """Génère le HTML de la vue profil d'un arbre avec la Planche II en fond."""
+
+    project_name = tree.get("idea", "Projet").replace("[scanned] ", "")
+    family = tree.get("family_name", "Inconnu")
+    family_emoji = tree.get("family_emoji", "🌳")
+    scale = tree.get("scale", {})
+    stats = tree.get("stats", {})
+    nodes = tree.get("nodes", [])
+
+    # Grouper les nodes par niveau
+    level_groups = {}
+    for node in nodes:
+        key = _node_level_key(node)
+        if key not in level_groups:
+            level_groups[key] = []
+        level_groups[key].append(node)
+
+    # Générer les éléments SVG pour chaque node
+    svg_nodes = []
+    center_x = 461  # Centre de l'image
+
+    for level_key, level_info in LEVEL_Y_MAP.items():
+        y = level_info["y"]
+        color = level_info["color"]
+        label = level_info["label"]
+        zone = level_info["zone"]
+
+        group_nodes = level_groups.get(level_key, [])
+
+        # Label du niveau à gauche
+        opacity = "0.9" if zone == "aerial" else "0.8"
+        svg_nodes.append(f'''
+        <text x="38" y="{y}" fill="{color}" font-size="12" font-weight="600"
+              font-family="JetBrains Mono, monospace" opacity="{opacity}"
+              filter="url(#textShadow)">{label}</text>''')
+
+        if not group_nodes:
+            # Niveau vide — cercle gris discret
+            svg_nodes.append(f'''
+        <circle cx="{center_x}" cy="{y}" r="3" fill="#333" opacity="0.3"/>''')
+            continue
+
+        # Distribuer les nodes sur l'axe si plusieurs au même niveau
+        n_count = len(group_nodes)
+        for i, node in enumerate(group_nodes):
+            # Offset Y pour éviter les chevauchements (±15px par node supplémentaire)
+            offset_y = (i - (n_count - 1) / 2) * 24
+            ny = y + offset_y
+
+            status = node.get("status", "todo")
+            confidence = node.get("confidence", 0)
+            node_id = node.get("id", "?")
+            node_label = node.get("label", "")
+            entry = node.get("entry", "~")
+
+            # Couleur du node selon status
+            if status == "done":
+                fill = color
+                inner_fill = "#fff"
+                inner_opacity = "0.8"
+            elif status == "wip":
+                fill = "#FFB74D"
+                inner_fill = "#fff"
+                inner_opacity = "0.6"
+            else:
+                fill = "#FF5252"
+                inner_fill = "#FF5252"
+                inner_opacity = "0.4"
+
+            # Taille selon confidence
+            radius = 5 + (confidence / 100) * 3  # 5-8px
+
+            # Node circle avec glow
+            svg_nodes.append(f'''
+        <g class="node-group" data-id="{node_id}" data-status="{status}"
+           data-confidence="{confidence}">
+          <circle cx="{center_x}" cy="{ny}" r="{radius:.0f}" fill="{fill}"
+                  opacity="0.85" filter="url(#nodeGlow)"/>
+          <circle cx="{center_x}" cy="{ny}" r="{radius/2.5:.1f}" fill="{inner_fill}"
+                  opacity="{inner_opacity}"/>''')
+
+            # Ligne de connexion + texte descriptif à droite
+            # Tronquer le label pour l'affichage
+            display_label = node_label[:50]
+            if len(node_label) > 50:
+                display_label += "…"
+
+            # Status icon
+            status_icon = {"done": "✓", "wip": "◐", "todo": "○"}.get(status, "?")
+
+            # Confidence bar compacte
+            conf_width = 40
+            conf_filled = int((confidence / 100) * conf_width)
+
+            svg_nodes.append(f'''
+          <line x1="{center_x + radius + 2}" y1="{ny}" x2="530" y2="{ny}"
+                stroke="{color}" stroke-width="0.7" opacity="0.35" stroke-dasharray="3,3"/>
+          <text x="538" y="{ny - 3}" fill="{color}" font-size="10" font-weight="400"
+                font-family="JetBrains Mono, monospace" opacity="0.85"
+                filter="url(#textShadow)">{status_icon} {node_id} {display_label}</text>
+          <rect x="538" y="{ny + 3}" width="{conf_width}" height="3" rx="1.5"
+                fill="#1a1a1a" opacity="0.6"/>
+          <rect x="538" y="{ny + 3}" width="{conf_filled}" height="3" rx="1.5"
+                fill="{fill}" opacity="0.6"/>
+          <text x="{538 + conf_width + 6}" y="{ny + 8}" fill="{color}" font-size="8"
+                font-family="JetBrains Mono, monospace" opacity="0.5"
+                filter="url(#textShadow)">{confidence}%</text>
+        </g>''')
+
+    # Assembler le SVG complet
+    svg_content = "\n".join(svg_nodes)
+
+    # Stats pour le panneau info
+    total_lines = stats.get("total_code_lines", 0)
+    total_files = stats.get("total_files", 0)
+    data_mb = stats.get("data_weight_mb", 0)
+    scale_label = scale.get("label", "")
+    done_count = sum(1 for n in nodes if n.get("status") == "done")
+    wip_count = sum(1 for n in nodes if n.get("status") == "wip")
+    todo_count = sum(1 for n in nodes if n.get("status") == "todo")
+
+    html = f'''<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Winter Tree — {project_name}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
+
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+
+  body {{
+    background: #050805;
+    color: #EDE5DB;
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    min-height: 100vh;
+  }}
+
+  .sidebar {{
+    width: 280px;
+    min-width: 280px;
+    background: #0a0d08;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 24px 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }}
+
+  .sidebar h1 {{
+    font-size: 14px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #8B6914;
+    font-weight: 400;
+  }}
+
+  .sidebar h2 {{
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: #EDE5DB;
+  }}
+
+  .stat-block {{
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 6px;
+    padding: 12px;
+  }}
+
+  .stat-block .label {{
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.4;
+    margin-bottom: 6px;
+  }}
+
+  .stat-block .value {{
+    font-size: 16px;
+    font-weight: 300;
+  }}
+
+  .stat-row {{
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 11px;
+    opacity: 0.7;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }}
+
+  .status-badge {{
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }}
+
+  .status-done {{ background: rgba(40,200,98,0.15); color: #28c862; }}
+  .status-wip {{ background: rgba(255,183,77,0.15); color: #FFB74D; }}
+  .status-todo {{ background: rgba(255,82,82,0.15); color: #FF5252; }}
+
+  .tree-container {{
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: auto;
+  }}
+
+  .tree-wrapper {{
+    position: relative;
+    width: 922px;
+    height: 1244px;
+    flex-shrink: 0;
+  }}
+
+  .tree-wrapper img {{
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 4px;
+  }}
+
+  .tree-overlay {{
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }}
+
+  .node-group {{ pointer-events: all; cursor: default; }}
+  .node-group:hover circle {{ filter: url(#nodeGlowStrong); }}
+
+  .footer {{
+    margin-top: auto;
+    font-size: 9px;
+    opacity: 0.25;
+    letter-spacing: 2px;
+    text-align: center;
+  }}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div>
+    <h1>Winter Tree</h1>
+    <h2>{family_emoji} {project_name}</h2>
+  </div>
+
+  <div class="stat-block">
+    <div class="label">Famille</div>
+    <div class="value">{family}</div>
+  </div>
+
+  <div class="stat-block">
+    <div class="label">Échelle</div>
+    <div class="value">{scale_label}</div>
+  </div>
+
+  <div class="stat-block">
+    <div class="label">Code</div>
+    <div class="value">{total_lines:,} lignes</div>
+    <div class="stat-row"><span>Fichiers</span><span>{total_files}</span></div>
+    <div class="stat-row"><span>Data</span><span>{data_mb:.0f} Mo</span></div>
+  </div>
+
+  <div class="stat-block">
+    <div class="label">Nœuds ({len(nodes)})</div>
+    <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+      <span class="status-badge status-done">✓ {done_count}</span>
+      <span class="status-badge status-wip">◐ {wip_count}</span>
+      <span class="status-badge status-todo">○ {todo_count}</span>
+    </div>
+  </div>
+
+  <div class="stat-block">
+    <div class="label">Langages</div>
+    {"".join(f'<div class="stat-row"><span>{lang}</span><span>{lines:,}L</span></div>' for lang, lines in sorted(stats.get("languages", {}).items(), key=lambda x: -x[1])[:6])}
+  </div>
+
+  <div class="footer">
+    racines &gt; arbre — 2026
+  </div>
+</div>
+
+<div class="tree-container">
+  <div class="tree-wrapper">
+    <img src="data:image/png;base64,{image_base64}" alt="Winter Tree Planche II"/>
+
+    <svg class="tree-overlay" viewBox="0 0 922 1244" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="nodeGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="5" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="nodeGlowStrong" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="10" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="textShadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#000" flood-opacity="0.9"/>
+        </filter>
+      </defs>
+
+      <!-- Axe central -->
+      <line x1="{center_x}" y1="60" x2="{center_x}" y2="1100"
+            stroke="rgba(139,105,20,0.15)" stroke-width="1" stroke-dasharray="6,4"/>
+
+      <!-- SOL label -->
+      <text x="860" y="580" fill="#8B6914" font-size="11" font-weight="600"
+            font-family="JetBrains Mono, monospace" opacity="0.7"
+            text-anchor="end" filter="url(#textShadow)">SOL</text>
+
+      <!-- Nodes -->
+      {svg_content}
+
+      <!-- Footer -->
+      <text x="461" y="1170" text-anchor="middle" fill="#555" font-size="10"
+            font-family="JetBrains Mono, monospace" letter-spacing="3" opacity="0.4">
+        WINTER TREE ENGINE v1 — {project_name}
+      </text>
+      <text x="461" y="1190" text-anchor="middle" fill="#444" font-size="8"
+            font-family="JetBrains Mono, monospace" letter-spacing="2" opacity="0.3">
+        racines toujours &gt; arbre — sky1241 — 2026
+      </text>
+    </svg>
+  </div>
+</div>
+
+</body>
+</html>'''
+
+    return html
+
+
+def serve_tree(json_path=None):
+    """🌐 Lance un serveur local et ouvre la vue profil dans le navigateur.
+
+    Args:
+        json_path: chemin vers le JSON de l'arbre (ou None pour la forêt)
+    """
+    import http.server
+    import socketserver
+    import threading
+    import webbrowser
+    import base64
+
+    # Trouver l'image de la planche
+    script_dir = Path(__file__).parent
+    image_path = script_dir / "assets" / "winter_tree_planche_II.png"
+
+    if not image_path.exists():
+        print(f"  ❌ Image non trouvée : {image_path}")
+        print(f"  Placez winter_tree_planche_II.png dans assets/")
+        return
+
+    # Encoder l'image en base64
+    with open(image_path, "rb") as f:
+        image_base64 = base64.b64encode(f.read()).decode("utf-8")
+
+    if json_path:
+        # Vue profil — un seul arbre
+        tree = load_tree(json_path)
+        if not tree:
+            print(f"  ❌ Impossible de charger : {json_path}")
+            return
+        html = _generate_profile_html(tree, image_base64)
+        page_title = tree.get("idea", "Projet").replace("[scanned] ", "")
+    else:
+        # TODO Étape 2 : vue forêt
+        print("  🌲 Vue forêt — pas encore implémenté")
+        print("  Usage: python engine.py serve <fichier.json>")
+        return
+
+    # Trouver un port dispo
+    port = 8420
+    for attempt in range(20):
+        try:
+            test_socket = socketserver.TCPServer(("", port + attempt), None)
+            test_socket.server_close()
+            port = port + attempt
+            break
+        except OSError:
+            continue
+
+    # Handler qui sert le HTML généré
+    class TreeHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
+
+        def log_message(self, format, *args):
+            pass  # Silencieux
+
+    server = socketserver.TCPServer(("", port), TreeHandler)
+
+    print(f"\n  🌲 WINTER TREE — {page_title}")
+    print(f"  {'─' * 40}")
+    print(f"  🌐 http://localhost:{port}")
+    print(f"  Ctrl+C pour arrêter")
+    print()
+
+    # Ouvrir le navigateur
+    webbrowser.open(f"http://localhost:{port}")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n  🛑 Serveur arrêté.")
+        server.server_close()
+
+
 def main():
     """Point d'entrée CLI."""
     if len(sys.argv) < 2:
@@ -3188,6 +3647,7 @@ def main():
 ==========================
 
 Usage:
+  python engine.py serve [json]        🌐 VISUALISE l'arbre dans le navigateur
   python engine.py plant "<idée>"     🌱 PLANTE UN ARBRE à partir d'une idée
   python engine.py scan <dossier>     🔬 SCANNE un repo existant
   python engine.py research <json> [contexte]  🔍 Prompts de recherche
@@ -3206,6 +3666,7 @@ Usage:
 Familles: conifere, feuillu, palmier, baobab, buisson, liane
 
 Exemples:
+  python engine.py serve scans/hsbc.json
   python engine.py plant "je veux un Shazam pour piano"
   python engine.py scan /path/to/my/repo
   python engine.py guard scans/shazam.json
@@ -3383,6 +3844,10 @@ Exemples:
             print(template)
         else:
             print(f"Famille inconnue : {fid}")
+
+    elif cmd == "serve":
+        json_path = sys.argv[2] if len(sys.argv) > 2 else None
+        serve_tree(json_path)
 
     elif cmd == "export":
         path = export_knowledge_base()
