@@ -853,27 +853,62 @@ function buildSVG(nodes) {
   //           R E N D E R
   // ═══════════════════════════════════════════
 
-  const posMap = {};  // nodeId → {x, y}
+  // ── Pré-calcul: positions idéales + positions réelles ──
+  const posMap = {};
+  const idealPos = {};
 
-  // ── LAYER 1: SQUELETTE FANTÔME (l'arbre idéal en transparence) ──
-  // Montre ce que le repo DEVRAIT avoir à chaque niveau.
-  // Les branches fantômes = la cible. Les trous = les lacunes.
+  // Positions idéales (le squelette parfait)
   for (const [lk, lev] of Object.entries(LEVELS)) {
-    const idealN = IDEAL[lk] || 0;
-    const ghostPos = branchPositions(lk, lev.y, idealN, lev.zone);
+    idealPos[lk] = branchPositions(lk, lev.y, IDEAL[lk] || 0, lev.zone);
+  }
+
+  // Positions réelles (triées par taille — subordination)
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const group = grouped[lk] || [];
+    if (group.length === 0) continue;
+    const sorted = [...group].sort((a, b) =>
+      (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0)
+    );
+    const positions = branchPositions(lk, lev.y, sorted.length, lev.zone);
+    sorted.forEach((n, i) => {
+      if (positions[i]) posMap[n.id] = positions[i];
+    });
+  }
+
+  // ── LAYER 1: SQUELETTE PARFAIT (l'arbre idéal si tout était sain) ──
+  // On part de la graine (tronc) et ça pousse dans toutes les directions.
+  // Canopée: T → B → b → F → C (du tronc vers la cime)
+  // Racines: T → R-1 → R-2 → R-3 → R-4 → R-5 (du tronc vers les profondeurs)
+  // Chaque connexion = une branche/racine du réseau idéal.
+  const ghostEdges = [
+    ["T", "B"], ["B", "b"], ["b", "F"], ["F", "C"],
+    ["T", "R-1"], ["R-1", "R-2"], ["R-2", "R-3"], ["R-3", "R-4"], ["R-4", "R-5"]
+  ];
+
+  ghostEdges.forEach(([from, to]) => {
+    const fPos = idealPos[from] || [];
+    const tPos = idealPos[to] || [];
+    if (fPos.length === 0 || tPos.length === 0) return;
+
+    tPos.forEach(tp => {
+      // Chaque enfant connecté au parent le plus proche
+      let best = fPos[0], bestD = Infinity;
+      fPos.forEach(fp => {
+        const d = Math.hypot(fp.x - tp.x, fp.y - tp.y);
+        if (d < bestD) { bestD = d; best = fp; }
+      });
+      const midX = (best.x + tp.x) / 2;
+      const midY = (best.y + tp.y) / 2 + (LEVELS[from]?.zone === "aerial" ? -12 : 8);
+      svgHTML += `<path d="M${best.x},${best.y} Q${midX},${midY} ${tp.x},${tp.y}"
+        fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>`;
+    });
+  });
+
+  // Nœuds fantômes pour les positions non couvertes (= lacunes du projet)
+  for (const [lk, lev] of Object.entries(LEVELS)) {
+    const ghostP = idealPos[lk] || [];
     const actualN = (grouped[lk] || []).length;
-
-    ghostPos.forEach((pos, i) => {
-      // Branche fantôme (ligne du tronc vers la position idéale)
-      if (lk !== "T") {
-        const ty = lev.zone === "aerial" ? lev.y - 3 : SOL_Y + 15;
-        svgHTML += `<line x1="${CENTER_X}" y1="${ty}" x2="${pos.x}" y2="${pos.y}"
-          stroke="${lev.color}" stroke-width="0.4" opacity="0.07"
-          stroke-dasharray="4,6"/>`;
-      }
-
-      // Nœud fantôme — visible seulement pour les positions NON couvertes
-      // = les lacunes du projet (ce qui manque)
+    ghostP.forEach((pos, i) => {
       if (i >= actualN) {
         svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="6"
           fill="none" stroke="${lev.color}" stroke-width="0.7" opacity="0.12"
@@ -882,40 +917,54 @@ function buildSVG(nodes) {
     });
   }
 
-  // ── LAYER 2: BRANCHES RÉELLES (courbes Bézier vers les vrais nœuds) ──
-  // Les nœuds sont TRIÉS par taille: les plus gros PROCHES du tronc (subordination)
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    const group = grouped[lk] || [];
-    if (group.length === 0) continue;
+  // ── LAYER 2: CONNEXIONS RÉELLES (lignes blanches reliant les nœuds) ──
+  // Hiérarchie inférée depuis les chemins d'entrée (entry paths).
+  // Rameaux → parent Branch (par préfixe de chemin)
+  // Branches → Tronc
+  // Cime → Tronc
+  // Racines → niveau peuplé le plus proche au-dessus
+  function findParentId(node) {
+    const lk = nodeLevelKey(node);
+    const entry = node.entry || "";
 
-    // Tri par volume de code descendant → gros modules proches du tronc
-    const sorted = [...group].sort((a, b) =>
-      (nodeMetrics[b.id]?.lines || 0) - (nodeMetrics[a.id]?.lines || 0)
-    );
-    const positions = branchPositions(lk, lev.y, sorted.length, lev.zone);
-
-    sorted.forEach((n, i) => {
-      if (!positions[i]) return;
-      posMap[n.id] = positions[i];
-
-      if (lk === "T") return;
-      const { x: nx, y: ny } = positions[i];
-      const ty = lev.zone === "aerial" ? lev.y - 3 : SOL_Y + 15;
-      const midX = CENTER_X + (nx - CENTER_X) * 0.4;
-      const midY = (ty + ny) / 2 + (lev.zone === "aerial" ? -8 : 5);
-      const viol = isViolation(n);
-
-      svgHTML += `<path d="M${CENTER_X},${ty} Q${midX},${midY} ${nx},${ny}"
-        fill="none" stroke="${viol ? '#FF5252' : lev.color}"
-        stroke-width="${viol ? 1.5 : 0.8}" opacity="${viol ? 0.35 : 0.22}"
-        stroke-dasharray="${lev.zone === 'under' ? '3,2' : 'none'}"/>`;
-    });
+    // Rameaux → trouver la branche parente par chemin de fichier
+    if (lk === "b" && entry) {
+      for (const bn of (grouped["B"] || [])) {
+        if (bn.entry && entry.startsWith(bn.entry)) return bn.id;
+      }
+    }
+    // Branches, Cime, Feuilles → tronc
+    if (lk === "B" || lk === "C" || lk === "F") return trunkGroup[0]?.id;
+    // R-1 → tronc
+    if (lk === "R-1") return trunkGroup[0]?.id;
+    // Racines profondes → remonter jusqu'au premier niveau peuplé
+    if (lk.startsWith("R-")) {
+      const depth = parseInt(lk.split("-")[1]);
+      for (let d = depth - 1; d >= 1; d--) {
+        const above = grouped[`R-${d}`];
+        if (above?.length > 0) return above[0].id;
+      }
+      return trunkGroup[0]?.id;
+    }
+    return null;
   }
 
+  nodes.forEach(n => {
+    const pid = findParentId(n);
+    if (!pid || pid === n.id) return;
+    const cp = posMap[n.id], pp = posMap[pid];
+    if (!cp || !pp) return;
+
+    const viol = isViolation(n);
+    // Courbe organique entre parent et enfant
+    const midX = (pp.x + cp.x) / 2 + (cp.x > pp.x ? -15 : 15);
+    const midY = (pp.y + cp.y) / 2;
+    svgHTML += `<path d="M${pp.x},${pp.y} Q${midX},${midY} ${cp.x},${cp.y}"
+      fill="none" stroke="${viol ? 'rgba(255,82,82,0.45)' : 'rgba(255,255,255,0.3)'}"
+      stroke-width="${viol ? 1.8 : 1.2}"/>`;
+  });
+
   // ── LAYER 3: NŒUDS RÉELS (taille = code, couleur = santé) ──
-  // Chaque nœud représente un module/composant du repo.
-  // La taille reflète le volume de code réel (sqrt scaling).
-  // ROUGE = violation subordination (branch > 0.6× tronc)
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const group = grouped[lk] || [];
     group.forEach(n => {
