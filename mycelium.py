@@ -33,14 +33,12 @@ def graph_from_edges(edges: list) -> nx.Graph:
         edges: liste de tuples (node_a, node_b) ou (node_a, node_b, weight)
 
     Returns:
-        nx.Graph
-
-    C'est le point d'entrée le plus basique. Pas d'opinion sur d'où
-    viennent les données — ça peut être des imports, des dépendances,
-    des appels de fonction, whatever.
+        nx.Graph (sans self-loops — ils biaisent α et BC)
     """
     G = nx.Graph()
     for edge in edges:
+        if edge[0] == edge[1]:
+            continue  # Pas de self-loop
         if len(edge) == 3:
             G.add_edge(edge[0], edge[1], weight=edge[2])
         else:
@@ -65,6 +63,9 @@ def graph_from_imports(import_graph: dict) -> nx.DiGraph:
         "lib.utils"     → "lib.utils"
         "src/core.dart" → "src.core"
 
+    Self-loops supprimés (un fichier qui s'importe lui-même n'a
+    pas de sens en tant qu'arête réseau — ça biaise α et BC).
+
     Args:
         import_graph: {str: set(str)} — fichier → ses imports
 
@@ -73,6 +74,8 @@ def graph_from_imports(import_graph: dict) -> nx.DiGraph:
     """
     def normalize(name: str) -> str:
         """Normalise un chemin ou module vers dot-notation sans extension."""
+        if not name or not name.strip():
+            return ""
         # Virer les extensions courantes
         for ext in (".py", ".dart", ".js", ".ts", ".jsx", ".tsx"):
             if name.endswith(ext):
@@ -82,16 +85,27 @@ def graph_from_imports(import_graph: dict) -> nx.DiGraph:
         # Virer __init__ en fin
         if name.endswith(".__init__"):
             name = name[:-9]
-        # Virer les . en début
+        # Virer les . en début (imports relatifs: ..parent → parent)
         name = name.lstrip(".")
+        # Collapse les .. consécutifs restants
+        while ".." in name:
+            name = name.replace("..", ".")
+        # Virer le . final si présent
+        name = name.rstrip(".")
         return name
 
     G = nx.DiGraph()
     for source, targets in import_graph.items():
         src = normalize(source)
+        if not src:
+            continue
         G.add_node(src)
         for target in targets:
             tgt = normalize(target)
+            if not tgt:
+                continue
+            if tgt == src:
+                continue  # Pas de self-loop
             G.add_edge(src, tgt)
     return G
 
@@ -102,8 +116,18 @@ def to_undirected(G: nx.DiGraph) -> nx.Graph:
     Les métriques réseau (Bebber 2007) travaillent sur des graphes
     non-dirigés. Les imports sont dirigés mais la COMMUNICATION
     entre modules est bidirectionnelle.
+
+    NOTE DESIGN : On perd la direction des imports. C'est VOULU.
+    Bebber 2007 travaille sur des graphes non-dirigés car les hyphes
+    sont des tubes bidirectionnels. En code, un import A→B implique
+    que A et B communiquent, pas que B connaît A.
+
+    Self-loops supprimés (un module qui se référence lui-même
+    n'est pas une arête réseau).
     """
-    return G.to_undirected()
+    H = G.to_undirected()
+    H.remove_edges_from(nx.selfloop_edges(H))
+    return H
 
 
 # ============================================================================
@@ -147,7 +171,10 @@ def meshedness(G: nx.Graph) -> float:
     # Forcer composante connexe (Bebber 2007 ne travaille que sur ça)
     if not nx.is_connected(G):
         largest_cc = max(nx.connected_components(G), key=len)
-        G = G.subgraph(largest_cc)
+        G = G.subgraph(largest_cc).copy()
+
+    # Supprimer self-loops (biaisent L artificiellement)
+    G.remove_edges_from(nx.selfloop_edges(G))
 
     N = G.number_of_nodes()
     L = G.number_of_edges()
@@ -273,14 +300,15 @@ def volume_mst_ratio(G: nx.Graph) -> float:
     if G.number_of_edges() == 0:
         return 1.0
 
-    # Coût réel
-    real_cost = sum(d.get("weight", 1.0) for u, v, d in G.edges(data=True))
+    # Coût réel (ignorer poids <= 0 — pas de sens physique)
+    real_cost = sum(max(d.get("weight", 1.0), 0) for u, v, d in G.edges(data=True))
 
     # Coût MST
     mst = nx.minimum_spanning_tree(G, weight="weight")
-    mst_cost = sum(d.get("weight", 1.0) for u, v, d in mst.edges(data=True))
+    mst_cost = sum(max(d.get("weight", 1.0), 0) for u, v, d in mst.edges(data=True))
 
-    if mst_cost == 0:
+    if mst_cost <= 0:
+        # MST de coût 0 = toutes les arêtes ont poids 0 → ratio n'a pas de sens
         return 1.0
 
     return real_cost / mst_cost
@@ -897,6 +925,28 @@ def run_tests():
     })
     check("Mix paths/dots: 3 nœuds", G_mix.number_of_nodes(), 3)
 
+    # Self-loops éliminés
+    G_self = graph_from_imports({"main.py": {"main"}})
+    check("Self-loop éliminé (0 arêtes)", G_self.number_of_edges(), 0)
+
+    G_self2 = graph_from_edges([("a", "a"), ("a", "b")])
+    check("Self-loop edges éliminé", G_self2.number_of_edges(), 1)
+
+    # Noms vides / bizarres ignorés
+    G_empty_names = graph_from_imports({
+        "": set(),
+        ".py": {""},
+        "real.py": {"other"},
+    })
+    check("Noms vides ignorés", "" not in G_empty_names.nodes(), True)
+    check("Extension seule ignorée", G_empty_names.number_of_nodes(), 2)
+
+    # Double dots normalisés
+    G_dots = graph_from_imports({
+        "main.py": {"..parent.module"},
+    })
+    check("..parent→parent.module", G_dots.has_edge("main", "parent.module"), True)
+
     # ── Brique 1 : Meshedness ──
     print("\n  BRIQUE 1 — Meshedness α")
     # Arbre pur : 4 nœuds, 3 arêtes → α = (3-4+1)/(2×4-5) = 0/3 = 0.0
@@ -924,6 +974,12 @@ def run_tests():
     alpha_disco = meshedness(G_disco)
     check("Déconnecté α >= 0 (plus grande composante)", alpha_disco >= 0.0, True)
 
+    # Self-loop sur graphe brut (defense in depth)
+    G_selfloop = nx.Graph()
+    G_selfloop.add_edges_from([("a", "b"), ("b", "c"), ("c", "a"), ("a", "a")])
+    alpha_sl = meshedness(G_selfloop)
+    check("Self-loop ignoré dans α (triangle=1.0)", alpha_sl, 1.0)
+
     # ── Brique 2 : E_global ──
     print("\n  BRIQUE 2 — Efficacité globale")
     # Complet K4 : E_global = 1.0
@@ -943,6 +999,15 @@ def run_tests():
     # Path : root à un bout → E_root = (1/3)(1 + 1/2 + 1/3) ≈ 0.611
     check("Path E_root(bout)≈0.61", root_efficiency(G_path, 0), 0.611, tolerance=0.02)
 
+    # Root inexistant
+    check("Root inexistant → 0.0", root_efficiency(G_path, "xyz"), 0.0)
+
+    # Root isolé dans graphe déconnecté
+    G_iso = nx.Graph()
+    G_iso.add_edges_from([("a", "b")])
+    G_iso.add_node("z")
+    check("Root isolé → 0.0", root_efficiency(G_iso, "z"), 0.0)
+
     # ── Brique 4 : Volume-MST ──
     print("\n  BRIQUE 4 — Volume-MST ratio")
     # Arbre → ratio = 1.0 (c'est déjà le MST)
@@ -950,6 +1015,20 @@ def run_tests():
 
     # K4 (6 arêtes, MST=3 arêtes) → ratio = 6/3 = 2.0
     check("K4 V/MST=2.0", volume_mst_ratio(G_k4), 2.0)
+
+    # Poids variables
+    G_w = nx.Graph()
+    G_w.add_edge("a", "b", weight=10)
+    G_w.add_edge("b", "c", weight=1)
+    G_w.add_edge("a", "c", weight=2)
+    check("Pondéré (10,1,2) V/MST=13/3", volume_mst_ratio(G_w), 13.0/3, tolerance=0.01)
+
+    # Poids zéro (edge case)
+    G_z = nx.Graph()
+    G_z.add_edge("a", "b", weight=0)
+    G_z.add_edge("b", "c", weight=0)
+    v_z = volume_mst_ratio(G_z)
+    check("Poids 0 → pas de crash", isinstance(v_z, float), True)
 
     # ── Brique 5 : Bottlenecks ──
     print("\n  BRIQUE 5 — Bottlenecks")
@@ -969,6 +1048,18 @@ def run_tests():
     k4_after_1 = rob_k4[1][1] if len(rob_k4) > 1 else 0
     check("K4 plus robuste qu'arbre", k4_after_1 >= tree_after_1, True)
 
+    # Étoile : supprimer le centre effondre tout
+    G_star5 = nx.star_graph(5)
+    rob_star = robustness_test(G_star5, steps=2)
+    check("Étoile: centre supprimé → effondrement",
+          rob_star[1][1] <= 0.2, True)  # Après centre: 1/6 ≈ 0.17
+
+    # Path(7) : centre = nœud 3, après suppression → 2 composantes
+    G_p7 = nx.path_graph(7)
+    rob_p7 = robustness_test(G_p7, steps=1)
+    check("Path(7): après centre → ~43%",
+          rob_p7[1][1], 0.43, tolerance=0.05)
+
     # ── Brique 7 : Small-world σ ──
     print("\n  BRIQUE 7 — Small-world σ")
     # Watts-Strogatz avec p faible = small-world
@@ -976,6 +1067,16 @@ def run_tests():
     sw = small_world_sigma(G_ws, nrand=3)
     check("WS σ > 1 (small-world)", sw["sigma"] > 1.0, True)
     check("WS γ > 1 (clustering élevé)", sw["gamma"] > 1.0, True)
+
+    # Path = PAS small-world (clustering = 0)
+    G_path_sw = nx.path_graph(15)
+    sw_path = small_world_sigma(G_path_sw, nrand=3)
+    check("Path σ = 0 (pas small-world)", sw_path["sigma"], 0.0)
+
+    # Petit graphe (< 4 nœuds) → retourne 0
+    G_tiny = graph_from_edges([("a", "b"), ("b", "c")])
+    sw_tiny = small_world_sigma(G_tiny, nrand=1)
+    check("Petit graphe σ = 0", sw_tiny["sigma"], 0.0)
 
     # ── Brique 8 : Small-world ω ──
     print("\n  BRIQUE 8 — Small-world ω")
@@ -989,6 +1090,15 @@ def run_tests():
 
     s2 = classify_strategy(alpha=0.02, e_global=0.2, e_root=0.8, robustness_50=0.1)
     check("Sparse → guerrilla", s2["strategy"], "guerrilla")
+
+    # Symétrie : score max = -score min
+    s_max = classify_strategy(alpha=1.0, e_global=1.0, e_root=0.0, robustness_50=1.0)
+    s_min = classify_strategy(alpha=0.0, e_global=0.0, e_root=1.0, robustness_50=0.0)
+    check("Symétrie score", abs(s_max["score"]) == abs(s_min["score"]), True)
+
+    # Pile sur les seuils → mixed
+    s_mid = classify_strategy(alpha=0.10, e_global=0.4, e_root=0.5)
+    check("Seuils milieu → mixed", s_mid["strategy"], "mixed")
 
     # ── Résumé ──
     print(f"\n{'=' * 50}")
