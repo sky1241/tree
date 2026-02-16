@@ -830,10 +830,11 @@ function buildSVG(nodes) {
     { id:"iC1", lk:"C", label:"Tests / CI",       x:476, y:112, pid:null },
     { id:"iC2", lk:"C", label:"Release / CD",     x:446, y:118, pid:null },
 
-    // FEUILLES — s\u00e9parations branches hautes
-    { id:"iF1", lk:"F", label:"API endpoints",    x:505, y:188, pid:null },
-    { id:"iF2", lk:"F", label:"UI composants",    x:418, y:193, pid:null },
-    { id:"iF3", lk:"F", label:"Exports / CLI",    x:538, y:218, pid:null },
+    // FEUILLES — poussent au bout des RAMEAUX (pas du tronc)
+    // Botanique: trunk → B → b → F (les aiguilles sont sur les rameaux)
+    { id:"iF1", lk:"F", label:"API endpoints",    x:505, y:188, pid:"ib1" },
+    { id:"iF2", lk:"F", label:"UI composants",    x:418, y:193, pid:"ib3" },
+    { id:"iF3", lk:"F", label:"Exports / CLI",    x:538, y:218, pid:"ib5" },
 
     // BRANCHES — jonctions o\u00f9 les branches quittent le tronc
     { id:"iB1", lk:"B", label:"Module A",         x:490, y:392, pid:null },
@@ -879,14 +880,30 @@ function buildSVG(nodes) {
   const iPos = {};
   idealTree.forEach(n => { iPos[n.id] = { x: n.x, y: n.y }; });
 
-  // ────── RENDER: TRONC (blanc) ──────
+  // ────── PIPE MODEL (Shinozaki) — épaisseur = flux transporté ──────
+  // Le tronc transporte TOUT → le plus épais
+  // Chaque embranchement transporte moins → plus fin
+  const PIPE_WIDTH = {
+    "T":   4.0,   // tronc = 100% du flux
+    "B":   2.5,   // trunk→branch = ~50% (règle C2: < 0.6× tronc)
+    "b":   1.5,   // branch→twig = ~30%
+    "C":   1.0,   // apex terminal, fin
+    "F":   1.2,   // feuilles, twigs fins
+    "R-1": 2.5,   // racines structurelles = même calibre que branches
+    "R-2": 1.8,   // pivotantes
+    "R-3": 1.2,   // radicelles (fines)
+    "R-4": 0.8,   // poils absorbants (microscopiques)
+    "R-5": 0.5,   // mycorhizes (les plus fins)
+  };
+
+  // ────── RENDER: TRONC (blanc, épais — pipe model) ──────
   svgHTML += `<line x1="${CENTER_X}" y1="90" x2="${CENTER_X}" y2="${SOL_Y}"
-    stroke="rgba(255,255,255,0.5)" stroke-width="3"/>`;
+    stroke="rgba(255,255,255,0.5)" stroke-width="${PIPE_WIDTH['T']}"/>`;
   // Tronc sous le sol (vers les racines)
   svgHTML += `<line x1="${CENTER_X}" y1="${SOL_Y}" x2="${CENTER_X}" y2="600"
-    stroke="rgba(255,255,255,0.35)" stroke-width="2.5"/>`;
+    stroke="rgba(255,255,255,0.35)" stroke-width="${PIPE_WIDTH['T'] * 0.85}"/>`;
 
-  // ────── RENDER: CONNEXIONS (blanc, courbes) ──────
+  // ────── RENDER: CONNEXIONS (pipe model — épaisseur proportionnelle) ──────
   idealTree.forEach(n => {
     const pos = iPos[n.id];
     if (!pos || n.lk === "T") return;
@@ -898,31 +915,76 @@ function buildSVG(nodes) {
 
     const cx = pp.x + (pos.x - pp.x) * 0.55;
     const cy = pp.y + (pos.y - pp.y) * 0.3;
-    const sw = n.pid ? 1.0 : 1.4;
+    const sw = PIPE_WIDTH[n.lk] || 1.0;
 
     svgHTML += `<path d="M${pp.x},${pp.y} Q${cx},${cy} ${pos.x},${pos.y}"
       fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="${sw}"/>`;
   });
 
-  // ────── RENDER: N\u0152UDS (blanc) ──────
+  // ────── TAILLE DES NŒUDS — proportionnelle à l'importance ──────
+  // Pipe model: plus un nœud est haut dans la hiérarchie, plus il est gros
+  const NODE_R = {
+    "T":   33,   // tronc = le plus gros (colonne vertébrale, 55-65% biomasse)
+    "B":   23,   // branches = modules principaux (< 0.6× tronc)
+    "b":   15,   // rameaux = sous-modules
+    "F":   12,   // feuilles = endpoints, UI (5% biomasse, 100% énergie)
+    "C":   11,   // cime = tests, CI/CD (bourgeons terminaux)
+    "R-1": 23,   // racines structurelles (même calibre que branches)
+    "R-2": 18,   // pivotantes (ancrage)
+    "R-3": 12,   // radicelles (fines, éphémères)
+    "R-4":  8,   // poils absorbants (microscopiques)
+    "R-5":  6,   // mycorhizes (les plus petits)
+  };
+
+  // ────── RENDER: NŒUDS (blanc, taille hiérarchique) ──────
   idealTree.forEach(n => {
     const pos = iPos[n.id];
     if (!pos) return;
-    const isT = n.lk === "T";
-    const r = isT ? 8 : 5;
+    const r = NODE_R[n.lk] || 5;
 
     svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}"
-      fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"
+      fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"
       filter="url(#glow)"/>`;
-    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="1.5" fill="#fff"/>`;
+    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="${Math.max(1.5, r * 0.25)}" fill="#fff"/>`;
 
-    // Label
+    // Label au-dessus (aérien) ou en-dessous (souterrain)
     const lev = LEVELS[n.lk];
     const above = lev?.zone === "aerial";
-    const ly = above ? pos.y - r - 4 : pos.y + r + 10;
+    const ly = above ? pos.y - r - 4 : pos.y + r + 12;
     svgHTML += `<text x="${pos.x}" y="${ly}" fill="rgba(255,255,255,0.7)" font-size="7"
       font-family="JetBrains Mono, monospace" text-anchor="middle"
       filter="url(#textSh)">${n.label}</text>`;
+  });
+
+  // ────── DÉSIGNATIONS TECHNIQUES (côté droit) ──────
+  // Mapping logiciel de chaque couche anatomique
+  const TECH_LABELS = [
+    { y: 100,  lk: "C",   ana: "+5 CIME",            tech: "Tests · CI/CD · Release" },
+    { y: 215,  lk: "F",   ana: "+4 FEUILLES",         tech: "API endpoints · UI · Outputs" },
+    { y: 330,  lk: "b",   ana: "+3 RAMEAUX",           tech: "Sub-features · Sub-modules" },
+    { y: 440,  lk: "B",   ana: "+2 BRANCHES",          tech: "Modules principaux" },
+    { y: 530,  lk: "T",   ana: "+1 TRONC",             tech: "Core engine · Pipeline" },
+    { y: 575,  lk: "SOL", ana: " 0 SOL",               tech: "Interface humain ↔ machine" },
+    { y: 650,  lk: "R-1", ana: "-1 R.STRUCT.",         tech: "Frameworks · APIs · Deps" },
+    { y: 760,  lk: "R-2", ana: "-2 R.PIVOT.",          tech: "Architecture · Décisions" },
+    { y: 870,  lk: "R-3", ana: "-3 RADICELLES",        tech: "Contraintes métier" },
+    { y: 960,  lk: "R-4", ana: "-4 POILS",             tech: "Licence · Conformité" },
+    { y: 1060, lk: "R-5", ana: "-5 MYCORHIZES",       tech: "Algo fondamentaux · Hardware" },
+  ];
+  const techX = 710;
+  TECH_LABELS.forEach(t => {
+    const col = LEVELS[t.lk]?.color || "rgba(255,255,255,0.4)";
+    // Ligne de repère
+    svgHTML += `<line x1="${techX - 8}" y1="${t.y}" x2="${techX}" y2="${t.y}"
+      stroke="${col}" stroke-width="0.8" opacity="0.5"/>`;
+    // Nom anatomique
+    svgHTML += `<text x="${techX + 4}" y="${t.y - 3}" fill="${col}" font-size="8"
+      font-family="JetBrains Mono, monospace" font-weight="600" opacity="0.7"
+      filter="url(#textSh)">${t.ana}</text>`;
+    // Désignation technique
+    svgHTML += `<text x="${techX + 4}" y="${t.y + 9}" fill="rgba(255,255,255,0.45)" font-size="7"
+      font-family="JetBrains Mono, monospace" font-style="italic"
+      filter="url(#textSh)">${t.tech}</text>`;
   });
 
   // ────── REPO NODES (invisibles, pour sidebar) ──────

@@ -14,11 +14,23 @@ Il faut maintenant faire la même chose pour les 5 autres familles.
 
 ### Conifère (🌲) — TERMINÉ
 - 28 nœuds idéaux avec positions pixel sur Planche II
-- Hiérarchie: trunk → B → b (aérien), trunk → R-1 → R-2 → ... (souterrain)
-- C et F connectés au tronc (apex)
+- **Hiérarchie corrigée (100% thèse):**
+  - Aérien: `trunk → B → b → F` (feuilles via rameaux, PAS directement au tronc)
+  - Apex: `trunk → C` (cime = bourgeons terminaux, directement au tronc)
+  - Souterrain: `trunk → R-1 → R-2 → R-3 → R-4 → R-5`
+- **Pipe Model (Shinozaki):** épaisseur connexions proportionnelle au flux
+  - T=4.0px, B/R-1=2.5px, R-2=1.8px, b=1.5px, F/R-3=1.2px, C=1.0px, R-4=0.8px, R-5=0.5px
+- **Taille nœuds** proportionnelle à l'importance hiérarchique:
+  - T=33px, B/R-1=23px, R-2=18px, b=15px, F/R-3=12px, C=11px, R-4=8px, R-5=6px
+- **Désignations techniques** affichées à droite de chaque couche
 - Rendu: nœuds blancs, connexions Bézier, tronc central
 - Fichier: `templates/interactive_profile.html`
 - Image: `assets/winter_tree_planche_II.png` (922×1244px)
+
+### ⚠️ TODO PRIORITAIRE — Lignes de séparation des niveaux
+Les lignes horizontales de séparation (CIME, FEUILLES, RAMEAUX, etc.) ne correspondent
+plus aux bonnes positions sur l'image. Il faut les recaler sur les vraies zones de l'arbre.
+Actuellement les Y dans `LEVELS` sont des valeurs arbitraires, pas calibrées sur la planche.
 
 ## Les 6 familles et leurs règles (source: docs/FAMILIES.md)
 
@@ -130,6 +142,34 @@ Root surface: 2.5-4.5× surface foliaire
 Foliage: 5% biomasse mais 100% énergie (photosynthèse)
 ```
 
+### Pipe Model — Épaisseur des connexions (Shinozaki et al.)
+```
+RÈGLE: L'épaisseur d'une connexion = proportionnelle au flux qu'elle transporte.
+Le tronc transporte TOUT → le plus épais.
+Chaque branche transporte MOINS → plus fin.
+Chaque rameau encore moins → encore plus fin.
+
+Conifère — stroke-width par niveau:
+  Tronc (T):     4.0px  — 100% du flux (colonne vertébrale)
+  T → B:         2.5px  — ~50% (règle C2: branche < 0.6× tronc)
+  T → C/F:       1.2px  — twigs apicaux, fins
+  B → b:         1.5px  — ~30% (rameau subordonné à la branche)
+  T → R-1:       2.5px  — racines structurelles (même calibre que branches)
+  R-1 → R-2:     1.8px  — pivotantes
+  R-2 → R-3:     1.2px  — radicelles (fines)
+  R-3 → R-4:     0.8px  — poils absorbants (microscopiques)
+  R-4 → R-5:     0.5px  — mycorhizes (les plus fins)
+
+Feuillu — épaisseurs DIFFÉRENTES:
+  T → B:         3.5px  — branches presque aussi grosses que le tronc (co-dominance)
+  B → b:         2.0px  — rameaux plus robustes que chez le conifère
+
+Palmier: Pas de branches → une seule ligne épaisse (tronc) + fines palmes au sommet
+Baobab: Tronc TRÈS épais (6-8px), branches très fines (1px)
+Buisson: Pas de tronc → toutes les tiges de même épaisseur (~2px)
+Liane: Tout fin (~1-1.5px), pas de structure porteuse
+```
+
 ## Les 10 niveaux anatomiques
 
 ```
@@ -181,15 +221,17 @@ PYTHONIOENCODING=utf-8 python engine.py serve scans/HSBC-algo-genetic.json
 
 ## Ce qui reste à faire
 
-1. ☐ Rendre le squelette 100% conforme aux thèses (connexions C→b→B→trunk?)
-2. ☐ Implémenter le switch par famille dans le template
-3. ☐ Squelette FEUILLU (branches co-dominantes, forme arrondie)
-4. ☐ Squelette PALMIER (pas de branches, tronc colonnaire)
-5. ☐ Squelette BAOBAB (tronc massif, petite couronne)
-6. ☐ Squelette BUISSON (multi-tiges, pas de tronc central)
-7. ☐ Squelette LIANE (grimpante, dépend d'un hôte)
-8. ☐ Overlay du repo réel sur le squelette parfait (diagnostic)
-9. ☐ Animations de croissance (graine → arbre)
+1. ☑ ~~Rendre le squelette conifère 100% conforme aux thèses~~ FAIT
+2. ☐ **RECALER LES LIGNES DE SÉPARATION** — les Y des niveaux dans `LEVELS` ne matchent
+   plus les vraies zones de la planche. À refaire pour chaque famille.
+3. ☐ Implémenter le switch par famille dans le template
+4. ☐ Squelette FEUILLU (branches co-dominantes, forme arrondie)
+5. ☐ Squelette PALMIER (pas de branches, tronc colonnaire)
+6. ☐ Squelette BAOBAB (tronc massif, petite couronne)
+7. ☐ Squelette BUISSON (multi-tiges, pas de tronc central)
+8. ☐ Squelette LIANE (grimpante, dépend d'un hôte)
+9. ☐ Overlay du repo réel sur le squelette parfait (diagnostic)
+10. ☐ Animations de croissance (graine → arbre)
 
 ## Conventions
 
