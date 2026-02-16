@@ -822,169 +822,108 @@ function buildSVG(nodes) {
   //  Connexions: tronc \u2192 B \u2192 b (a\u00e9rien), tronc \u2192 R-1 \u2192 R-2\u2026 (souterrain)
   // ═══════════════════════════════════════════════════════════
 
-  function idealX(lk, side, ratio) {
-    const lev = LEVELS[lk];
-    const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
-    const half = side === "R" ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
-    return Math.round(side === "R" ? CENTER_X + half * ratio : CENTER_X - half * ratio);
-  }
-
-  // 28 n\u0153uds id\u00e9aux — structure explicite
+  // 28 n\u0153uds — positions EXACTES sur Planche II (922\u00d71244px)
+  // Plac\u00e9s aux POINTS DE S\u00c9PARATION visibles de l'arbre:
+  //   tronc \u2192 branche, branche \u2192 rameau, racine \u2192 bifurcation
   const idealTree = [
-    // CIME (2) — bourgeons terminaux, auxines
-    { id:"iC1", lk:"C", label:"Tests / CI",     side:"R", ratio:0.45, pid:null },
-    { id:"iC2", lk:"C", label:"Release / CD",   side:"L", ratio:0.45, pid:null },
+    // CIME — apex, bourgeons terminaux
+    { id:"iC1", lk:"C", label:"Tests / CI",       x:476, y:112, pid:null },
+    { id:"iC2", lk:"C", label:"Release / CD",     x:446, y:118, pid:null },
 
-    // FEUILLES (3) — 5% biomasse, 100% \u00e9nergie
-    { id:"iF1", lk:"F", label:"API endpoints",  side:"R", ratio:0.32, pid:null },
-    { id:"iF2", lk:"F", label:"UI composants",  side:"L", ratio:0.32, pid:null },
-    { id:"iF3", lk:"F", label:"Exports / CLI",  side:"R", ratio:0.62, pid:null },
+    // FEUILLES — s\u00e9parations branches hautes
+    { id:"iF1", lk:"F", label:"API endpoints",    x:505, y:188, pid:null },
+    { id:"iF2", lk:"F", label:"UI composants",    x:418, y:193, pid:null },
+    { id:"iF3", lk:"F", label:"Exports / CLI",    x:538, y:218, pid:null },
 
-    // BRANCHES (4) — scaffold, < 0.6\u00d7 tronc
-    { id:"iB1", lk:"B", label:"Module A",       side:"R", ratio:0.30, pid:null },
-    { id:"iB2", lk:"B", label:"Module B",       side:"L", ratio:0.30, pid:null },
-    { id:"iB3", lk:"B", label:"Module C",       side:"R", ratio:0.62, pid:null },
-    { id:"iB4", lk:"B", label:"Module D",       side:"L", ratio:0.62, pid:null },
+    // BRANCHES — jonctions o\u00f9 les branches quittent le tronc
+    { id:"iB1", lk:"B", label:"Module A",         x:490, y:392, pid:null },
+    { id:"iB2", lk:"B", label:"Module B",         x:432, y:397, pid:null },
+    { id:"iB3", lk:"B", label:"Module C",         x:515, y:450, pid:null },
+    { id:"iB4", lk:"B", label:"Module D",         x:408, y:455, pid:null },
 
-    // RAMEAUX (6) — sub-branches de B, < 4 ans
-    { id:"ib1", lk:"b", label:"Sub-mod 1",      side:"R", ratio:0.28, pid:"iB1" },
-    { id:"ib2", lk:"b", label:"Sub-mod 2",      side:"R", ratio:0.44, pid:"iB1" },
-    { id:"ib3", lk:"b", label:"Sub-mod 3",      side:"L", ratio:0.28, pid:"iB2" },
-    { id:"ib4", lk:"b", label:"Sub-mod 4",      side:"L", ratio:0.44, pid:"iB2" },
-    { id:"ib5", lk:"b", label:"Sub-mod 5",      side:"R", ratio:0.60, pid:"iB3" },
-    { id:"ib6", lk:"b", label:"Sub-mod 6",      side:"L", ratio:0.60, pid:"iB4" },
+    // RAMEAUX — s\u00e9parations le long des branches (entre B et canop\u00e9e)
+    { id:"ib1", lk:"b", label:"Sub-mod 1",        x:520, y:278, pid:"iB1" },
+    { id:"ib2", lk:"b", label:"Sub-mod 2",        x:555, y:308, pid:"iB1" },
+    { id:"ib3", lk:"b", label:"Sub-mod 3",        x:400, y:283, pid:"iB2" },
+    { id:"ib4", lk:"b", label:"Sub-mod 4",        x:368, y:312, pid:"iB2" },
+    { id:"ib5", lk:"b", label:"Sub-mod 5",        x:580, y:342, pid:"iB3" },
+    { id:"ib6", lk:"b", label:"Sub-mod 6",        x:345, y:348, pid:"iB4" },
 
-    // TRONC (1) — 55-65% biomasse, ne divise JAMAIS
-    { id:"iT1", lk:"T", label:"Core pipeline",  side:"C", ratio:0, pid:null },
+    // TRONC — centre
+    { id:"iT1", lk:"T", label:"Core pipeline",    x:461, y:530, pid:null },
 
-    // R-1 STRUCTURELLES (3) — 5-15 racines, \u224830cm
-    { id:"iR11", lk:"R-1", label:"Framework web",  side:"R", ratio:0.28, pid:null },
-    { id:"iR12", lk:"R-1", label:"Framework data", side:"L", ratio:0.28, pid:null },
-    { id:"iR13", lk:"R-1", label:"Framework test", side:"R", ratio:0.55, pid:null },
+    // R-1 — premi\u00e8res bifurcations racinaires
+    { id:"iR11", lk:"R-1", label:"Framework web",   x:505, y:612, pid:null },
+    { id:"iR12", lk:"R-1", label:"Framework data",  x:418, y:618, pid:null },
+    { id:"iR13", lk:"R-1", label:"Framework test",  x:545, y:638, pid:null },
 
-    // R-2 PIVOTANTES (2) — ancrage 60cm-2m
-    { id:"iR21", lk:"R-2", label:"Archi DB",    side:"R", ratio:0.35, pid:"iR11" },
-    { id:"iR22", lk:"R-2", label:"Archi API",   side:"L", ratio:0.35, pid:"iR12" },
+    // R-2 — bifurcations plus profondes
+    { id:"iR21", lk:"R-2", label:"Archi DB",        x:548, y:712, pid:"iR11" },
+    { id:"iR22", lk:"R-2", label:"Archi API",       x:375, y:720, pid:"iR12" },
 
-    // R-3 RADICELLES (3) — \u00e9ph\u00e9m\u00e8res, absorption
-    { id:"iR31", lk:"R-3", label:"Contrainte 1", side:"R", ratio:0.40, pid:"iR21" },
-    { id:"iR32", lk:"R-3", label:"Contrainte 2", side:"L", ratio:0.40, pid:"iR22" },
-    { id:"iR33", lk:"R-3", label:"Contrainte 3", side:"R", ratio:0.68, pid:"iR21" },
+    // R-3 — ramifications fines
+    { id:"iR31", lk:"R-3", label:"Contrainte 1",    x:580, y:800, pid:"iR21" },
+    { id:"iR32", lk:"R-3", label:"Contrainte 2",    x:345, y:808, pid:"iR22" },
+    { id:"iR33", lk:"R-3", label:"Contrainte 3",    x:628, y:815, pid:"iR21" },
 
-    // R-4 POILS (2) — filtrent tout
-    { id:"iR41", lk:"R-4", label:"Licence",      side:"R", ratio:0.45, pid:"iR31" },
-    { id:"iR42", lk:"R-4", label:"Conformit\u00e9",  side:"L", ratio:0.45, pid:"iR32" },
+    // R-4 — radicelles profondes
+    { id:"iR41", lk:"R-4", label:"Licence",         x:612, y:895, pid:"iR31" },
+    { id:"iR42", lk:"R-4", label:"Conformit\u00e9",     x:312, y:902, pid:"iR32" },
 
-    // R-5 MYCORHIZES (2) — symbiose \u00d7100
-    { id:"iR51", lk:"R-5", label:"Algorithmes",  side:"R", ratio:0.50, pid:"iR41" },
-    { id:"iR52", lk:"R-5", label:"Hardware",     side:"L", ratio:0.50, pid:"iR42" },
+    // R-5 — mycorhizes
+    { id:"iR51", lk:"R-5", label:"Algorithmes",     x:645, y:988, pid:"iR41" },
+    { id:"iR52", lk:"R-5", label:"Hardware",        x:278, y:995, pid:"iR42" },
   ];
 
-  // ═══ Calculer positions — BRANCHES EN ANGLE (pas horizontales) ═══
-  // Conif\u00e8re: branches \u00e0 45-60\u00b0, retombent l\u00e9g\u00e8rement.
-  // Plus loin du tronc → plus bas (droop naturel).
-  // Sub-branches partent du bout de la branche parente, pas du tronc.
-
+  // Positions = coordonn\u00e9es pixel directes
   const iPos = {};
+  idealTree.forEach(n => { iPos[n.id] = { x: n.x, y: n.y }; });
 
-  // D'abord: calculer les positions dans l'ORDRE de d\u00e9pendance
-  // (parents avant enfants)
-  const ordered = idealTree.filter(n => !n.pid).concat(idealTree.filter(n => n.pid));
+  // ────── RENDER: TRONC (blanc) ──────
+  svgHTML += `<line x1="${CENTER_X}" y1="90" x2="${CENTER_X}" y2="${SOL_Y}"
+    stroke="rgba(255,255,255,0.5)" stroke-width="3"/>`;
+  // Tronc sous le sol (vers les racines)
+  svgHTML += `<line x1="${CENTER_X}" y1="${SOL_Y}" x2="${CENTER_X}" y2="600"
+    stroke="rgba(255,255,255,0.35)" stroke-width="2.5"/>`;
 
-  ordered.forEach(n => {
-    const lev = LEVELS[n.lk];
-    if (n.side === "C") {
-      iPos[n.id] = { x: CENTER_X, y: lev.y };
-      return;
-    }
-
-    const dir = n.side === "R" ? 1 : -1;
-    const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
-    const maxHalf = n.side === "R" ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
-
-    if (n.pid && iPos[n.pid]) {
-      // Sub-branche: part du parent, s'\u00e9tend plus loin dans la m\u00eame direction
-      const pp = iPos[n.pid];
-      const ext = maxHalf * n.ratio * 0.35;
-      const droopDir = lev.zone === "aerial" ? -1 : 1;
-      iPos[n.id] = {
-        x: Math.round(pp.x + dir * ext),
-        y: Math.round(pp.y + droopDir * ext * 0.45)
-      };
-    } else {
-      // Branche principale: part du tronc en angle
-      const branchLen = maxHalf * n.ratio;
-      // Angle de branche: a\u00e9rien = retombe 25-40\u00b0, racine = plonge 30-50\u00b0
-      const droop = lev.zone === "aerial" ? 0.4 : 0.5;
-      iPos[n.id] = {
-        x: Math.round(CENTER_X + dir * branchLen),
-        y: Math.round(lev.y + branchLen * droop)
-      };
-    }
-  });
-
-  // ────── RENDER: TRONC ──────
-  // Tronc l\u00e9g\u00e8rement plus \u00e9pais en bas (taper naturel)
-  svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 20}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 30}"
-    stroke="rgba(218,165,32,0.45)" stroke-width="4"/>`;
-
-  // Points d'attache (petits cercles sur le tronc)
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    if (lk === "T") continue;
-    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="3.5"
-      fill="rgba(218,165,32,0.15)" stroke="rgba(218,165,32,0.3)" stroke-width="1"/>`;
-  }
-
-  // ────── RENDER: CONNEXIONS (courbes organiques) ──────
+  // ────── RENDER: CONNEXIONS (blanc, courbes) ──────
   idealTree.forEach(n => {
     const pos = iPos[n.id];
     if (!pos || n.lk === "T") return;
+
     let pp;
     if (n.pid && iPos[n.pid]) { pp = iPos[n.pid]; }
-    else if (n.lk === "R-1") { pp = { x: CENTER_X, y: SOL_Y + 10 }; }
-    else { pp = { x: CENTER_X, y: LEVELS[n.lk].y }; }
+    else if (n.lk === "R-1") { pp = { x: CENTER_X, y: SOL_Y + 15 }; }
+    else { pp = { x: CENTER_X, y: n.y - 15 }; }  // tronc \u00e0 la hauteur du n\u0153ud
 
-    // Courbe B\u00e9zier: le point de contr\u00f4le tire vers l'ext\u00e9rieur
-    const cx = pp.x + (pos.x - pp.x) * 0.6;
-    const cy = pp.y + (pos.y - pp.y) * 0.25;
-    const isSubBranch = !!n.pid;
-    const sw = isSubBranch ? 1.0 : 1.5;
+    const cx = pp.x + (pos.x - pp.x) * 0.55;
+    const cy = pp.y + (pos.y - pp.y) * 0.3;
+    const sw = n.pid ? 1.0 : 1.4;
 
     svgHTML += `<path d="M${pp.x},${pp.y} Q${cx},${cy} ${pos.x},${pos.y}"
-      fill="none" stroke="rgba(218,165,32,0.45)" stroke-width="${sw}"/>`;
+      fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="${sw}"/>`;
   });
 
-  // ────── RENDER: N\u0152UDS ID\u00c9AUX ──────
+  // ────── RENDER: N\u0152UDS (blanc) ──────
   idealTree.forEach(n => {
     const pos = iPos[n.id];
     if (!pos) return;
     const isT = n.lk === "T";
-    const r = isT ? 9 : 6;
+    const r = isT ? 8 : 5;
 
     svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}"
-      fill="rgba(218,165,32,0.18)" stroke="rgba(218,165,32,0.6)" stroke-width="1.5"
+      fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"
       filter="url(#glow)"/>`;
-    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="1.5"
-      fill="rgba(218,165,32,0.9)"/>`;
+    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="1.5" fill="#fff"/>`;
 
-    // Label au-dessus pour a\u00e9rien, en-dessous pour souterrain
+    // Label
     const lev = LEVELS[n.lk];
-    const labelAbove = lev.zone === "aerial";
-    const ly = labelAbove ? pos.y - r - 4 : pos.y + r + 10;
-    svgHTML += `<text x="${pos.x}" y="${ly}" fill="rgba(218,165,32,0.65)" font-size="7"
+    const above = lev?.zone === "aerial";
+    const ly = above ? pos.y - r - 4 : pos.y + r + 10;
+    svgHTML += `<text x="${pos.x}" y="${ly}" fill="rgba(255,255,255,0.7)" font-size="7"
       font-family="JetBrains Mono, monospace" text-anchor="middle"
       filter="url(#textSh)">${n.label}</text>`;
   });
-
-  // ────── BADGES DIAGNOSTIC ──────
-  for (const [lk, lev] of Object.entries(LEVELS)) {
-    const count = idealTree.filter(n => n.lk === lk).length;
-    if (count > 0 && lk !== "T") {
-      svgHTML += `<text x="880" y="${lev.y + 4}" fill="rgba(218,165,32,0.4)" font-size="8"
-        font-family="JetBrains Mono, monospace" text-anchor="end"
-        filter="url(#textSh)">${count}</text>`;
-    }
-  }
 
   // ────── REPO NODES (invisibles, pour sidebar) ──────
   const posMap = {};
