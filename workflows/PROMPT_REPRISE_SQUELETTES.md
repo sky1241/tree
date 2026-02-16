@@ -284,12 +284,17 @@ PYTHONIOENCODING=utf-8 python engine.py serve scans/HSBC-algo-genetic.json
    - Hover bidirectionnel sidebar ↔ arbre (pulse + highlight)
    - Click → connecteur gold pointillé sidebar → arbre + detail panel
    - Overflow: nœuds excédentaires positionnés en fallback hors squelette
-10. ☐ **RECALER LES LIGNES DE SÉPARATION** — prochain chantier:
-    - Calibrer les Y de chaque zone (CIME, FEUILLES, RAMEAUX...) sur chaque planche
-    - Définir les "boîtes" visuelles de chaque niveau pour que overflow reste dans sa zone
-    - Les nœuds qui débordent = diagnostic clair (pas un bug d'affichage)
-11. ☐ Améliorer le rendu des overflow (espacement, indication visuelle "hors cadre")
-12. ☐ Animations de croissance (graine → arbre)
+10. ☑ ~~Ghost rows~~ FAIT — nœuds idéaux manquants en grisé dans sidebar, compteur réel/idéal
+11. ☑ ~~Click ghost → highlight~~ FAIT — click ghost row pulse le nœud blanc sur l'arbre
+    (anneau rouge, pan automatique, connecteur rouge pointillé sidebar→arbre)
+    CSS: `.ideal-g.ghost-highlight`, JS: `selectGhostNode()`, `highlightIdealNode()`, `updateGhostConnector()`
+12. ☑ ~~Descriptions idéaux~~ FAIT — chaque ghost row affiche une description sous le label
+    Dict `IDEAL_DESC` (par label) + fallback `LEVEL_DESC` (par niveau)
+    Span `.ghost-desc` sous le label, tooltip title sur la cellule
+13. ☐ Recaler les lignes de séparation — les images des planches doivent être redessinées
+    pour matcher le squelette (travail graphique, pas code)
+14. ☐ Améliorer le rendu des overflow (espacement, indication visuelle "hors cadre")
+15. ☐ Animations de croissance (graine → arbre)
 
 ## Concept clé — Diagnostic par overlay
 

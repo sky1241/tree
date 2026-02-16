@@ -291,6 +291,47 @@
   }
   .tree-svg .node-g.highlight .node-bg { filter: url(#glow); }
 
+  /* Skeleton node ghost-highlight (from ghost row click/hover) */
+  @keyframes skeletonPulse {
+    0%, 100% { stroke: #FF5252; stroke-width: 2; stroke-opacity: 0.4; }
+    50% { stroke: #FF5252; stroke-width: 4; stroke-opacity: 1; }
+  }
+  .tree-svg .ideal-g { pointer-events: none; }
+  .tree-svg .ideal-g .ideal-ring {
+    opacity: 0;
+    fill: none;
+    transition: opacity 0.3s ease;
+  }
+  .tree-svg .ideal-g.ghost-highlight .ideal-ring {
+    opacity: 1;
+    stroke: var(--red);
+    stroke-width: 3;
+    animation: skeletonPulse 1s ease-in-out infinite;
+    filter: url(#glow);
+  }
+  .tree-svg .ideal-g.ghost-highlight .ideal-body {
+    fill: rgba(255,82,82,0.3) !important;
+    stroke: rgba(255,82,82,0.8) !important;
+  }
+  .tree-svg .ideal-g.ghost-highlight .ideal-label {
+    fill: #FF5252 !important;
+    opacity: 1 !important;
+    font-weight: 600;
+  }
+
+  /* Ghost row hover in sidebar */
+  .ghost-row { cursor: pointer; transition: background 0.2s; }
+  .ghost-row:hover { background: rgba(255,82,82,0.08) !important; }
+  .ghost-row.ghost-active { background: rgba(255,82,82,0.12) !important; border-left: 2px solid var(--red); }
+  .ghost-row .ghost-desc {
+    display: block;
+    font-size: 7px;
+    opacity: 0.35;
+    font-style: italic;
+    margin-top: 1px;
+    line-height: 1.2;
+  }
+
   .connector-svg {
     position: absolute;
     top: 0; left: 0;
@@ -661,6 +702,73 @@ function init() {
 }
 
 // ── NODE LIST ──
+// ── DESCRIPTIONS DES NOEUDS IDEAUX ──
+const IDEAL_DESC = {
+  // CIME
+  "Tests / CI":       "Pipeline CI — compile et teste automatiquement chaque commit",
+  "Release / CD":     "Pipeline CD — automatise le packaging et la mise en production",
+  "Monitoring":       "Surveillance temps-r\u00e9el — alertes, logs, m\u00e9triques de sant\u00e9",
+  // FEUILLES
+  "API endpoints":    "Points d'entr\u00e9e expos\u00e9s (REST, GraphQL, gRPC) consomm\u00e9s par les clients",
+  "UI composants":    "Composants d'interface utilisateur visibles et interactifs",
+  "Exports / CLI":    "Sorties du syst\u00e8me — commandes CLI, fichiers export\u00e9s, int\u00e9grations",
+  "Webhooks":         "Callbacks HTTP — notifications push vers des syst\u00e8mes externes",
+  // RAMEAUX
+  "Sub-mod 1":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
+  "Sub-mod 2":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
+  "Sub-mod 3":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
+  "Sub-mod 4":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
+  "Sub-mod 5":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
+  "Sub-mod 6":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
+  "Vrille 1":         "Point d'accroche — d\u00e9pendance vers un module h\u00f4te",
+  "Vrille 2":         "Point d'accroche — d\u00e9pendance vers un module h\u00f4te",
+  "Vrille 3":         "Point d'accroche — d\u00e9pendance vers un module h\u00f4te",
+  // BRANCHES
+  "Module A":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
+  "Module B":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
+  "Module C":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
+  "Module D":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
+  "Module E":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
+  "Fork A":           "Branche de code — fork ou variante principale",
+  "Fork B":           "Branche de code — fork ou variante principale",
+  // TRONC
+  "Core pipeline":    "Moteur central — orchestre le flux de donn\u00e9es principal",
+  "Core engine":      "Moteur central — le c\u0153ur de la logique m\u00e9tier",
+  "Tige principale":  "Tige unique — le fil conducteur minimal du projet",
+  "Tronc massif":     "Architecture monolithique — tout passe par le tronc",
+  "Core central":     "Noyau central — le point de passage oblig\u00e9",
+  // RACINES R-1
+  "Framework web":    "Framework HTTP/web (Express, Django, Spring, FastAPI...)",
+  "Framework data":   "Framework de donn\u00e9es (ORM, SDK cloud, cache, queue...)",
+  "Framework test":   "Framework de test (Jest, Pytest, JUnit, Cypress...)",
+  "Dep principale":   "D\u00e9pendance principale — brique logicielle fondatrice",
+  // RACINES R-2
+  "Archi DB":         "Architecture base de donn\u00e9es — sch\u00e9ma, migrations, choix SGBD",
+  "Archi API":        "Architecture API — patterns, versioning, s\u00e9rialisation",
+  // RACINES R-3
+  "Contrainte 1":     "Contrainte m\u00e9tier — r\u00e8gle impos\u00e9e par le domaine d'activit\u00e9",
+  "Contrainte 2":     "Contrainte m\u00e9tier — r\u00e8gle impos\u00e9e par le domaine d'activit\u00e9",
+  "Contrainte 3":     "Contrainte m\u00e9tier — r\u00e8gle impos\u00e9e par le domaine d'activit\u00e9",
+  // RACINES R-4
+  "Licence":          "Contrainte de licence — GPL, MIT, Apache, propri\u00e9taire...",
+  "Conformite":       "Conformit\u00e9 r\u00e9glementaire — RGPD, SOC2, PCI-DSS, HIPAA...",
+  // RACINES R-5
+  "Algorithmes":      "Algorithmes fondamentaux — les briques de calcul de base",
+  "Hardware":         "Contraintes mat\u00e9rielles — CPU, m\u00e9moire, stockage, r\u00e9seau",
+};
+const LEVEL_DESC = {
+  "C":   "Couche la plus haute \u2014 production continue (tests, releases)",
+  "F":   "Feuilles \u2014 points d'entr\u00e9e/sortie visibles",
+  "b":   "Rameaux \u2014 sous-composants sp\u00e9cialis\u00e9s",
+  "B":   "Branches \u2014 modules principaux autonomes",
+  "T":   "Tronc \u2014 le moteur central qui relie tout",
+  "R-1": "Racines struct. \u2014 frameworks et d\u00e9pendances",
+  "R-2": "Racines pivot. \u2014 choix d'architecture",
+  "R-3": "Radicelles \u2014 contraintes m\u00e9tier fines",
+  "R-4": "Poils absorb. \u2014 licence et conformit\u00e9",
+  "R-5": "Mycorhizes \u2014 fondations invisibles",
+};
+
 function buildNodeList(nodes) {
   const list = document.getElementById("nodeList");
   const grouped = {};
@@ -716,23 +824,35 @@ function buildNodeList(nodes) {
       const idealIdx = realCount + m;
       const idealNode = window._skel ? window._skel.nodes.filter(n => n.lk === lk)[idealIdx] : null;
       const ghostLabel = idealNode ? idealNode.label : "???";
+      const ghostId = idealNode ? idealNode.id : "";
+      const desc = IDEAL_DESC[ghostLabel] || LEVEL_DESC[lk] || "";
       html += `
-      <tr class="node-row ghost-row" data-level="${lk}">
+      <tr class="node-row ghost-row" data-level="${lk}" data-ideal-id="${ghostId}">
         <td class="col-dot"><div class="node-dot" style="background:transparent;border:1px dashed rgba(255,82,82,0.4);"></div></td>
         <td class="col-id" style="opacity:0.2;">--</td>
-        <td class="col-label" style="opacity:0.3;font-style:italic;" title="Manque: ${ghostLabel}">${ghostLabel}</td>
+        <td class="col-label" style="opacity:0.3;font-style:italic;" title="${desc}">
+          ${ghostLabel}
+          ${desc ? `<span class="ghost-desc">${desc}</span>` : ""}
+        </td>
         <td class="col-conf" style="opacity:0.15;">--</td>
-        <td class="col-status" style="opacity:0.3;">◌</td>
+        <td class="col-status" style="opacity:0.3;">\u25CC</td>
       </tr>`;
     }
   }
   html += `</tbody></table>`;
   list.innerHTML = html;
 
-  list.querySelectorAll(".node-row").forEach(row => {
+  // Real repo nodes: bidirectional link
+  list.querySelectorAll(".node-row:not(.ghost-row)").forEach(row => {
     row.addEventListener("click", () => selectNode(row.dataset.id));
     row.addEventListener("mouseenter", () => highlightTreeNode(row.dataset.id, true));
     row.addEventListener("mouseleave", () => highlightTreeNode(row.dataset.id, false));
+  });
+  // Ghost rows: highlight skeleton node on tree
+  list.querySelectorAll(".ghost-row").forEach(row => {
+    row.addEventListener("click", () => selectGhostNode(row.dataset.idealId, row));
+    row.addEventListener("mouseenter", () => highlightIdealNode(row.dataset.idealId, true));
+    row.addEventListener("mouseleave", () => highlightIdealNode(row.dataset.idealId, false));
   });
 }
 
@@ -1175,18 +1295,22 @@ function buildSVG(nodes) {
     if (!pos) return;
     const r = NODE_R[n.lk] || 5;
 
-    svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}"
+    svgHTML += `<g class="ideal-g" data-ideal-id="${n.id}" data-level="${n.lk}">`;
+    svgHTML += `<circle class="ideal-ring" cx="${pos.x}" cy="${pos.y}" r="${r + 10}"
+      fill="none" stroke="#FF5252" stroke-width="2.5"/>`;
+    svgHTML += `<circle class="ideal-body" cx="${pos.x}" cy="${pos.y}" r="${r}"
       fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"
       filter="url(#glow)"/>`;
     svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="${Math.max(1.5, r * 0.25)}" fill="#fff"/>`;
 
-    // Label au-dessus (aérien) ou en-dessous (souterrain)
+    // Label au-dessus (aerien) ou en-dessous (souterrain)
     const lev = LEVELS[n.lk];
     const above = lev?.zone === "aerial";
     const ly = above ? pos.y - r - 4 : pos.y + r + 12;
-    svgHTML += `<text x="${pos.x}" y="${ly}" fill="rgba(255,255,255,0.7)" font-size="7"
+    svgHTML += `<text class="ideal-label" x="${pos.x}" y="${ly}" fill="rgba(255,255,255,0.7)" font-size="7"
       font-family="JetBrains Mono, monospace" text-anchor="middle"
       filter="url(#textSh)">${n.label}</text>`;
+    svgHTML += `</g>`;
   });
 
   // ────── DÉSIGNATIONS TECHNIQUES (côté droit) ──────
@@ -1313,7 +1437,85 @@ function highlightTreeNode(id, on) {
   else g.classList.remove("highlight");
 }
 
-// ── CONNECTOR LINE (sidebar row → tree node) ──
+// ── HIGHLIGHT IDEAL NODE (from ghost row hover) ──
+function highlightIdealNode(idealId, on) {
+  if (!idealId) return;
+  const g = document.querySelector(`.ideal-g[data-ideal-id="${idealId}"]`);
+  if (!g) return;
+  if (on) g.classList.add("ghost-highlight");
+  else g.classList.remove("ghost-highlight");
+}
+
+// ── SELECT GHOST NODE (from ghost row click) ──
+let activeGhostId = null;
+function selectGhostNode(idealId, row) {
+  if (!idealId) return;
+
+  // Clear previous ghost selection
+  if (activeGhostId) {
+    highlightIdealNode(activeGhostId, false);
+    document.querySelectorAll(".ghost-row.ghost-active").forEach(r => r.classList.remove("ghost-active"));
+  }
+
+  // Toggle off if same node clicked again
+  if (activeGhostId === idealId) {
+    activeGhostId = null;
+    updateConnector(null);
+    return;
+  }
+
+  activeGhostId = idealId;
+  highlightIdealNode(idealId, true);
+  if (row) row.classList.add("ghost-active");
+
+  // Pan to the ideal node position
+  const g = document.querySelector(`.ideal-g[data-ideal-id="${idealId}"]`);
+  if (g) {
+    const body = g.querySelector("circle.ideal-body");
+    if (body) {
+      panToPoint(parseFloat(body.getAttribute("cx")), parseFloat(body.getAttribute("cy")));
+    }
+  }
+
+  // Draw connector from ghost row to skeleton node
+  updateGhostConnector(idealId);
+}
+
+function updateGhostConnector(idealId) {
+  const svg = document.getElementById("connectorSvg");
+  const app = document.querySelector(".app");
+  if (!svg || !app) return;
+  svg.setAttribute("width", app.clientWidth);
+  svg.setAttribute("height", app.clientHeight);
+  svg.innerHTML = "";
+  if (!idealId) return;
+
+  const row = document.querySelector(`.ghost-row[data-ideal-id="${idealId}"]`);
+  const g = document.querySelector(`.ideal-g[data-ideal-id="${idealId}"]`);
+  if (!row || !g) return;
+  const body = g.querySelector("circle.ideal-body");
+  if (!body) return;
+
+  const rowRect = row.getBoundingClientRect();
+  const appRect = app.getBoundingClientRect();
+  const rowY = rowRect.top + rowRect.height / 2 - appRect.top;
+  const rowX = rowRect.right - appRect.left;
+
+  const cx = parseFloat(body.getAttribute("cx"));
+  const cy = parseFloat(body.getAttribute("cy"));
+  const sidebarW = 300;
+  const nodeScreenX = sidebarW + panX + cx * zoom;
+  const nodeScreenY = panY + cy * zoom;
+
+  const midX = rowX + (nodeScreenX - rowX) * 0.4;
+  svg.innerHTML = `
+    <path class="connector-line active"
+          d="M${rowX},${rowY} C${midX},${rowY} ${midX},${nodeScreenY} ${nodeScreenX},${nodeScreenY}"
+          fill="none" stroke="#FF5252" stroke-dasharray="4,4" stroke-width="1.2" opacity="0.5"/>
+  `;
+}
+
+// ── CONNECTOR LINE (sidebar row \u2192 tree node) ──
 function updateConnector(id) {
   const svg = document.getElementById("connectorSvg");
   const app = document.querySelector(".app");
@@ -1350,6 +1552,13 @@ function updateConnector(id) {
 
 // ── NODE SELECTION ──
 function selectNode(id) {
+  // Clear ghost highlight if any
+  if (activeGhostId) {
+    highlightIdealNode(activeGhostId, false);
+    document.querySelectorAll(".ghost-row.ghost-active").forEach(r => r.classList.remove("ghost-active"));
+    activeGhostId = null;
+  }
+
   selectedNodeId = id;
   const node = TREE_DATA.nodes.find(n => n.id === id);
   if (!node) return;
@@ -1441,6 +1650,13 @@ function closeDetail() {
   document.querySelectorAll(".node-row").forEach(i => i.classList.remove("selected"));
   document.querySelectorAll(".node-g").forEach(g => g.classList.remove("selected"));
   updateConnector(null);
+  // Clear ghost highlight too
+  if (activeGhostId) {
+    highlightIdealNode(activeGhostId, false);
+    document.querySelectorAll(".ghost-row.ghost-active").forEach(r => r.classList.remove("ghost-active"));
+    activeGhostId = null;
+    updateGhostConnector(null);
+  }
 }
 
 // ── PAN / ZOOM ──
@@ -1499,6 +1715,7 @@ function applyTransform() {
   inner.style.transition = isDragging ? "none" : "transform 0.2s ease-out";
   document.getElementById("zoomLevel").textContent = `${Math.round(zoom * 100)}%`;
   if (selectedNodeId) updateConnector(selectedNodeId);
+  if (activeGhostId) updateGhostConnector(activeGhostId);
 }
 
 function fitToScreen() {
