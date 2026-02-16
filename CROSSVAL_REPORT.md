@@ -202,3 +202,37 @@ Biologie → Code:
 | fastapi | 0.035 | 0.207 | +0.172 | +0.002 | background↔exceptions |
 
 **Observations:** Les fusions détectées correspondent à des connexions architecturales logiques. FastAPI (guerrilla) gagne le plus de meshedness car son réseau est le plus sparse.
+
+---
+
+## Brique 12 — Intégration complète
+
+### Ce qui a été fait
+
+- `analyze()` intègre maintenant les 12 briques (0-11) en un seul appel
+- `print_report()` affiche tout: métriques, Physarum, anastomose
+- Paramètres configurables: mu, steps, méthode anastomose, seuils
+
+### Tests d'intégration (39/39 PASS)
+
+16 configurations testées:
+- Graphe vide, 1 nœud, 2 nœuds (edge cases)
+- Triangle, Path(10), Star(8) (topologies simples)
+- K5, Grille 4x4 (denses)
+- Watts-Strogatz (small-world)
+- Graphe déconnecté
+- DiGraph (import graph)
+- Flask-like (repo réaliste)
+- Physarum ON/OFF, Anastomose ON/OFF
+- print_report sur 5 types sans crash
+- Cohérence croisée K6 (dense→phalanx) et Tree (sparse→guerrilla)
+
+### Résumé total
+
+| Briques | Tests | Status |
+|---------|-------|--------|
+| 0-9 (métriques) | 51 | ✅ |
+| 10 (Kirchhoff/Physarum) | 16 | ✅ |
+| 11 (Anastomose) | 14 | ✅ |
+| 12 (Intégration) | 39 | ✅ |
+| **TOTAL** | **120** | **✅** |

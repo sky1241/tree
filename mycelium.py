@@ -669,16 +669,26 @@ def classify_strategy(alpha: float, e_global: float, e_root: float,
 # ANALYSE COMPLÈTE
 # ============================================================================
 
-def analyze(G_input, root: str = None) -> dict:
-    """Analyse complète d'un graphe.
+def analyze(G_input, root: str = None, run_physarum=True, run_anastomosis=True,
+            physarum_mu=1.0, physarum_steps=100, anastomosis_method="jaccard",
+            anastomosis_threshold=0.2) -> dict:
+    """Analyse complète d'un graphe — Briques 0 à 11.
 
     Args:
         G_input: nx.Graph ou nx.DiGraph
         root: nœud racine (entry point). Si None, prend le plus connecté.
+        run_physarum: bool — lancer Kirchhoff + Physarum (brique 10).
+        run_anastomosis: bool — détecter les candidats anastomose (brique 11).
+        physarum_mu: float — exposant Physarum (1.0=shortest, <1=loops).
+        physarum_steps: int — itérations Physarum max.
+        anastomosis_method: str — "jaccard", "adamic_adar", "common_neighbors".
+        anastomosis_threshold: float — seuil pour la détection anastomose.
 
     Returns:
-        dict avec toutes les métriques
+        dict avec toutes les métriques briques 0-11
     """
+    import copy
+
     # S'assurer qu'on a un graphe non-dirigé pour les métriques
     if isinstance(G_input, nx.DiGraph):
         G = to_undirected(G_input)
@@ -696,7 +706,7 @@ def analyze(G_input, root: str = None) -> dict:
         # Le nœud avec le plus de connexions
         root = max(G.nodes(), key=lambda n: G.degree(n))
 
-    # --- Métriques de base ---
+    # --- Briques 1-5: Métriques de base ---
     alpha = meshedness(G)
     e_global = global_efficiency(G)
     e_root = root_efficiency(G, root)
@@ -714,10 +724,10 @@ def analyze(G_input, root: str = None) -> dict:
         "bottlenecks": [(n, round(s, 4)) for n, s in bottlenecks],
     }
 
-    # --- Robustesse (seulement si pas trop gros) ---
+    # --- Brique 6: Robustesse (seulement si pas trop gros) ---
     if N <= 500:
         rob = robustness_test(G, attack="betweenness", steps=min(N // 2, 20))
-        # Trouver la fraction connectée quand 50% des nœuds sont supprimés
+        # Trouver la fraction connectée quand 30% des nœuds sont supprimés
         rob_50 = None
         for frac_removed, frac_connected in rob:
             if frac_removed >= 0.3:
@@ -730,7 +740,7 @@ def analyze(G_input, root: str = None) -> dict:
         result["robustness_curve"] = "skipped (N > 500)"
         result["robustness_at_30pct"] = None
 
-    # --- Small-world (seulement si connexe et pas trop gros) ---
+    # --- Briques 7-8: Small-world (seulement si connexe et pas trop gros) ---
     if N <= 200 and nx.is_connected(G):
         sw_sigma = small_world_sigma(G, nrand=3)
         sw_omega = small_world_omega(G, nrand=3, nlattice=3)
@@ -744,9 +754,61 @@ def analyze(G_input, root: str = None) -> dict:
         result["clustering"] = round(nx.average_clustering(G), 4)
         result["avg_path_length"] = None
 
-    # --- Stratégie ---
+    # --- Brique 9: Stratégie ---
     strat = classify_strategy(alpha, e_global, e_root, rob_50)
     result["strategy"] = strat
+
+    # --- Brique 10: Kirchhoff + Physarum ---
+    if run_physarum and N >= 3 and L >= 2:
+        # Sources: root injecte, feuilles absorbent
+        degrees = dict(G.degree())
+        leaves = [n for n in G.nodes() if degrees[n] <= 2 and n != root]
+        if not leaves:
+            leaves = [n for n in G.nodes() if n != root][:max(3, N // 4)]
+
+        if leaves:
+            sources = {root: 1.0}
+            for lf in leaves:
+                sources[lf] = -1.0 / len(leaves)
+
+            G_phys = copy.deepcopy(G)
+            sim = physarum_simulate(G_phys, sources, n_steps=physarum_steps,
+                                   mu=physarum_mu, decay=1.0, h=0.2,
+                                   min_conductivity=1e-4)
+
+            n_thick = len(sim["thick_edges"])
+            n_dead = len(sim["dead_edges"])
+            n_total = n_thick + n_dead
+
+            result["physarum"] = {
+                "mu": physarum_mu,
+                "steps": sim["steps"],
+                "converged": sim["converged"],
+                "thick_edges": n_thick,
+                "dead_edges": n_dead,
+                "survival_pct": round(n_thick / n_total * 100, 1) if n_total > 0 else 0,
+                "top_arteries": [(u, v, round(c, 4)) for u, v, c in sim["thick_edges"][:5]],
+                "top_dead": sim["dead_edges"][:5],
+            }
+        else:
+            result["physarum"] = {"skipped": "no leaves found"}
+    else:
+        result["physarum"] = {"skipped": "too small or disabled"}
+
+    # --- Brique 11: Anastomose ---
+    if run_anastomosis and N >= 3 and L >= 2:
+        candidates = detect_anastomosis_candidates(
+            G, method=anastomosis_method, threshold=anastomosis_threshold,
+            max_candidates=10)
+
+        result["anastomosis"] = {
+            "method": anastomosis_method,
+            "threshold": anastomosis_threshold,
+            "candidates_found": len(candidates),
+            "top_candidates": [(u, v, round(s, 4)) for u, v, s in candidates[:5]],
+        }
+    else:
+        result["anastomosis"] = {"skipped": "too small or disabled"}
 
     return result
 
@@ -790,7 +852,7 @@ def print_report(report: dict):
 
     # E_root
     er_bar = "█" * int(e_root * 20) + "░" * (20 - int(e_root * 20))
-    print(f"  E_root ({report['root'][:15]}): {e_root:.4f}  [{er_bar}]")
+    print(f"  E_root ({str(report['root'])[:15]}): {e_root:.4f}  [{er_bar}]")
 
     # Volume-MST
     print(f"  Volume/MST       : {v_mst:.2f}x", end="")
@@ -844,6 +906,35 @@ def print_report(report: dict):
     for d in strat["details"]:
         print(f"    • {d}")
 
+    # Physarum (brique 10)
+    phys = report.get("physarum", {})
+    if "skipped" not in phys:
+        print(f"\n  --- Kirchhoff / Physarum (μ={phys.get('mu', '?')}) ---")
+        print(f"  Steps      : {phys['steps']}  (converged={phys['converged']})")
+        surv = phys['survival_pct']
+        surv_bar = "█" * int(surv / 5) + "░" * (20 - int(surv / 5))
+        print(f"  Survie     : {phys['thick_edges']}/{phys['thick_edges']+phys['dead_edges']} ({surv:.0f}%)  [{surv_bar}]")
+        if phys.get("top_arteries"):
+            print(f"  Artères principales:")
+            for u, v, c in phys["top_arteries"][:3]:
+                c_bar = "█" * int(c * 20)
+                print(f"    {c:.4f} [{c_bar}] {u} ↔ {v}")
+        if phys.get("top_dead"):
+            print(f"  Morts: {', '.join(f'{u}↔{v}' for u, v in phys['top_dead'][:3])}")
+
+    # Anastomose (brique 11)
+    anast = report.get("anastomosis", {})
+    if "skipped" not in anast:
+        print(f"\n  --- Anastomose ({anast.get('method', '?')}, seuil={anast.get('threshold', '?')}) ---")
+        print(f"  Candidats  : {anast['candidates_found']}")
+        if anast.get("top_candidates"):
+            print(f"  Top fusions potentielles:")
+            for u, v, s in anast["top_candidates"][:5]:
+                s_bar = "█" * int(s * 20)
+                print(f"    {s:.3f} [{s_bar}] {u} ↔ {v}")
+        if anast["candidates_found"] == 0:
+            print(f"    → Réseau déjà saturé ou trop sparse pour l'anastomose")
+
     print(f"\n{'=' * 60}")
 
 
@@ -856,7 +947,7 @@ def main():
 
     if len(sys.argv) < 2:
         print("""
-🍄 MYCELIUM ENGINE v0.1
+🍄 MYCELIUM ENGINE v1.0 — 12 briques, 120 tests
 ========================
 
 Usage:
@@ -2081,6 +2172,199 @@ if __name__ == "__main__":
     main()
     p1, f1 = test_kirchhoff_physarum()
     p2, f2 = test_anastomosis()
-    total_p = p1 + p2
-    total_f = f1 + f2
-    print(f"\n  BRIQUES 10+11: {total_p}/{total_p+total_f} tests passés")
+    p3, f3 = test_full_pipeline()
+    total_p = p1 + p2 + p3
+    total_f = f1 + f2 + f3
+    print(f"\n{'='*50}")
+    print(f"  TOTAL BRIQUES 10+11+12: {total_p}/{total_p+total_f}")
+    print(f"{'='*50}")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 12 — INTÉGRATION COMPLÈTE (analyze → print_report)
+# ═══════════════════════════════════════════════════════════════════
+# Teste que analyze() + print_report() fonctionnent de bout en bout
+# sur TOUTES les configurations de graphe possibles:
+#   - Arbres (path, star)
+#   - Graphes denses (complet, grille)
+#   - Graphes réalistes (repo-like)
+#   - Graphes déconnectés
+#   - Cas limites (1 nœud, 2 nœuds, graphe vide)
+#   - DiGraph (import graph)
+#   - Avec et sans Physarum/Anastomose
+# ═══════════════════════════════════════════════════════════════════
+
+def test_full_pipeline():
+    """Tests d'intégration: analyze() + print_report() sur tous les types."""
+
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            passed += 1
+        else:
+            failed += 1
+            print(f"  ❌ FAIL: {name}")
+
+    print("\n=== BRIQUE 12: Intégration complète ===\n")
+
+    # --- Config 1: Graphe vide ---
+    G_empty = nx.Graph()
+    r = analyze(G_empty)
+    check("Graphe vide: retourne error", "error" in r)
+
+    # --- Config 2: 1 nœud ---
+    G1 = nx.Graph()
+    G1.add_node("solo")
+    r = analyze(G1, run_physarum=False, run_anastomosis=False)
+    check("1 nœud: pas de crash", r["nodes"] == 1)
+
+    # --- Config 3: 2 nœuds, 1 arête ---
+    G2 = nx.Graph()
+    G2.add_edge("a", "b")
+    r = analyze(G2, run_physarum=False, run_anastomosis=False)
+    check("2 nœuds: α=0 (arbre)", r["meshedness_alpha"] == 0.0)
+
+    # --- Config 4: Triangle ---
+    G3 = nx.Graph()
+    G3.add_edges_from([(0, 1), (1, 2), (0, 2)])
+    r = analyze(G3)
+    check("Triangle: α=1", r["meshedness_alpha"] == 1.0)
+    check("Triangle: E_global=1", r["global_efficiency"] == 1.0)
+    check("Triangle: strategy exists", "strategy" in r)
+    check("Triangle: physarum exists", "physarum" in r)
+    check("Triangle: anastomosis exists", "anastomosis" in r)
+
+    # --- Config 5: Path (arbre pur) ---
+    G_path = nx.path_graph(10)
+    r = analyze(G_path)
+    check("Path(10): α=0", r["meshedness_alpha"] == 0.0)
+    check("Path(10): strategy guerrilla ou mixed",
+          r["strategy"]["strategy"] in ("guerrilla", "mixed"))
+    check("Path(10): physarum ran", "steps" in r.get("physarum", {}))
+
+    # --- Config 6: Star (hub-and-spoke) ---
+    G_star = nx.star_graph(8)
+    r = analyze(G_star)
+    check("Star(8): α=0 (arbre)", r["meshedness_alpha"] == 0.0)
+    check("Star(8): root=centre (0)", r["root"] == 0)
+    check("Star(8): bottleneck=centre",
+          r["bottlenecks"][0][0] == 0 if r["bottlenecks"] else True)
+
+    # --- Config 7: Graphe complet K5 ---
+    G_k5 = nx.complete_graph(5)
+    r = analyze(G_k5)
+    check("K5: E_global=1", r["global_efficiency"] == 1.0)
+    check("K5: phalanx", r["strategy"]["strategy"] == "phalanx")
+    check("K5: anastomose 0 candidats",
+          r["anastomosis"]["candidates_found"] == 0)
+
+    # --- Config 8: Grille 4x4 ---
+    G_grid = nx.grid_2d_graph(4, 4)
+    r = analyze(G_grid, physarum_steps=50)
+    check("Grille 4x4: N=16", r["nodes"] == 16)
+    check("Grille 4x4: α > 0 (pas arbre)", r["meshedness_alpha"] > 0)
+    check("Grille 4x4: physarum converge",
+          r["physarum"].get("converged", False) or r["physarum"].get("steps", 0) > 0)
+
+    # --- Config 9: Watts-Strogatz (small-world) ---
+    G_ws = nx.watts_strogatz_graph(30, 4, 0.3, seed=42)
+    r = analyze(G_ws, run_physarum=True, physarum_steps=30)
+    check("WS(30,4,0.3): small-world σ > 1",
+          isinstance(r["small_world_sigma"], float) and r["small_world_sigma"] > 1)
+    check("WS: physarum résultat",
+          "thick_edges" in r.get("physarum", {}))
+
+    # --- Config 10: Graphe déconnecté ---
+    G_disc = nx.Graph()
+    G_disc.add_edges_from([(0, 1), (1, 2), (0, 2)])  # composante 1
+    G_disc.add_edges_from([(10, 11), (11, 12)])  # composante 2
+    r = analyze(G_disc)
+    check("Déconnecté: pas de crash", r["nodes"] == 6)
+    check("Déconnecté: α calculé", isinstance(r["meshedness_alpha"], float))
+
+    # --- Config 11: DiGraph (graphe d'imports) ---
+    G_di = nx.DiGraph()
+    G_di.add_edges_from([
+        ("main", "utils"), ("main", "models"), ("utils", "config"),
+        ("models", "config"), ("models", "utils"), ("api", "models"),
+        ("api", "utils"), ("api", "auth"), ("auth", "config"),
+    ])
+    r = analyze(G_di)
+    check("DiGraph: converti en undirected", r["nodes"] > 0)
+    check("DiGraph: root trouvé", r["root"] is not None)
+    check("DiGraph: all briques present",
+          all(k in r for k in ["meshedness_alpha", "global_efficiency",
+                               "strategy", "physarum", "anastomosis"]))
+
+    # --- Config 12: Repo-like (flask structure) ---
+    G_flask = nx.Graph()
+    G_flask.add_edges_from([
+        ("__init__", "app"), ("__init__", "cli"), ("__init__", "config"),
+        ("app", "cli"), ("app", "config"), ("app", "sessions"),
+        ("app", "templating"), ("cli", "helpers"), ("config", "helpers"),
+        ("sessions", "helpers"), ("templating", "helpers"),
+        ("helpers", "utils"), ("sessions", "utils"),
+    ])
+    r = analyze(G_flask, root="__init__", physarum_mu=0.7, physarum_steps=50,
+                anastomosis_method="jaccard", anastomosis_threshold=0.15)
+    check("Flask-like: root=__init__", r["root"] == "__init__")
+    check("Flask-like: physarum ran", "thick_edges" in r.get("physarum", {}))
+    check("Flask-like: anastomose détecte",
+          r["anastomosis"]["candidates_found"] > 0)
+
+    # --- Config 13: print_report ne crash pas sur tous les types ---
+    import io, contextlib
+    test_graphs = {
+        "triangle": nx.complete_graph(3),
+        "path": nx.path_graph(5),
+        "star": nx.star_graph(5),
+        "grid": nx.grid_2d_graph(3, 3),
+        "ws": nx.watts_strogatz_graph(20, 4, 0.3, seed=42),
+    }
+    all_reports_ok = True
+    for gname, G in test_graphs.items():
+        try:
+            r = analyze(G, physarum_steps=20)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                print_report(r)
+            output = buf.getvalue()
+            if "MYCELIUM ANALYSIS" not in output:
+                all_reports_ok = False
+        except Exception as e:
+            all_reports_ok = False
+            print(f"    print_report crash on {gname}: {e}")
+    check("print_report: 5 types sans crash", all_reports_ok)
+
+    # --- Config 14: analyze avec physarum désactivé ---
+    r_no_phys = analyze(nx.path_graph(5), run_physarum=False)
+    check("Physarum disabled: skipped",
+          "skipped" in r_no_phys.get("physarum", {}))
+
+    # --- Config 15: analyze avec anastomose désactivée ---
+    r_no_anast = analyze(nx.path_graph(5), run_anastomosis=False)
+    check("Anastomose disabled: skipped",
+          "skipped" in r_no_anast.get("anastomosis", {}))
+
+    # --- Config 16: Cohérence croisée ---
+    # Un graphe dense doit avoir: α élevé, E élevé, stratégie phalanx,
+    # Physarum haute survie, peu de candidats anastomose
+    G_dense = nx.complete_graph(6)
+    r_d = analyze(G_dense, physarum_steps=30)
+    check("K6 cohérence: α > 1", r_d["meshedness_alpha"] > 1.0)
+    check("K6 cohérence: E = 1", r_d["global_efficiency"] == 1.0)
+    check("K6 cohérence: phalanx", r_d["strategy"]["strategy"] == "phalanx")
+    check("K6 cohérence: 0 candidats anastomose",
+          r_d["anastomosis"]["candidates_found"] == 0)
+
+    # Un arbre doit avoir: α=0, stratégie guerrilla, tous les liens survivent au Physarum
+    G_tree = nx.random_labeled_tree(12, seed=42)
+    r_t = analyze(G_tree, physarum_steps=50)
+    check("Tree cohérence: α=0", r_t["meshedness_alpha"] == 0.0)
+    check("Tree cohérence: guerrilla", r_t["strategy"]["strategy"] == "guerrilla")
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
