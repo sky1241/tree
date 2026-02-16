@@ -243,7 +243,11 @@ Liane: Tout fin (~1-1.5px), pas de structure porteuse
 - `templates/interactive_profile.html` — Page profil arbre
   - Layout: sidebar (300px) + canvas (image + SVG overlay) + detail panel
   - Constantes: IMG_W=922, IMG_H=1244, CENTER_X=461, SOL_Y=575
-  - SVG overlay avec nœuds, connexions, squelette
+  - **Sidebar = tableau interactif** (`<table class="node-table">`) avec colonnes (dot, ID, Label, Conf, St)
+  - **Noeuds repo visibles** sur SVG (`.node-g` avec `.node-ring` + `.node-bg` + `.node-core`)
+  - **Lien bidirectionnel** sidebar ↔ arbre (hover highlight + click select + connector gold)
+  - **Mapping repo→squelette**: premiers N nœuds par niveau mappés sur positions idéales, overflow en fallback
+  - SVG overlay avec nœuds idéaux (blanc), nœuds repo (couleur status), connexions Bézier
   - Zoom/pan/click interactif
 
 - `scans/*.json` — Données de repos scannés
@@ -274,13 +278,34 @@ PYTHONIOENCODING=utf-8 python engine.py serve scans/HSBC-algo-genetic.json
 6. ☑ ~~Squelette BAOBAB~~ FAIT — 23 nœuds, tronc massif (T=7.0px/45px), couronne minuscule
 7. ☑ ~~Squelette BUISSON~~ FAIT — 26 nœuds, multi-tiges (trunkTopY=null), B=T=2.0px
 8. ☑ ~~Squelette LIANE~~ FAIT — 21 nœuds, tout fin (T=1.5px/15px), vrilles
-9. ☐ Overlay du repo réel sur le squelette parfait (diagnostic)
-10. ☐ Animations de croissance (graine → arbre)
+9. ☑ ~~Overlay du repo réel sur le squelette parfait~~ FAIT
+   - Tableau interactif sidebar (table HTML avec colonnes)
+   - Nœuds repo visibles (vert=done, orange=wip, rouge=todo) mappés sur squelette
+   - Hover bidirectionnel sidebar ↔ arbre (pulse + highlight)
+   - Click → connecteur gold pointillé sidebar → arbre + detail panel
+   - Overflow: nœuds excédentaires positionnés en fallback hors squelette
+10. ☐ **RECALER LES LIGNES DE SÉPARATION** — prochain chantier:
+    - Calibrer les Y de chaque zone (CIME, FEUILLES, RAMEAUX...) sur chaque planche
+    - Définir les "boîtes" visuelles de chaque niveau pour que overflow reste dans sa zone
+    - Les nœuds qui débordent = diagnostic clair (pas un bug d'affichage)
+11. ☐ Améliorer le rendu des overflow (espacement, indication visuelle "hors cadre")
+12. ☐ Animations de croissance (graine → arbre)
+
+## Concept clé — Diagnostic par overlay
+
+Le squelette blanc = la NORME (arbre idéal selon la botanique).
+Les nœuds colorés = la RÉALITÉ (ce que le repo scannné a vraiment).
+L'ÉCART entre les deux = le DIAGNOSTIC:
+- Nœud vert SUR blanc → conforme, le module est au bon endroit
+- Blanc SANS vert → il manque quelque chose (ex: pas de tests = pas de CIME)
+- Vert en OVERFLOW → le projet DÉBORDE (trop de rameaux, structure non standard)
+- Comme un scanner médical: squelette parfait vs squelette du patient
 
 ## Conventions
 
 - Windows 10, shell bash, PYTHONIOENCODING=utf-8
 - Git: push sur main (github.com/sky1241/tree.git)
 - Template reloadé au restart serveur (pas de hot reload)
-- Nœuds actuellement en BLANC (temporaire, couleurs à définir)
+- Nœuds idéaux en BLANC, nœuds repo en COULEUR (vert/orange/rouge par status)
 - Positions pixel hardcodées par famille (pas de calcul dynamique)
+- Patch scripts (`_patch_*.py`) pour modifier le template (contourne problèmes Unicode Edit tool)
