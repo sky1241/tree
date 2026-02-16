@@ -880,24 +880,62 @@ function buildSVG(nodes) {
     { id:"iR52", lk:"R-5", label:"Hardware",     side:"L", ratio:0.50, pid:"iR42" },
   ];
 
-  // Calculer positions id\u00e9ales
+  // ═══ Calculer positions — BRANCHES EN ANGLE (pas horizontales) ═══
+  // Conif\u00e8re: branches \u00e0 45-60\u00b0, retombent l\u00e9g\u00e8rement.
+  // Plus loin du tronc → plus bas (droop naturel).
+  // Sub-branches partent du bout de la branche parente, pas du tronc.
+
   const iPos = {};
-  idealTree.forEach(n => {
-    if (n.side === "C") { iPos[n.id] = { x: CENTER_X, y: LEVELS[n.lk].y }; }
-    else { iPos[n.id] = { x: idealX(n.lk, n.side, n.ratio), y: LEVELS[n.lk].y }; }
+
+  // D'abord: calculer les positions dans l'ORDRE de d\u00e9pendance
+  // (parents avant enfants)
+  const ordered = idealTree.filter(n => !n.pid).concat(idealTree.filter(n => n.pid));
+
+  ordered.forEach(n => {
+    const lev = LEVELS[n.lk];
+    if (n.side === "C") {
+      iPos[n.id] = { x: CENTER_X, y: lev.y };
+      return;
+    }
+
+    const dir = n.side === "R" ? 1 : -1;
+    const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
+    const maxHalf = n.side === "R" ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
+
+    if (n.pid && iPos[n.pid]) {
+      // Sub-branche: part du parent, s'\u00e9tend plus loin dans la m\u00eame direction
+      const pp = iPos[n.pid];
+      const ext = maxHalf * n.ratio * 0.35;
+      const droopDir = lev.zone === "aerial" ? -1 : 1;
+      iPos[n.id] = {
+        x: Math.round(pp.x + dir * ext),
+        y: Math.round(pp.y + droopDir * ext * 0.45)
+      };
+    } else {
+      // Branche principale: part du tronc en angle
+      const branchLen = maxHalf * n.ratio;
+      // Angle de branche: a\u00e9rien = retombe 25-40\u00b0, racine = plonge 30-50\u00b0
+      const droop = lev.zone === "aerial" ? 0.4 : 0.5;
+      iPos[n.id] = {
+        x: Math.round(CENTER_X + dir * branchLen),
+        y: Math.round(lev.y + branchLen * droop)
+      };
+    }
   });
 
   // ────── RENDER: TRONC ──────
-  svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 30}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 40}"
+  // Tronc l\u00e9g\u00e8rement plus \u00e9pais en bas (taper naturel)
+  svgHTML += `<line x1="${CENTER_X}" y1="${LEVELS['C'].y - 20}" x2="${CENTER_X}" y2="${LEVELS['R-5'].y + 30}"
     stroke="rgba(218,165,32,0.45)" stroke-width="4"/>`;
 
-  // Points d'attache
+  // Points d'attache (petits cercles sur le tronc)
   for (const [lk, lev] of Object.entries(LEVELS)) {
-    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="4.5"
-      fill="rgba(218,165,32,0.12)" stroke="rgba(218,165,32,0.35)" stroke-width="1.3"/>`;
+    if (lk === "T") continue;
+    svgHTML += `<circle cx="${CENTER_X}" cy="${lev.y}" r="3.5"
+      fill="rgba(218,165,32,0.15)" stroke="rgba(218,165,32,0.3)" stroke-width="1"/>`;
   }
 
-  // ────── RENDER: CONNEXIONS ──────
+  // ────── RENDER: CONNEXIONS (courbes organiques) ──────
   idealTree.forEach(n => {
     const pos = iPos[n.id];
     if (!pos || n.lk === "T") return;
@@ -906,15 +944,20 @@ function buildSVG(nodes) {
     else if (n.lk === "R-1") { pp = { x: CENTER_X, y: SOL_Y + 10 }; }
     else { pp = { x: CENTER_X, y: LEVELS[n.lk].y }; }
 
-    svgHTML += `<line x1="${pp.x}" y1="${pp.y}" x2="${pos.x}" y2="${pos.y}"
-      stroke="rgba(218,165,32,0.45)" stroke-width="1.6"/>`;
+    // Courbe B\u00e9zier: le point de contr\u00f4le tire vers l'ext\u00e9rieur
+    const cx = pp.x + (pos.x - pp.x) * 0.6;
+    const cy = pp.y + (pos.y - pp.y) * 0.25;
+    const isSubBranch = !!n.pid;
+    const sw = isSubBranch ? 1.0 : 1.5;
+
+    svgHTML += `<path d="M${pp.x},${pp.y} Q${cx},${cy} ${pos.x},${pos.y}"
+      fill="none" stroke="rgba(218,165,32,0.45)" stroke-width="${sw}"/>`;
   });
 
   // ────── RENDER: N\u0152UDS ID\u00c9AUX ──────
   idealTree.forEach(n => {
     const pos = iPos[n.id];
     if (!pos) return;
-    const lev = LEVELS[n.lk];
     const isT = n.lk === "T";
     const r = isT ? 9 : 6;
 
@@ -923,7 +966,12 @@ function buildSVG(nodes) {
       filter="url(#glow)"/>`;
     svgHTML += `<circle cx="${pos.x}" cy="${pos.y}" r="1.5"
       fill="rgba(218,165,32,0.9)"/>`;
-    svgHTML += `<text x="${pos.x}" y="${pos.y - r - 4}" fill="rgba(218,165,32,0.7)" font-size="7"
+
+    // Label au-dessus pour a\u00e9rien, en-dessous pour souterrain
+    const lev = LEVELS[n.lk];
+    const labelAbove = lev.zone === "aerial";
+    const ly = labelAbove ? pos.y - r - 4 : pos.y + r + 10;
+    svgHTML += `<text x="${pos.x}" y="${ly}" fill="rgba(218,165,32,0.65)" font-size="7"
       font-family="JetBrains Mono, monospace" text-anchor="middle"
       filter="url(#textSh)">${n.label}</text>`;
   });
@@ -932,9 +980,9 @@ function buildSVG(nodes) {
   for (const [lk, lev] of Object.entries(LEVELS)) {
     const count = idealTree.filter(n => n.lk === lk).length;
     if (count > 0 && lk !== "T") {
-      svgHTML += `<text x="880" y="${lev.y + 4}" fill="rgba(218,165,32,0.5)" font-size="8"
+      svgHTML += `<text x="880" y="${lev.y + 4}" fill="rgba(218,165,32,0.4)" font-size="8"
         font-family="JetBrains Mono, monospace" text-anchor="end"
-        filter="url(#textSh)">${count} id\u00e9al</text>`;
+        filter="url(#textSh)">${count}</text>`;
     }
   }
 
