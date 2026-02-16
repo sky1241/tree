@@ -135,70 +135,101 @@
   .node-list {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 0;
+    padding: 0;
   }
 
   .node-list::-webkit-scrollbar { width: 4px; }
   .node-list::-webkit-scrollbar-track { background: transparent; }
   .node-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 
-  .node-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
+  /* Interactive Table */
+  .node-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+
+  .node-table thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg2);
+    z-index: 2;
+  }
+
+  .node-table th {
+    padding: 6px 8px;
+    text-align: left;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.3;
+    font-weight: 400;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .node-table .level-row td {
+    padding: 12px 8px 4px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.25;
+    border: none;
+  }
+
+  .node-table .node-row {
     cursor: pointer;
     transition: all 0.15s;
     border-left: 2px solid transparent;
   }
 
-  .node-item:hover {
-    background: rgba(255,255,255,0.03);
+  .node-table .node-row:hover {
+    background: rgba(255,255,255,0.04);
   }
 
-  .node-item.selected {
-    background: rgba(139,105,20,0.1);
+  .node-table .node-row.selected {
+    background: rgba(139,105,20,0.12);
     border-left-color: var(--gold);
   }
 
-  .node-item.hidden { display: none; }
+  .node-table .node-row.highlight {
+    background: rgba(139,105,20,0.08);
+    border-left-color: var(--gold-light);
+  }
+
+  .node-table .node-row.hidden { display: none; }
+
+  .node-table td {
+    padding: 6px 8px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+
+  .node-table .col-dot { width: 16px; }
+  .node-table .col-id { width: 32px; opacity: 0.35; font-size: 9px; }
+  .node-table .col-label {
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+  }
+  .node-table .col-conf {
+    width: 40px;
+    text-align: right;
+    opacity: 0.3;
+    font-size: 8px;
+  }
+  .node-table .col-status {
+    width: 24px;
+    text-align: center;
+    font-size: 10px;
+  }
 
   .node-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
-  }
-
-  .node-item .node-id {
-    font-size: 9px;
-    opacity: 0.35;
-    width: 28px;
-    flex-shrink: 0;
-  }
-
-  .node-item .node-label {
-    font-size: 10px;
-    opacity: 0.7;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-  }
-
-  .node-item .node-conf {
-    font-size: 8px;
-    opacity: 0.3;
-    flex-shrink: 0;
-  }
-
-  /* Level headers in list */
-  .level-header {
-    padding: 10px 16px 4px;
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    opacity: 0.25;
   }
 
   .sidebar-footer {
@@ -248,6 +279,33 @@
     opacity: 0;
     transition: all 0.25s ease;
   }
+
+  @keyframes nodePulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  .tree-svg .node-g.highlight .node-ring {
+    opacity: 1;
+    stroke-width: 3;
+    animation: nodePulse 0.8s ease-in-out infinite;
+  }
+  .tree-svg .node-g.highlight .node-bg { filter: url(#glow); }
+
+  .connector-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .connector-line {
+    stroke: var(--gold);
+    stroke-width: 1;
+    stroke-dasharray: 4,4;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .connector-line.active { opacity: 0.4; }
 
   .level-line {
     opacity: 0.12;
@@ -449,6 +507,9 @@
     <div class="sidebar-footer">racines > arbre — 2026</div>
   </div>
 
+  <!-- Connector overlay -->
+  <svg class="connector-svg" id="connectorSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+
   <!-- MAIN CANVAS -->
   <div class="canvas" id="canvas">
     <div class="canvas-inner" id="canvasInner">
@@ -612,38 +673,46 @@ function buildNodeList(nodes) {
     grouped[key].push(n);
   });
 
-  let html = "";
+  let html = `<table class="node-table">
+    <thead><tr>
+      <th></th><th>ID</th><th>Label</th><th>Conf</th><th>St</th>
+    </tr></thead><tbody>`;
+
   const levelOrder = ["C", "F", "b", "B", "T", "R-1", "R-2", "R-3", "R-4", "R-5"];
-  
+
   for (const lk of levelOrder) {
     const lev = LEVELS[lk];
     const group = grouped[lk];
     if (!group || !lev) continue;
 
-    html += `<div class="level-header">${lev.label}</div>`;
+    html += `<tr class="level-row"><td colspan="5">${lev.label}</td></tr>`;
     for (const n of group) {
       html += `
-        <div class="node-item" data-id="${n.id}" data-status="${n.status}" data-level="${lk}">
-          <div class="node-dot" style="background:${statusColor(n.status)}"></div>
-          <div class="node-id">${n.id}</div>
-          <div class="node-label">${n.label}</div>
-          <div class="node-conf">${n.confidence || 0}%</div>
-        </div>`;
+      <tr class="node-row" data-id="${n.id}" data-status="${n.status}" data-level="${lk}">
+        <td class="col-dot"><div class="node-dot" style="background:${statusColor(n.status)}"></div></td>
+        <td class="col-id">${n.id}</td>
+        <td class="col-label" title="${n.label}">${n.label}</td>
+        <td class="col-conf">${n.confidence || 0}%</td>
+        <td class="col-status">${statusIcon(n.status)}</td>
+      </tr>`;
     }
   }
+  html += `</tbody></table>`;
   list.innerHTML = html;
 
-  list.querySelectorAll(".node-item").forEach(item => {
-    item.addEventListener("click", () => selectNode(item.dataset.id));
+  list.querySelectorAll(".node-row").forEach(row => {
+    row.addEventListener("click", () => selectNode(row.dataset.id));
+    row.addEventListener("mouseenter", () => highlightTreeNode(row.dataset.id, true));
+    row.addEventListener("mouseleave", () => highlightTreeNode(row.dataset.id, false));
   });
 }
 
 function filterNodes() {
-  document.querySelectorAll(".node-item").forEach(item => {
-    if (statusFilter === "all" || item.dataset.status === statusFilter) {
-      item.classList.remove("hidden");
+  document.querySelectorAll(".node-row").forEach(row => {
+    if (statusFilter === "all" || row.dataset.status === statusFilter) {
+      row.classList.remove("hidden");
     } else {
-      item.classList.add("hidden");
+      row.classList.add("hidden");
     }
   });
   // Also filter SVG nodes
@@ -1121,22 +1190,44 @@ function buildSVG(nodes) {
       filter="url(#textSh)">${t.tech}</text>`;
   });
 
-  // ────── REPO NODES (invisibles, pour sidebar) ──────
+  // ────── REPO NODES (visibles, mappes sur squelette) ──────
+  const idealByLevel = {};
+  idealTree.forEach(n => {
+    if (!idealByLevel[n.lk]) idealByLevel[n.lk] = [];
+    idealByLevel[n.lk].push(n);
+  });
+
   const posMap = {};
   for (const [lk, lev] of Object.entries(LEVELS)) {
-    (grouped[lk] || []).forEach((n, i) => {
-      const side = i % 2 === 0 ? 1 : -1;
-      const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
-      const half = side > 0 ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
-      const x = lk === "T" ? CENTER_X : CENTER_X + side * half * (0.2 + (i * 0.12));
-      posMap[n.id] = { x: Math.round(x), y: lev.y };
+    const repoGroup = grouped[lk] || [];
+    const idealGroup = idealByLevel[lk] || [];
+    repoGroup.forEach((n, i) => {
+      if (i < idealGroup.length) {
+        const ideal = idealGroup[i];
+        posMap[n.id] = { x: ideal.x, y: ideal.y };
+      } else {
+        const side = i % 2 === 0 ? 1 : -1;
+        const bounds = lev.zone === "aerial" ? canopyWidthAt(lev.y) : rootWidthAt(lev.y);
+        const half = side > 0 ? Math.max(bounds.right - CENTER_X, 30) : Math.max(CENTER_X - bounds.left, 30);
+        const x = lk === "T" ? CENTER_X : CENTER_X + side * half * (0.2 + (i * 0.12));
+        posMap[n.id] = { x: Math.round(x), y: lev.y };
+      }
     });
   }
+
   nodes.forEach(n => {
     const pos = posMap[n.id] || { x: CENTER_X, y: 500 };
+    const lk = nodeLevelKey(n);
+    const sc = statusColor(n.status);
+    const r = NODE_R[lk] || 8;
     svgHTML += `
-    <g class="node-g" data-id="${n.id}" data-status="${n.status}">
-      <circle cx="${pos.x}" cy="${pos.y}" r="8" fill="transparent"/>
+    <g class="node-g" data-id="${n.id}" data-status="${n.status}" data-level="${lk}">
+      <circle class="node-ring" cx="${pos.x}" cy="${pos.y}" r="${r + 8}"
+        fill="none" stroke="${sc}" stroke-width="2"/>
+      <circle class="node-bg" cx="${pos.x}" cy="${pos.y}" r="${r * 0.6}"
+        fill="rgba(0,0,0,0.4)" stroke="${sc}" stroke-width="1.5"/>
+      <circle class="node-core" cx="${pos.x}" cy="${pos.y}" r="${Math.max(2, r * 0.2)}"
+        fill="${sc}"/>
     </g>`;
   });
 
@@ -1164,13 +1255,67 @@ function buildSVG(nodes) {
 
   svg.innerHTML = svgHTML;
 
-  // Node click events
+  // Node click + hover events (bidirectional)
   svg.querySelectorAll(".node-g").forEach(g => {
     g.addEventListener("click", (e) => {
       e.stopPropagation();
       selectNode(g.dataset.id);
     });
+    g.addEventListener("mouseenter", () => {
+      const row = document.querySelector(`.node-row[data-id="${g.dataset.id}"]`);
+      if (row) {
+        row.classList.add("highlight");
+        row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
+    g.addEventListener("mouseleave", () => {
+      const row = document.querySelector(`.node-row[data-id="${g.dataset.id}"]`);
+      if (row) row.classList.remove("highlight");
+    });
   });
+}
+
+// ── HIGHLIGHT TREE NODE (from sidebar hover) ──
+function highlightTreeNode(id, on) {
+  const g = document.querySelector(`.node-g[data-id="${id}"]`);
+  if (!g) return;
+  if (on) g.classList.add("highlight");
+  else g.classList.remove("highlight");
+}
+
+// ── CONNECTOR LINE (sidebar row → tree node) ──
+function updateConnector(id) {
+  const svg = document.getElementById("connectorSvg");
+  const app = document.querySelector(".app");
+  if (!svg || !app) return;
+  svg.setAttribute("width", app.clientWidth);
+  svg.setAttribute("height", app.clientHeight);
+  svg.innerHTML = "";
+  if (!id) return;
+
+  const row = document.querySelector(`.node-row[data-id="${id}"]`);
+  const nodeG = document.querySelector(`.node-g[data-id="${id}"]`);
+  if (!row || !nodeG) return;
+  const circle = nodeG.querySelector("circle.node-bg");
+  if (!circle) return;
+
+  const rowRect = row.getBoundingClientRect();
+  const appRect = app.getBoundingClientRect();
+  const rowY = rowRect.top + rowRect.height / 2 - appRect.top;
+  const rowX = rowRect.right - appRect.left;
+
+  const cx = parseFloat(circle.getAttribute("cx"));
+  const cy = parseFloat(circle.getAttribute("cy"));
+  const sidebarW = 300;
+  const nodeScreenX = sidebarW + panX + cx * zoom;
+  const nodeScreenY = panY + cy * zoom;
+
+  const midX = rowX + (nodeScreenX - rowX) * 0.4;
+  svg.innerHTML = `
+    <path class="connector-line active"
+          d="M${rowX},${rowY} C${midX},${rowY} ${midX},${nodeScreenY} ${nodeScreenX},${nodeScreenY}"
+          fill="none"/>
+  `;
 }
 
 // ── NODE SELECTION ──
@@ -1179,9 +1324,9 @@ function selectNode(id) {
   const node = TREE_DATA.nodes.find(n => n.id === id);
   if (!node) return;
 
-  // Highlight in list
-  document.querySelectorAll(".node-item").forEach(i => i.classList.remove("selected"));
-  const listItem = document.querySelector(`.node-item[data-id="${id}"]`);
+  // Highlight in table
+  document.querySelectorAll(".node-row").forEach(i => i.classList.remove("selected"));
+  const listItem = document.querySelector(`.node-row[data-id="${id}"]`);
   if (listItem) {
     listItem.classList.add("selected");
     listItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1192,13 +1337,16 @@ function selectNode(id) {
   const svgNode = document.querySelector(`.node-g[data-id="${id}"]`);
   if (svgNode) svgNode.classList.add("selected");
 
-  // Pan to node — find its actual SVG position
+  // Pan to node
   if (svgNode) {
-    const circle = svgNode.querySelector("circle:nth-child(4)"); // glow circle
+    const circle = svgNode.querySelector("circle.node-bg");
     if (circle) {
       panToPoint(parseFloat(circle.getAttribute("cx")), parseFloat(circle.getAttribute("cy")));
     }
   }
+
+  // Draw connector
+  updateConnector(id);
 
   // Open detail
   showDetail(node);
@@ -1260,8 +1408,9 @@ function showDetail(node) {
 function closeDetail() {
   document.getElementById("detailPanel").classList.remove("open");
   selectedNodeId = null;
-  document.querySelectorAll(".node-item").forEach(i => i.classList.remove("selected"));
+  document.querySelectorAll(".node-row").forEach(i => i.classList.remove("selected"));
   document.querySelectorAll(".node-g").forEach(g => g.classList.remove("selected"));
+  updateConnector(null);
 }
 
 // ── PAN / ZOOM ──
@@ -1319,6 +1468,7 @@ function applyTransform() {
   inner.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   inner.style.transition = isDragging ? "none" : "transform 0.2s ease-out";
   document.getElementById("zoomLevel").textContent = `${Math.round(zoom * 100)}%`;
+  if (selectedNodeId) updateConnector(selectedNodeId);
 }
 
 function fitToScreen() {
