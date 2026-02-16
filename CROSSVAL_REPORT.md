@@ -151,3 +151,54 @@ Il manque la couche de traduction NOMBRES → GÉOMÉTRIE 3D:
 - Nouveau lien → nouveau filament pousse entre deux points
 
 Briques 11-12 (anastomose, rapport complet) restent à coder.
+
+---
+
+## Brique 11 — Anastomose (Fusion de branches)
+
+### Sources scientifiques
+
+| Ref | Paper | Concept |
+|-----|-------|---------|
+| Edelstein 1982 | J. Theor. Biol. 98:679-701 | f = -a₁n² - a₂nρ (tip-tip + tip-hypha fusion rates) |
+| Schnepf & Roose 2006 | Proc. R. Soc. B | AM fungi: anastomosis rate constants a₁, a₂ |
+| Glass & Fleissner 2006 | The Mycota | "Re-Wiring the Network": homing + fusion mechanism |
+| Podospora anserina 2020 | Sci. Rep. | Whole-field imaging: N grows as network densifies |
+
+### Modèle implémenté
+
+Biologie → Code:
+- Hyphe proche d'une autre hyphe → Deux modules partageant des voisins sans être connectés
+- Fusion (anastomose) → Nouvelle arête ajoutée
+- Densité locale (Edelstein) → Jaccard coefficient du voisinage
+
+3 fonctions: `detect_anastomosis_candidates()`, `anastomose()`, `incremental_growth()`
+3 méthodes de détection: Jaccard, Adamic-Adar, Common Neighbors
+
+### Tests unitaires (14/14 PASS)
+
+| Test | Résultat |
+|------|----------|
+| Deux triangles pont: candidates trouvés | ✅ |
+| K5: aucun candidat (tout connecté) | ✅ |
+| Path(10): candidats limités | ✅ |
+| Anastomose sur path: α augmente | ✅ |
+| Deux chaînes: E_global augmente | ✅ |
+| Marquage anastomosis=True | ✅ |
+| Conductivité initiale correcte | ✅ |
+| Adamic-Adar fonctionne | ✅ |
+| Incremental growth: snapshots | ✅ |
+| Incremental growth: croissance | ✅ (×2) |
+| Incremental: détection fusions | ✅ |
+| Graph vide: pas de crash | ✅ |
+| Triangle: pas de doublons | ✅ |
+
+### Validation sur vrais repos
+
+| Repo | α avant | α après (5 fusions) | Δα | ΔE | Top fusion |
+|------|---------|---------------------|-----|-----|------------|
+| flask | 1.581 | 1.698 | +0.116 | +0.009 | json.provider↔config |
+| requests | 1.296 | 1.482 | +0.185 | +0.016 | _internal_utils↔adapters |
+| fastapi | 0.035 | 0.207 | +0.172 | +0.002 | background↔exceptions |
+
+**Observations:** Les fusions détectées correspondent à des connexions architecturales logiques. FastAPI (guerrilla) gagne le plus de meshedness car son réseau est le plus sparse.

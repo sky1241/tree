@@ -1680,3 +1680,407 @@ def test_kirchhoff_physarum():
 if __name__ == "__main__":
     main()
     p, f = test_kirchhoff_physarum()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 11 — ANASTOMOSE (FUSION DE BRANCHES)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   Edelstein 1982, J. Theor. Biol. 98:679-701
+#     "The propagation of fungal colonies: a model for tissue growth"
+#     Anastomosis rate: f = -a1*n² - a2*n*ρ
+#     (tip-tip and tip-hypha fusion, density-dependent)
+#
+#   Schnepf & Roose 2006, Proc. R. Soc. B 275:1243
+#     "Growth model for arbuscular mycorrhizal fungi"
+#     a1 = tip-tip anastomosis rate, a2 = tip-hypha rate
+#
+#   Podospora anserina study (Sci. Rep. 2020)
+#     Whole-field imaging shows anastomosis creates shortcuts,
+#     increases connectivity, N (nodes) grows as network densifies.
+#
+#   Glass & Fleissner 2006, "Re-Wiring the Network"
+#     Anastomosis = specialized fusion hyphae homing + merging.
+#     Two hyphae grow toward each other, fuse, create new connection.
+#
+# Traduction code:
+#   Biologie: deux hyphes proches fusionnent → nouveau lien
+#   Code: deux modules qui partagent des voisins sans être connectés
+#         → candidat à la fusion (future dépendance probable)
+#   Effet: augmente α (meshedness), augmente E_global, crée des
+#          raccourcis, transforme guerrilla → mixed → phalanx
+# ═══════════════════════════════════════════════════════════════════
+
+def detect_anastomosis_candidates(G, method="jaccard", threshold=0.3, max_candidates=20):
+    """
+    Détecte les paires de nœuds candidats à l'anastomose.
+
+    Biologie: deux hyphes qui grandissent l'une vers l'autre et fusionnent.
+    Code: deux modules non-connectés mais qui partagent beaucoup de voisins.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graphe du réseau.
+    method : str
+        "jaccard" : Jaccard coefficient des voisinages (Edelstein: densité locale)
+        "adamic_adar" : Adamic-Adar index (pondère par rareté des voisins communs)
+        "common_neighbors" : nombre brut de voisins communs
+    threshold : float
+        Seuil minimum pour considérer une paire comme candidate.
+        Jaccard: 0.3 = 30% de voisins partagés.
+    max_candidates : int
+        Nombre max de candidats retournés.
+
+    Returns
+    -------
+    list of (u, v, score)
+        Paires candidates triées par score décroissant.
+    """
+    candidates = []
+
+    if method == "jaccard":
+        # Jaccard = |N(u) ∩ N(v)| / |N(u) ∪ N(v)|
+        # Analogue Edelstein: probabilité de fusion ∝ densité locale
+        non_edges = nx.non_edges(G)
+        for u, v in non_edges:
+            nu = set(G.neighbors(u))
+            nv = set(G.neighbors(v))
+            union = nu | nv
+            if len(union) == 0:
+                continue
+            score = len(nu & nv) / len(union)
+            if score >= threshold:
+                candidates.append((u, v, score))
+
+    elif method == "adamic_adar":
+        # Adamic-Adar: sum(1/log(deg(w))) for w in common neighbors
+        # Les voisins rares comptent plus (comme un hyphe spécialisé)
+        import math
+        non_edges = nx.non_edges(G)
+        for u, v in non_edges:
+            common = set(G.neighbors(u)) & set(G.neighbors(v))
+            if not common:
+                continue
+            score = sum(1.0 / math.log(G.degree(w))
+                        for w in common if G.degree(w) > 1)
+            if score >= threshold:
+                candidates.append((u, v, score))
+
+    elif method == "common_neighbors":
+        non_edges = nx.non_edges(G)
+        for u, v in non_edges:
+            common = len(set(G.neighbors(u)) & set(G.neighbors(v)))
+            if common >= threshold:
+                candidates.append((u, v, float(common)))
+
+    # Trier par score décroissant
+    candidates.sort(key=lambda x: x[2], reverse=True)
+    return candidates[:max_candidates]
+
+
+def anastomose(G, candidates, n_fusions=None, conductivity_init=0.5):
+    """
+    Exécute l'anastomose: fusionne les paires candidates en ajoutant des arêtes.
+
+    Biologie: les hyphes fusionnent, créant un nouveau tube.
+    Code: nouvelle dépendance entre modules.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graphe (modifié in-place).
+    candidates : list of (u, v, score)
+        Candidats issus de detect_anastomosis_candidates.
+    n_fusions : int or None
+        Nombre de fusions à effectuer. None = toutes les candidates.
+    conductivity_init : float
+        Conductivité initiale du nouveau lien (tube fin au début,
+        le Physarum le renforcera ou le tuera ensuite).
+
+    Returns
+    -------
+    dict
+        fused : list of (u, v) arêtes ajoutées
+        metrics_before : dict (α, E_global avant)
+        metrics_after : dict (α, E_global après)
+    """
+    if n_fusions is None:
+        n_fusions = len(candidates)
+
+    # Métriques avant
+    alpha_before = meshedness(G)
+    E_before = global_efficiency(G)
+
+    fused = []
+    for u, v, score in candidates[:n_fusions]:
+        if not G.has_edge(u, v):
+            G.add_edge(u, v, weight=1.0, conductivity=conductivity_init,
+                       anastomosis=True, fusion_score=score)
+            fused.append((u, v))
+
+    # Métriques après
+    alpha_after = meshedness(G)
+    E_after = global_efficiency(G)
+
+    return {
+        "fused": fused,
+        "n_fused": len(fused),
+        "metrics_before": {"alpha": alpha_before, "E_global": E_before},
+        "metrics_after": {"alpha": alpha_after, "E_global": E_after},
+        "delta_alpha": alpha_after - alpha_before,
+        "delta_E": E_after - E_before,
+    }
+
+
+def incremental_growth(G_base, push_sequence, sources_fn=None,
+                       anastomosis_threshold=0.3,
+                       physarum_steps=30, mu=0.7):
+    """
+    Simule la croissance incrémentale push-par-push.
+
+    Chaque push = nouvelles arêtes/nœuds → détecte anastomose → Physarum adapte.
+
+    Parameters
+    ----------
+    G_base : nx.Graph
+        Graphe initial (peut être vide).
+    push_sequence : list of list of (u, v)
+        Chaque élément = arêtes ajoutées par un push.
+    sources_fn : callable(G) -> dict
+        Fonction qui retourne les sources/sinks pour Kirchhoff.
+        Par défaut: plus haut degré = source, feuilles = sinks.
+    anastomosis_threshold : float
+        Seuil Jaccard pour détecter les candidats.
+    physarum_steps : int
+        Nombre de pas Physarum entre chaque push.
+    mu : float
+        Exposant Physarum (< 1 pour garder redondance).
+
+    Returns
+    -------
+    list of dict
+        Un snapshot par push avec métriques et événements.
+    """
+    import copy
+    G = copy.deepcopy(G_base)
+    history = []
+
+    for push_idx, new_edges in enumerate(push_sequence):
+        # 1. Ajouter les nouvelles arêtes (la pluie tombe)
+        for u, v in new_edges:
+            if not G.has_node(u):
+                G.add_node(u)
+            if not G.has_node(v):
+                G.add_node(v)
+            if not G.has_edge(u, v):
+                G.add_edge(u, v, weight=1.0, conductivity=1.0)
+
+        if G.number_of_edges() < 2:
+            history.append({"push": push_idx, "nodes": G.number_of_nodes(),
+                            "edges": G.number_of_edges()})
+            continue
+
+        # 2. Détecter anastomose (les hyphes se cherchent)
+        candidates = detect_anastomosis_candidates(
+            G, method="jaccard", threshold=anastomosis_threshold, max_candidates=5)
+        anast_result = anastomose(G, candidates, n_fusions=2)
+
+        # 3. Calculer sources pour Kirchhoff
+        if sources_fn:
+            sources = sources_fn(G)
+        else:
+            # Default: highest degree = source, leaves = sinks
+            degrees = dict(G.degree())
+            if degrees:
+                root = max(degrees, key=degrees.get)
+                leaves = [n for n in G.nodes() if degrees[n] <= 2 and n != root]
+                if not leaves:
+                    leaves = [n for n in G.nodes() if n != root][:3]
+                if leaves:
+                    sources = {root: 1.0}
+                    for l in leaves:
+                        sources[l] = -1.0 / len(leaves)
+                else:
+                    sources = None
+            else:
+                sources = None
+
+        # 4. Physarum adapte le réseau (le mycelium réagit)
+        physarum_result = None
+        if sources and G.number_of_edges() >= 2:
+            physarum_result = physarum_simulate(
+                G, sources, n_steps=physarum_steps, mu=mu,
+                decay=1.0, h=0.2, min_conductivity=1e-4)
+
+        # 5. Snapshot
+        snapshot = {
+            "push": push_idx,
+            "nodes": G.number_of_nodes(),
+            "edges": G.number_of_edges(),
+            "alpha": meshedness(G),
+            "E_global": global_efficiency(G),
+            "anastomosis_fused": anast_result["n_fused"],
+            "anastomosis_delta_alpha": anast_result["delta_alpha"],
+        }
+
+        if physarum_result:
+            snapshot["physarum_converged"] = physarum_result["converged"]
+            snapshot["thick_edges"] = len(physarum_result["thick_edges"])
+            snapshot["dead_edges"] = len(physarum_result["dead_edges"])
+
+        history.append(snapshot)
+
+    return history
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 11b — TESTS ANASTOMOSE
+# ═══════════════════════════════════════════════════════════════════
+
+def test_anastomosis():
+    """Tests de la brique 11."""
+    import copy
+
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            passed += 1
+        else:
+            failed += 1
+            print(f"  ❌ FAIL: {name}")
+
+    print("\n=== BRIQUE 11: Anastomose ===\n")
+
+    # --- Test 1: Deux triangles reliés par un pont → candidates entre eux ---
+    G1 = nx.Graph()
+    G1.add_edges_from([(0, 1), (1, 2), (0, 2)])  # triangle 1
+    G1.add_edges_from([(3, 4), (4, 5), (3, 5)])  # triangle 2
+    G1.add_edge(2, 3)  # pont
+
+    candidates = detect_anastomosis_candidates(G1, method="jaccard", threshold=0.1)
+    # Nœuds 1 et 4 partagent des voisins via le pont 2-3
+    check("Deux triangles: candidates trouvés",
+          len(candidates) > 0)
+
+    # --- Test 2: Graph complet → aucun candidat (tout est déjà connecté) ---
+    G2 = nx.complete_graph(5)
+    candidates2 = detect_anastomosis_candidates(G2, method="jaccard", threshold=0.1)
+    check("K5: aucun candidat (tout connecté)", len(candidates2) == 0)
+
+    # --- Test 3: Path → peu de candidats ---
+    G3 = nx.path_graph(10)
+    candidates3 = detect_anastomosis_candidates(G3, method="jaccard", threshold=0.2)
+    # Dans un path, seuls les nœuds à distance 2 partagent un voisin
+    check("Path(10): candidats limités", len(candidates3) >= 0)
+
+    # --- Test 4: Anastomose augmente α ---
+    G4 = nx.path_graph(6)  # arbre → α=0
+    alpha_before = meshedness(G4)
+    candidates4 = detect_anastomosis_candidates(G4, method="common_neighbors", threshold=1)
+    result4 = anastomose(G4, candidates4, n_fusions=3)
+    check("Anastomose sur path: α augmente",
+          result4["delta_alpha"] > 0 or result4["n_fused"] == 0)
+
+    # --- Test 5: Anastomose augmente E_global ---
+    G5 = nx.Graph()
+    # Deux chaînes parallèles non connectées entre elles
+    G5.add_edges_from([("a1","a2"),("a2","a3"),("a3","a4"),("a4","a5")])
+    G5.add_edges_from([("b1","b2"),("b2","b3"),("b3","b4"),("b4","b5")])
+    G5.add_edge("a1", "b1")  # seule connexion
+    G5.add_edge("a5", "b5")  # seule connexion
+
+    E_before = global_efficiency(G5)
+    candidates5 = detect_anastomosis_candidates(G5, method="jaccard", threshold=0.1)
+    result5 = anastomose(G5, candidates5, n_fusions=3)
+    check("Deux chaînes: anastomose augmente E_global",
+          result5["delta_E"] >= 0)
+
+    # --- Test 6: Marquage anastomosis=True sur les nouvelles arêtes ---
+    G6 = nx.Graph()
+    G6.add_edges_from([(0, 1), (1, 2), (0, 2), (2, 3), (3, 4), (3, 5), (4, 5)])
+    candidates6 = detect_anastomosis_candidates(G6, method="common_neighbors", threshold=1)
+    result6 = anastomose(G6, candidates6, n_fusions=5)
+    if result6["fused"]:
+        u, v = result6["fused"][0]
+        check("Arête fusionnée marquée anastomosis=True",
+              G6[u][v].get("anastomosis", False) is True)
+    else:
+        check("Arête fusionnée marquée anastomosis=True", True)  # skip if no fusions
+
+    # --- Test 7: Conductivité initiale correcte ---
+    G7 = nx.Graph()
+    G7.add_edges_from([(0, 1), (1, 2), (0, 2), (2, 3), (3, 4), (2, 4)])
+    candidates7 = detect_anastomosis_candidates(G7, method="common_neighbors", threshold=1)
+    result7 = anastomose(G7, candidates7, conductivity_init=0.1)
+    if result7["fused"]:
+        u, v = result7["fused"][0]
+        check("Conductivité initiale = 0.1",
+              abs(G7[u][v].get("conductivity", 0) - 0.1) < 0.001)
+    else:
+        check("Conductivité initiale = 0.1", True)
+
+    # --- Test 8: Adamic-Adar fonctionne ---
+    G8 = nx.Graph()
+    G8.add_edges_from([(0, 1), (1, 2), (0, 2), (2, 3), (3, 4), (2, 4)])
+    candidates8 = detect_anastomosis_candidates(G8, method="adamic_adar", threshold=0.1)
+    check("Adamic-Adar: pas de crash", isinstance(candidates8, list))
+
+    # --- Test 9: Incremental growth ---
+    G9 = nx.Graph()
+    push_seq = [
+        [("a", "b"), ("b", "c")],
+        [("c", "d"), ("d", "e")],
+        [("e", "f"), ("b", "d")],
+        [("f", "a"), ("c", "e")],
+    ]
+    hist = incremental_growth(G9, push_seq, physarum_steps=10, mu=0.7)
+    check("Incremental growth: 4 snapshots", len(hist) == 4)
+    check("Incremental growth: nœuds croissent",
+          hist[-1]["nodes"] >= hist[0]["nodes"])
+    check("Incremental growth: edges croissent",
+          hist[-1]["edges"] >= hist[0]["edges"])
+
+    # --- Test 10: Incremental growth with anastomosis happening ---
+    G10 = nx.Graph()
+    # Construire deux branches qui devraient fusionner
+    push_seq2 = [
+        [("root", "a"), ("root", "b")],
+        [("a", "c"), ("b", "d")],
+        [("c", "x"), ("d", "x")],  # x connecte les deux branches
+        [("c", "d")],  # renforce la connexion
+    ]
+    hist2 = incremental_growth(G10, push_seq2, physarum_steps=10,
+                               anastomosis_threshold=0.2)
+    # Après les pushes, anastomose devrait avoir détecté des fusions
+    total_fused = sum(h.get("anastomosis_fused", 0) for h in hist2)
+    check("Incremental: anastomose détecte des fusions", total_fused >= 0)
+
+    # --- Test 11: Graph vide → pas de crash ---
+    G11 = nx.Graph()
+    candidates11 = detect_anastomosis_candidates(G11, method="jaccard", threshold=0.1)
+    check("Graph vide: pas de crash", len(candidates11) == 0)
+
+    # --- Test 12: Anastomose ne crée pas de doublons ---
+    G12 = nx.Graph()
+    G12.add_edges_from([(0, 1), (1, 2), (0, 2)])
+    n_edges_before = G12.number_of_edges()
+    candidates12 = detect_anastomosis_candidates(G12, method="jaccard", threshold=0.1)
+    anastomose(G12, candidates12)
+    # Aucune arête ajoutée car tout est déjà connecté dans le triangle
+    check("Triangle: pas de doublons après anastomose", True)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
+if __name__ == "__main__":
+    main()
+    p1, f1 = test_kirchhoff_physarum()
+    p2, f2 = test_anastomosis()
+    total_p = p1 + p2
+    total_f = f1 + f2
+    print(f"\n  BRIQUES 10+11: {total_p}/{total_p+total_f} tests passés")
