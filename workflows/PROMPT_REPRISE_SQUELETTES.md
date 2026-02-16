@@ -27,6 +27,50 @@ Il faut maintenant faire la même chose pour les 5 autres familles.
 - Fichier: `templates/interactive_profile.html`
 - Image: `assets/winter_tree_planche_II.png` (922×1244px)
 
+### Feuillu (🌳) — TERMINÉ
+- 31 nœuds, trunkTopY=200 (tronc COURT, forme arrondie)
+- **Hiérarchie:** trunk → B (co-dominant, B peut = T) → b → F → C
+- **Pipe:** T=4.0, B=3.5 (presque = T!), b=2.0, F=1.2, C=1.0
+- **Nœuds:** T=30, B=26, b=15, F=12, C=10
+- 5 branches principales (co-dominance F1:BRANCH_FIRST)
+- Image: `assets/winter_tree_planche_IV_chene.png`
+
+### Baobab (🫚) — TERMINÉ
+- 23 nœuds, trunkTopY=170 (tronc MASSIF, couronne minuscule)
+- **Hiérarchie:** trunk DOMINANT → peu de B → peu de b → F → C
+- **Pipe:** T=7.0 (le plus épais!), B=1.2, b=0.8, F=0.6, C=0.5
+- **Nœuds:** T=45 (le plus gros!), B=12, b=8, F=6, C=5
+- Seulement 3 branches (B2:SMALL_CROWN)
+- Image: `assets/winter_tree_planche_III_baobab.png`
+
+### Palmier (🌴) — TERMINÉ
+- 18 nœuds, trunkTopY=150 (colonnaire, UN méristème)
+- **Hiérarchie:** trunk linéaire → C (crown shaft) → F (palmes). ZÉRO B/b (P2:NO_BRANCHES)
+- **Pipe:** T=4.0, C=1.5, F=1.0, B=0, b=0
+- **Nœuds:** T=35, C=15, F=10, B=0, b=0
+- Image: `assets/winter_tree_planche_VII_palmier.png`
+
+### Buisson (🌿) — TERMINÉ
+- 26 nœuds, trunkTopY=null (PAS de tronc central! Bu1:NO_CENTRAL_TRUNK)
+- **Hiérarchie:** racines → collet (T) → tiges parallèles (B=T en taille)
+- **Pipe:** T=2.0, B=2.0 (MÊME épaisseur!), b=1.5, F=1.0, C=0.8
+- **Nœuds:** T=20, B=20 (MÊME taille!), b=12, F=10, C=8
+- 4 tiges indépendantes (Bu4:REDUNDANCY)
+- Image: `assets/winter_tree_planche_V_buisson.png`
+
+### Liane (🌱) — TERMINÉ
+- 21 nœuds, trunkTopY=90 (grimpante, TOUT fin)
+- **Hiérarchie:** hôte → tige (T) → forks (B) → vrilles (b) → F → C
+- **Pipe:** T=1.5, B=1.2, b=1.0, F=0.8, C=0.6 (tout fin, L2:NO_STRUCTURAL_COST)
+- **Nœuds:** T=15, B=12, b=10, F=8, C=6 (tout petit)
+- Image: `assets/winter_tree_planche_VI_liane.png`
+
+### Architecture technique — Switch par famille
+- Objet `_F` dans le template contient les 6 familles
+- Sélection: `const skel = _F[family] || _F.conifere;`
+- Chaque famille: `{ trunkTopY, nodes[], pw{}, nr{} }`
+- Le tronc ne se dessine que si `trunkTopY !== null` (buisson = pas de tronc)
+
 ### ⚠️ TODO PRIORITAIRE — Lignes de séparation des niveaux
 Les lignes horizontales de séparation (CIME, FEUILLES, RAMEAUX, etc.) ne correspondent
 plus aux bonnes positions sur l'image. Il faut les recaler sur les vraies zones de l'arbre.
@@ -224,12 +268,12 @@ PYTHONIOENCODING=utf-8 python engine.py serve scans/HSBC-algo-genetic.json
 1. ☑ ~~Rendre le squelette conifère 100% conforme aux thèses~~ FAIT
 2. ☐ **RECALER LES LIGNES DE SÉPARATION** — les Y des niveaux dans `LEVELS` ne matchent
    plus les vraies zones de la planche. À refaire pour chaque famille.
-3. ☐ Implémenter le switch par famille dans le template
-4. ☐ Squelette FEUILLU (branches co-dominantes, forme arrondie)
-5. ☐ Squelette PALMIER (pas de branches, tronc colonnaire)
-6. ☐ Squelette BAOBAB (tronc massif, petite couronne)
-7. ☐ Squelette BUISSON (multi-tiges, pas de tronc central)
-8. ☐ Squelette LIANE (grimpante, dépend d'un hôte)
+3. ☑ ~~Implémenter le switch par famille dans le template~~ FAIT (objet `_F` avec 6 familles)
+4. ☑ ~~Squelette FEUILLU~~ FAIT — 31 nœuds, branches co-dominantes (B=3.5px, presque = T)
+5. ☑ ~~Squelette PALMIER~~ FAIT — 18 nœuds, zéro branche (P2:NO_BRANCHES), crown shaft
+6. ☑ ~~Squelette BAOBAB~~ FAIT — 23 nœuds, tronc massif (T=7.0px/45px), couronne minuscule
+7. ☑ ~~Squelette BUISSON~~ FAIT — 26 nœuds, multi-tiges (trunkTopY=null), B=T=2.0px
+8. ☑ ~~Squelette LIANE~~ FAIT — 21 nœuds, tout fin (T=1.5px/15px), vrilles
 9. ☐ Overlay du repo réel sur le squelette parfait (diagnostic)
 10. ☐ Animations de croissance (graine → arbre)
 
