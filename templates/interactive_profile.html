@@ -630,7 +630,28 @@ function statusColor(status) {
 }
 
 function statusIcon(status) {
-  return { done: "✓", wip: "◐", todo: "○" }[status] || "?";
+  return { done: "\u2713", wip: "\u25D0", todo: "\u25CB" }[status] || "?";
+}
+
+// Couleur de confiance: rouge → orange → jaune → vert
+function confColor(pct) {
+  if (pct <= 0) return "rgba(255,255,255,0.15)";
+  if (pct < 30) return "#FF5252";     // rouge
+  if (pct < 50) return "#FF8A65";     // orange
+  if (pct < 70) return "#FFD54F";     // jaune
+  if (pct < 85) return "#AED581";     // vert clair
+  return "#66BB6A";                    // vert
+}
+
+// Barre de confiance mini (pour la colonne)
+function confBar(pct) {
+  const c = confColor(pct);
+  return `<div style="display:flex;align-items:center;gap:3px;">
+    <div style="width:24px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:${c};border-radius:2px;"></div>
+    </div>
+    <span style="color:${c};font-size:8px;opacity:0.8;">${pct}</span>
+  </div>`;
 }
 
 // ── INIT ──
@@ -704,69 +725,69 @@ function init() {
 // ── NODE LIST ──
 // ── DESCRIPTIONS DES NOEUDS IDEAUX ──
 const IDEAL_DESC = {
-  // CIME
-  "Tests / CI":       "Pipeline CI — compile et teste automatiquement chaque commit",
-  "Release / CD":     "Pipeline CD — automatise le packaging et la mise en production",
-  "Monitoring":       "Surveillance temps-r\u00e9el — alertes, logs, m\u00e9triques de sant\u00e9",
-  // FEUILLES
-  "API endpoints":    "Points d'entr\u00e9e expos\u00e9s (REST, GraphQL, gRPC) consomm\u00e9s par les clients",
-  "UI composants":    "Composants d'interface utilisateur visibles et interactifs",
-  "Exports / CLI":    "Sorties du syst\u00e8me — commandes CLI, fichiers export\u00e9s, int\u00e9grations",
-  "Webhooks":         "Callbacks HTTP — notifications push vers des syst\u00e8mes externes",
-  // RAMEAUX
-  "Sub-mod 1":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
-  "Sub-mod 2":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
-  "Sub-mod 3":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
-  "Sub-mod 4":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
-  "Sub-mod 5":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
-  "Sub-mod 6":        "Sous-module sp\u00e9cialis\u00e9 rattach\u00e9 \u00e0 un module principal",
-  "Vrille 1":         "Point d'accroche — d\u00e9pendance vers un module h\u00f4te",
-  "Vrille 2":         "Point d'accroche — d\u00e9pendance vers un module h\u00f4te",
-  "Vrille 3":         "Point d'accroche — d\u00e9pendance vers un module h\u00f4te",
-  // BRANCHES
-  "Module A":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
-  "Module B":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
-  "Module C":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
-  "Module D":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
-  "Module E":         "Module fonctionnel principal — unit\u00e9 autonome du projet",
-  "Fork A":           "Branche de code — fork ou variante principale",
-  "Fork B":           "Branche de code — fork ou variante principale",
-  // TRONC
-  "Core pipeline":    "Moteur central — orchestre le flux de donn\u00e9es principal",
-  "Core engine":      "Moteur central — le c\u0153ur de la logique m\u00e9tier",
-  "Tige principale":  "Tige unique — le fil conducteur minimal du projet",
-  "Tronc massif":     "Architecture monolithique — tout passe par le tronc",
-  "Core central":     "Noyau central — le point de passage oblig\u00e9",
-  // RACINES R-1
-  "Framework web":    "Framework HTTP/web (Express, Django, Spring, FastAPI...)",
-  "Framework data":   "Framework de donn\u00e9es (ORM, SDK cloud, cache, queue...)",
-  "Framework test":   "Framework de test (Jest, Pytest, JUnit, Cypress...)",
-  "Dep principale":   "D\u00e9pendance principale — brique logicielle fondatrice",
-  // RACINES R-2
-  "Archi DB":         "Architecture base de donn\u00e9es — sch\u00e9ma, migrations, choix SGBD",
-  "Archi API":        "Architecture API — patterns, versioning, s\u00e9rialisation",
-  // RACINES R-3
-  "Contrainte 1":     "Contrainte m\u00e9tier — r\u00e8gle impos\u00e9e par le domaine d'activit\u00e9",
-  "Contrainte 2":     "Contrainte m\u00e9tier — r\u00e8gle impos\u00e9e par le domaine d'activit\u00e9",
-  "Contrainte 3":     "Contrainte m\u00e9tier — r\u00e8gle impos\u00e9e par le domaine d'activit\u00e9",
-  // RACINES R-4
-  "Licence":          "Contrainte de licence — GPL, MIT, Apache, propri\u00e9taire...",
-  "Conformite":       "Conformit\u00e9 r\u00e9glementaire — RGPD, SOC2, PCI-DSS, HIPAA...",
-  // RACINES R-5
-  "Algorithmes":      "Algorithmes fondamentaux — les briques de calcul de base",
-  "Hardware":         "Contraintes mat\u00e9rielles — CPU, m\u00e9moire, stockage, r\u00e9seau",
+  // CIME — ce qui sort en haut
+  "Tests / CI":       "\u2192 Ajouter un pipeline CI (GitHub Actions, GitLab CI) qui teste chaque commit",
+  "Release / CD":     "\u2192 Mettre en place le d\u00e9ploiement auto (npm publish, docker push, deploy)",
+  "Monitoring":       "\u2192 Installer un monitoring (Sentry, Datadog, Grafana) pour voir les erreurs en prod",
+  // FEUILLES — ce que les utilisateurs voient
+  "API endpoints":    "\u2192 Cr\u00e9er des routes API (REST/GraphQL) pour exposer les fonctions du projet",
+  "UI composants":    "\u2192 Cr\u00e9er une interface utilisateur (dashboard, formulaires, boutons...)",
+  "Exports / CLI":    "\u2192 Ajouter un CLI ou des exports (csv, json, pdf) pour r\u00e9cup\u00e9rer les r\u00e9sultats",
+  "Webhooks":         "\u2192 Configurer des webhooks pour notifier d'autres syst\u00e8mes automatiquement",
+  // RAMEAUX — sous-fonctions
+  "Sub-mod 1":        "\u2192 D\u00e9couper un module en sous-fonctions ind\u00e9pendantes",
+  "Sub-mod 2":        "\u2192 D\u00e9couper un module en sous-fonctions ind\u00e9pendantes",
+  "Sub-mod 3":        "\u2192 D\u00e9couper un module en sous-fonctions ind\u00e9pendantes",
+  "Sub-mod 4":        "\u2192 D\u00e9couper un module en sous-fonctions ind\u00e9pendantes",
+  "Sub-mod 5":        "\u2192 D\u00e9couper un module en sous-fonctions ind\u00e9pendantes",
+  "Sub-mod 6":        "\u2192 D\u00e9couper un module en sous-fonctions ind\u00e9pendantes",
+  "Vrille 1":         "\u2192 Cr\u00e9er un wrapper/adapteur vers un service externe",
+  "Vrille 2":         "\u2192 Cr\u00e9er un wrapper/adapteur vers un service externe",
+  "Vrille 3":         "\u2192 Cr\u00e9er un wrapper/adapteur vers un service externe",
+  // BRANCHES — modules principaux
+  "Module A":         "\u2192 Il manque un module fonctionnel principal dans le projet",
+  "Module B":         "\u2192 Il manque un module fonctionnel principal dans le projet",
+  "Module C":         "\u2192 Il manque un module fonctionnel principal dans le projet",
+  "Module D":         "\u2192 Il manque un module fonctionnel principal dans le projet",
+  "Module E":         "\u2192 Il manque un module fonctionnel principal dans le projet",
+  "Fork A":           "\u2192 Pr\u00e9voir une variante/fork du code pour un cas d'usage diff\u00e9rent",
+  "Fork B":           "\u2192 Pr\u00e9voir une variante/fork du code pour un cas d'usage diff\u00e9rent",
+  // TRONC — le coeur
+  "Core pipeline":    "\u2192 Cr\u00e9er le pipeline central qui orchestre tout le flux de donn\u00e9es",
+  "Core engine":      "\u2192 Cr\u00e9er le moteur principal — le fichier qui lance tout",
+  "Tige principale":  "\u2192 D\u00e9finir le point d'entr\u00e9e unique du projet (main, index, app)",
+  "Tronc massif":     "\u2192 Structurer le coeur monolithique — tout doit passer par l\u00e0",
+  "Core central":     "\u2192 Cr\u00e9er le noyau central du projet",
+  // RACINES R-1 — frameworks
+  "Framework web":    "\u2192 Installer un framework web (Express, Django, FastAPI, Spring...)",
+  "Framework data":   "\u2192 Installer un ORM ou SDK data (Prisma, SQLAlchemy, Mongoose...)",
+  "Framework test":   "\u2192 Installer un framework de test (Jest, Pytest, JUnit, Cypress...)",
+  "Dep principale":   "\u2192 Ajouter la d\u00e9pendance principale manquante dans package.json/requirements",
+  // RACINES R-2 — architecture
+  "Archi DB":         "\u2192 D\u00e9finir l'architecture DB (sch\u00e9ma, tables, migrations, choix SQL/NoSQL)",
+  "Archi API":        "\u2192 D\u00e9finir l'architecture API (REST vs GraphQL, versioning, auth)",
+  // RACINES R-3 — contraintes
+  "Contrainte 1":     "\u2192 Documenter les r\u00e8gles m\u00e9tier (ex: limites, validations, formules)",
+  "Contrainte 2":     "\u2192 Documenter les r\u00e8gles m\u00e9tier (ex: limites, validations, formules)",
+  "Contrainte 3":     "\u2192 Documenter les r\u00e8gles m\u00e9tier (ex: limites, validations, formules)",
+  // RACINES R-4 — licence & conformit\u00e9
+  "Licence":          "\u2192 Ajouter un fichier LICENSE (MIT, GPL, Apache) + v\u00e9rifier les deps",
+  "Conformite":       "\u2192 V\u00e9rifier la conformit\u00e9 (RGPD, SOC2, cookies, mentions l\u00e9gales)",
+  // RACINES R-5 — fondations
+  "Algorithmes":      "\u2192 Documenter les algos utilis\u00e9s (tri, crypto, ML, hashing...)",
+  "Hardware":         "\u2192 D\u00e9finir les specs mat\u00e9rielles requises (CPU, RAM, GPU, stockage)",
 };
 const LEVEL_DESC = {
-  "C":   "Couche la plus haute \u2014 production continue (tests, releases)",
-  "F":   "Feuilles \u2014 points d'entr\u00e9e/sortie visibles",
-  "b":   "Rameaux \u2014 sous-composants sp\u00e9cialis\u00e9s",
-  "B":   "Branches \u2014 modules principaux autonomes",
-  "T":   "Tronc \u2014 le moteur central qui relie tout",
-  "R-1": "Racines struct. \u2014 frameworks et d\u00e9pendances",
-  "R-2": "Racines pivot. \u2014 choix d'architecture",
-  "R-3": "Radicelles \u2014 contraintes m\u00e9tier fines",
-  "R-4": "Poils absorb. \u2014 licence et conformit\u00e9",
-  "R-5": "Mycorhizes \u2014 fondations invisibles",
+  "C":   "\u2192 Il manque un \u00e9l\u00e9ment en cime (tests, CI/CD, releases)",
+  "F":   "\u2192 Il manque une sortie visible (API, UI, CLI, export)",
+  "b":   "\u2192 Il manque un sous-composant (feature, helper, service)",
+  "B":   "\u2192 Il manque un module principal du projet",
+  "T":   "\u2192 Le moteur central doit \u00eatre cr\u00e9\u00e9 ou compl\u00e9t\u00e9",
+  "R-1": "\u2192 Installer un framework ou une d\u00e9pendance cl\u00e9",
+  "R-2": "\u2192 D\u00e9finir une d\u00e9cision d'architecture",
+  "R-3": "\u2192 Documenter une contrainte m\u00e9tier",
+  "R-4": "\u2192 Ajouter licence ou conformit\u00e9",
+  "R-5": "\u2192 D\u00e9finir les fondations (algos, hardware)",
 };
 
 function buildNodeList(nodes) {
@@ -811,10 +832,10 @@ function buildNodeList(nodes) {
     for (const n of group) {
       html += `
       <tr class="node-row" data-id="${n.id}" data-status="${n.status}" data-level="${lk}">
-        <td class="col-dot"><div class="node-dot" style="background:${statusColor(n.status)}"></div></td>
+        <td class="col-dot"><div class="node-dot" style="background:${confColor(n.confidence || 0)}"></div></td>
         <td class="col-id">${n.id}</td>
         <td class="col-label" title="${n.label}">${n.label}</td>
-        <td class="col-conf">${n.confidence || 0}%</td>
+        <td class="col-conf">${confBar(n.confidence || 0)}</td>
         <td class="col-status">${statusIcon(n.status)}</td>
       </tr>`;
     }
@@ -1372,16 +1393,17 @@ function buildSVG(nodes) {
   nodes.forEach(n => {
     const pos = posMap[n.id] || { x: CENTER_X, y: 500 };
     const lk = nodeLevelKey(n);
-    const sc = statusColor(n.status);
+    const conf = n.confidence || 0;
+    const cc = confColor(conf);
     const r = NODE_R[lk] || 8;
     svgHTML += `
     <g class="node-g" data-id="${n.id}" data-status="${n.status}" data-level="${lk}">
       <circle class="node-ring" cx="${pos.x}" cy="${pos.y}" r="${r + 8}"
-        fill="none" stroke="${sc}" stroke-width="2"/>
+        fill="none" stroke="${cc}" stroke-width="2"/>
       <circle class="node-bg" cx="${pos.x}" cy="${pos.y}" r="${r * 0.6}"
-        fill="rgba(0,0,0,0.4)" stroke="${sc}" stroke-width="1.5"/>
+        fill="rgba(0,0,0,0.4)" stroke="${cc}" stroke-width="1.5"/>
       <circle class="node-core" cx="${pos.x}" cy="${pos.y}" r="${Math.max(2, r * 0.2)}"
-        fill="${sc}"/>
+        fill="${cc}"/>
     </g>`;
   });
 
