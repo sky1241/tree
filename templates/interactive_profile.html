@@ -639,9 +639,6 @@ function init() {
     });
   });
 
-  // Node list grouped by level
-  buildNodeList(nodes);
-
   // Image
   const img = document.getElementById("treeImg");
   img.src = IMG_SRC;
@@ -650,7 +647,8 @@ function init() {
   document.getElementById("minimapImg").src = IMG_SRC;
 
   img.onload = () => {
-    buildSVG(nodes);
+    buildSVG(nodes);  // defines _F and window._skel
+    buildNodeList(nodes);  // needs window._skel for ghost rows
     fitToScreen();
     updateMinimap();
   };
@@ -682,10 +680,26 @@ function buildNodeList(nodes) {
 
   for (const lk of levelOrder) {
     const lev = LEVELS[lk];
-    const group = grouped[lk];
-    if (!group || !lev) continue;
+    const group = grouped[lk] || [];
+    if (!lev) continue;
 
-    html += `<tr class="level-row"><td colspan="5">${lev.label}</td></tr>`;
+    // Skip levels with zero real AND zero ideal nodes
+    const idealCountCheck = window._skel ? window._skel.nodes.filter(n => n.lk === lk).length : 0;
+    if (group.length === 0 && idealCountCheck === 0) continue;
+
+    // Count ideal nodes at this level
+    const idealCount = window._skel ? window._skel.nodes.filter(n => n.lk === lk).length : 0;
+    const realCount = group ? group.length : 0;
+    const missing = Math.max(0, idealCount - realCount);
+    const overflow = Math.max(0, realCount - idealCount);
+
+    // Level header with count indicator
+    let badge = "";
+    if (missing > 0) badge = ` <span style="color:var(--red);opacity:0.6;font-size:8px;">−${missing}</span>`;
+    if (overflow > 0) badge = ` <span style="color:var(--orange);opacity:0.6;font-size:8px;">+${overflow}</span>`;
+    html += `<tr class="level-row"><td colspan="5">${lev.label} <span style="opacity:0.3;font-size:8px;">${realCount}/${idealCount}</span>${badge}</td></tr>`;
+
+    // Real repo nodes
     for (const n of group) {
       html += `
       <tr class="node-row" data-id="${n.id}" data-status="${n.status}" data-level="${lk}">
@@ -694,6 +708,21 @@ function buildNodeList(nodes) {
         <td class="col-label" title="${n.label}">${n.label}</td>
         <td class="col-conf">${n.confidence || 0}%</td>
         <td class="col-status">${statusIcon(n.status)}</td>
+      </tr>`;
+    }
+
+    // Ghost rows for missing ideal nodes
+    for (let m = 0; m < missing; m++) {
+      const idealIdx = realCount + m;
+      const idealNode = window._skel ? window._skel.nodes.filter(n => n.lk === lk)[idealIdx] : null;
+      const ghostLabel = idealNode ? idealNode.label : "???";
+      html += `
+      <tr class="node-row ghost-row" data-level="${lk}">
+        <td class="col-dot"><div class="node-dot" style="background:transparent;border:1px dashed rgba(255,82,82,0.4);"></div></td>
+        <td class="col-id" style="opacity:0.2;">--</td>
+        <td class="col-label" style="opacity:0.3;font-style:italic;" title="Manque: ${ghostLabel}">${ghostLabel}</td>
+        <td class="col-conf" style="opacity:0.15;">--</td>
+        <td class="col-status" style="opacity:0.3;">◌</td>
       </tr>`;
     }
   }
@@ -1105,6 +1134,7 @@ function buildSVG(nodes) {
 
   // ── Sélection du squelette actif ──
   const skel = _F[family] || _F.conifere;
+  window._skel = skel;  // expose for ghost rows in buildNodeList
   const idealTree = skel.nodes;
   const PIPE_WIDTH = skel.pw;
   const NODE_R = skel.nr;
