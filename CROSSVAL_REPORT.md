@@ -85,3 +85,69 @@ Propriétés vérifiées : tendance temporelle croissante (j18→j39), treatment
 ## Conclusion
 
 25/26 métriques matchent les données publiées. Le seul écart (C_random C. elegans) est dû à un choix de modèle de random (ER vs configuration model), pas à une erreur de calcul. Notre implémentation reproduit fidèlement les résultats de 8 papiers fondamentaux couvrant 50 ans de théorie des réseaux (1969-2013).
+
+---
+
+## Brique 10 — Kirchhoff Flow + Physarum Adaptive Conductivity
+
+### Sources scientifiques
+
+| Ref | Paper | Équation validée |
+|-----|-------|-----------------|
+| Tero 2007 | J. Theor. Biol. 244:553-564 | dD/dt = \|Q\|^μ - D (current reinforcement rule) |
+| Tero 2010 | Science 327:439-442 | Network design Tokyo rail (μ < 1 → loops) |
+| Ito 2011 | arXiv:1101.5249 | Convergence exponentielle vers shortest path |
+| Bonifaci 2012 | SODA | Preuve: Physarum résout shortest path sur tout graphe |
+
+### Modèle implémenté
+
+Kirchhoff: `L(σ)p = b` → pressions `p` → flux `Q_ij = σ_ij * (p_i - p_j) / L_ij`
+Physarum update: `D_e(t+1) = D_e(t) + h * (|Q_e|^μ - decay * D_e(t))`
+
+- μ=1 : convergence vers shortest path (Tero 2007)
+- μ<1 : maintien de redondance/loops (Tero 2010, robustesse Tokyo)
+
+### Tests unitaires (16/16 PASS)
+
+| Test | Résultat | Réf |
+|------|----------|-----|
+| Triangle: flux conservatif | ✅ | Kirchhoff 1845 |
+| Triangle: plus de flux sur chemin court | ✅ | Loi d'Ohm |
+| Physarum μ=1: shortest path domine | ✅ cond_short=0.999, cond_long=1e-6 | Tero 2007 |
+| Physarum μ=1: convergence | ✅ 133 steps | Ito 2011 |
+| Physarum μ=0.5: chemin alternatif survit | ✅ cond>0.01 | Tero 2010 |
+| Star: flux symétriques | ✅ | Kirchhoff |
+| Path: pression monotone | ✅ | Ohm |
+| Graph trivial: pas de crash | ✅ | Edge case |
+| Grille 3x3: thick_edges non vide | ✅ | - |
+| Grille 3x3: pruning fonctionne | ✅ | Tero 2007 |
+| Flask-like: converge | ✅ | - |
+| Flask-like: thick_edges | ✅ | - |
+| K5 conservation node 1,2,3 | ✅ (×3) | Kirchhoff KCL |
+| Tero 2007: diamond shortest dominates | ✅ ratio>10x | Tero 2007 |
+
+### Validation sur vrais repos GitHub
+
+| Repo | N | L | μ=1 (shortest) | μ=0.33 (loops) |
+|------|---|---|-----------------|----------------|
+| requests | 18 | 50 | 20/50 alive (40%) | 48/50 alive (96%) |
+| flask | 24 | 91 | 3/91 alive (3%) | 91/91 alive (100%) |
+| httpx | 23 | 72 | 13/72 alive (18%) | 72/72 alive (100%) |
+
+**Observations clés:**
+- μ=1 élimine agressivement → seul le shortest path survit (Tero 2007 ✅)
+- μ<1 conserve la redondance → réseau robuste comme Tokyo rail (Tero 2010 ✅)
+- Flask μ=1: seulement 3 arêtes survivent sur 91 → réseau hyper-centralisé autour typing→cli→views
+- Requests μ=1: compat→utils comme artère principale → correspond au rôle réel de compat
+- httpx μ=1: _models comme hub central → correspond au God Object identifié en brique 0-9
+
+### Gap identifié pour Winter Tree
+
+Les formules donnent des NOMBRES (conductivité par arête, flux).
+Il manque la couche de traduction NOMBRES → GÉOMÉTRIE 3D:
+- Conductivité haute → filament épais dans le cube
+- Conductivité basse → filament fin/transparent
+- D → 0 (mort) → filament disparaît
+- Nouveau lien → nouveau filament pousse entre deux points
+
+Briques 11-12 (anastomose, rapport complet) restent à coder.

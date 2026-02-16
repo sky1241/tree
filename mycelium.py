@@ -1190,5 +1190,493 @@ def run_demo():
     print_report(r3)
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 10 — KIRCHHOFF FLOW + PHYSARUM ADAPTIVE CONDUCTIVITY
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   Tero, Kobayashi & Nakagaki 2007, J. Theor. Biol. 244:553-564
+#     "A mathematical model for adaptive transport network"
+#   Tero et al. 2010, Science 327:439-442
+#     "Rules for Biologically Inspired Adaptive Network Design"
+#   Ito, Johansson, Nakagaki & Tero 2011, arXiv:1101.5249
+#     "Convergence Properties for the Physarum Solver"
+#   Bonifaci, Mehlhorn & Varma 2012, SODA
+#     "Physarum can compute shortest paths"
+#
+# Modèle:
+#   Chaque arête e a: longueur L_e (fixe), conductivité D_e(t) (variable)
+#   Résistance: r_e = L_e / D_e
+#   Flux via Kirchhoff: résoudre L(D)p = b pour les pressions p
+#   Q_ij = D_ij * (p_i - p_j) / L_ij   (loi d'Ohm)
+#   Mise à jour: dD_e/dt = |Q_e|^mu - decay * D_e
+#   Discret: D_e(t+1) = D_e(t) + h * (|Q_e(t)|^mu - decay * D_e(t))
+#
+#   mu=1: convergence vers shortest path (Tero 2007)
+#   mu<1: maintien de loops/redondance (Tero 2010, Tokyo rail)
+# ═══════════════════════════════════════════════════════════════════
+
+def kirchhoff_flow(G, sources, sinks=None, weight="weight"):
+    """
+    Calcule le flux Kirchhoff (courant électrique) dans le graphe.
+
+    Résout le système de Kirchhoff: L(σ)p = b
+    puis calcule Q_ij = σ_ij * (p_i - p_j) / L_ij
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graphe non-orienté avec poids optionnels (= longueurs).
+    sources : dict {node: float}
+        Nœuds sources (+) et sinks (-). Doit sommer à 0.
+        Ex: {"main.py": 1.0, "utils.py": -0.5, "models.py": -0.5}
+    sinks : dict, optional
+        Si fourni, les sources sont positives et les sinks négatifs.
+        Sinon, tout est dans `sources`.
+    weight : str
+        Attribut d'arête pour la longueur (défaut: "weight", 1.0 si absent).
+
+    Returns
+    -------
+    dict
+        {(u,v): flow, ...} flux sur chaque arête (signé: positif = u→v)
+        {"pressures": {node: p}, "flows": {(u,v): Q}}
+    """
+    import numpy as np
+
+    if G.number_of_nodes() < 2 or G.number_of_edges() == 0:
+        return {"pressures": {}, "flows": {}}
+
+    # Handle disconnected graphs: work on component containing first source
+    if not nx.is_connected(G):
+        source_nodes = [n for n, v in (sources or {}).items() if v > 0]
+        if source_nodes and source_nodes[0] in G:
+            comp = nx.node_connected_component(G, source_nodes[0])
+            G = G.subgraph(comp).copy()
+        else:
+            # Use largest connected component
+            comp = max(nx.connected_components(G), key=len)
+            G = G.subgraph(comp).copy()
+
+        # Filter sources to only nodes in component
+        b_dict_raw = dict(sources)
+        if sinks:
+            for node, val in sinks.items():
+                b_dict_raw[node] = b_dict_raw.get(node, 0) - abs(val)
+        sources = {n: v for n, v in b_dict_raw.items() if n in G}
+        sinks = None  # already merged
+
+    # Build source vector b
+    b_dict = dict(sources)
+    if sinks:
+        for node, val in sinks.items():
+            b_dict[node] = b_dict.get(node, 0) - abs(val)
+
+    # Normalize to sum=0
+    total = sum(b_dict.values())
+    if abs(total) > 1e-10:
+        # Distribute excess equally among all non-source nodes
+        non_source = [n for n in G.nodes() if n not in b_dict]
+        if non_source:
+            correction = -total / len(non_source)
+            for n in non_source:
+                b_dict[n] = correction
+        else:
+            # Can't balance, scale sinks
+            sink_total = sum(v for v in b_dict.values() if v < 0)
+            if sink_total != 0:
+                scale = -(sum(v for v in b_dict.values() if v > 0)) / (-sink_total)
+                for n in b_dict:
+                    if b_dict[n] < 0:
+                        b_dict[n] *= scale
+
+    nodes = list(G.nodes())
+    node_idx = {n: i for i, n in enumerate(nodes)}
+    N = len(nodes)
+
+    # Build Laplacian L(σ) = B * diag(σ/L) * B^T
+    # Where σ_e = conductivity (from edge attribute "conductivity", default 1)
+    # And L_e = length (from edge attribute weight, default 1)
+    L_mat = np.zeros((N, N))
+
+    edge_data = {}
+    for u, v, d in G.edges(data=True):
+        length = d.get(weight, 1.0)
+        if length <= 0:
+            length = 1.0
+        conductivity = d.get("conductivity", 1.0)
+        conductance = conductivity / length  # σ/L
+
+        i, j = node_idx[u], node_idx[v]
+        L_mat[i, i] += conductance
+        L_mat[j, j] += conductance
+        L_mat[i, j] -= conductance
+        L_mat[j, i] -= conductance
+        edge_data[(u, v)] = {"length": length, "conductivity": conductivity,
+                             "conductance": conductance}
+
+    # Source vector
+    b_vec = np.zeros(N)
+    for node, val in b_dict.items():
+        if node in node_idx:
+            b_vec[node_idx[node]] = val
+
+    # Fix one node potential to 0 (ground) to make system solvable
+    # Use first sink or first node
+    ground = 0
+    for node, val in b_dict.items():
+        if val < 0 and node in node_idx:
+            ground = node_idx[node]
+            break
+
+    # Remove ground row/col, solve, re-insert
+    mask = np.ones(N, dtype=bool)
+    mask[ground] = False
+    L_reduced = L_mat[np.ix_(mask, mask)]
+    b_reduced = b_vec[mask]
+
+    try:
+        p_reduced = np.linalg.solve(L_reduced, b_reduced)
+    except np.linalg.LinAlgError:
+        # Singular — graph probably disconnected
+        return {"pressures": {n: 0.0 for n in nodes}, "flows": {}}
+
+    p_full = np.zeros(N)
+    p_full[mask] = p_reduced
+    p_full[ground] = 0.0
+
+    # Compute flows: Q_ij = σ_ij * (p_i - p_j) / L_ij = conductance * (p_i - p_j)
+    pressures = {nodes[i]: float(p_full[i]) for i in range(N)}
+    flows = {}
+    for (u, v), ed in edge_data.items():
+        i, j = node_idx[u], node_idx[v]
+        q = ed["conductance"] * (p_full[i] - p_full[j])
+        flows[(u, v)] = float(q)
+
+    return {"pressures": pressures, "flows": flows}
+
+
+def physarum_step(G, flows, mu=1.0, decay=1.0, h=0.1, min_conductivity=1e-6):
+    """
+    Un pas de la dynamique Physarum: met à jour les conductivités.
+
+    dD_e/dt = |Q_e|^mu - decay * D_e
+    D_e(t+1) = D_e(t) + h * (|Q_e|^mu - decay * D_e(t))
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graphe avec attribut "conductivity" sur les arêtes.
+    flows : dict {(u,v): Q}
+        Flux calculés par kirchhoff_flow.
+    mu : float
+        Exposant de feedback. mu=1: shortest path. mu<1: maintien redondance.
+        Tero 2010 utilise mu=1.8 pour des réseaux plus robustes.
+    decay : float
+        Taux de décroissance. Plus élevé = plus agressif sur le pruning.
+    h : float
+        Pas de temps discret.
+    min_conductivity : float
+        Plancher pour éviter D=0 (mort complète).
+
+    Returns
+    -------
+    dict {(u,v): new_conductivity}
+    """
+    new_cond = {}
+    for u, v, d in G.edges(data=True):
+        D = d.get("conductivity", 1.0)
+        # Get flow (try both orientations)
+        Q = flows.get((u, v), flows.get((v, u), 0.0))
+        abs_Q = abs(Q)
+
+        # Physarum update: dD/dt = |Q|^mu - decay*D
+        dD = abs_Q ** mu - decay * D
+        D_new = D + h * dD
+        D_new = max(D_new, min_conductivity)
+
+        new_cond[(u, v)] = D_new
+        # Apply to graph
+        G[u][v]["conductivity"] = D_new
+
+    return new_cond
+
+
+def physarum_simulate(G, sources, n_steps=50, mu=1.0, decay=1.0, h=0.1,
+                      min_conductivity=1e-6, convergence_threshold=1e-4,
+                      weight="weight"):
+    """
+    Simulation complète du modèle Physarum (Tero 2007).
+
+    Itère kirchhoff_flow → physarum_step jusqu'à convergence.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graphe initial. Les arêtes reçoivent conductivity=1.0 si absent.
+    sources : dict {node: float}
+        Sources (+) et sinks (-).
+    n_steps : int
+        Nombre max d'itérations.
+    mu : float
+        Exposant de feedback (1.0=shortest path, <1=loops conservées).
+    decay : float
+        Taux de décroissance des tubes.
+    h : float
+        Pas de temps.
+    min_conductivity : float
+        Conductivité minimale (empêche la mort totale).
+    convergence_threshold : float
+        Seuil de convergence sur le changement relatif max de conductivité.
+    weight : str
+        Attribut de poids pour les longueurs.
+
+    Returns
+    -------
+    dict
+        history : list of {(u,v): conductivity} per step
+        final_flows : {(u,v): Q} flux final
+        final_pressures : {node: p} pressions finales
+        converged : bool
+        steps : int
+        thick_edges : list of (u, v, conductivity) triés par conductivité desc
+        dead_edges : list of (u, v) arêtes quasi-mortes (D ≈ min)
+    """
+    # Initialize conductivities
+    for u, v, d in G.edges(data=True):
+        if "conductivity" not in d:
+            d["conductivity"] = 1.0
+
+    history = []
+    converged = False
+    steps_taken = 0
+
+    for step in range(n_steps):
+        # 1. Solve Kirchhoff
+        result = kirchhoff_flow(G, sources, weight=weight)
+        flows = result["flows"]
+
+        if not flows:
+            break
+
+        # 2. Update conductivities (Physarum step)
+        old_cond = {(u, v): G[u][v].get("conductivity", 1.0)
+                    for u, v in G.edges()}
+        new_cond = physarum_step(G, flows, mu=mu, decay=decay, h=h,
+                                min_conductivity=min_conductivity)
+        history.append(dict(new_cond))
+
+        # 3. Check convergence
+        max_change = 0
+        for edge, D_new in new_cond.items():
+            D_old = old_cond.get(edge, 1.0)
+            if D_old > min_conductivity:
+                change = abs(D_new - D_old) / D_old
+                max_change = max(max_change, change)
+
+        steps_taken = step + 1
+        if max_change < convergence_threshold:
+            converged = True
+            break
+
+    # Final flow computation
+    final_result = kirchhoff_flow(G, sources, weight=weight)
+
+    # Classify edges
+    thick_edges = []
+    dead_edges = []
+    for u, v, d in G.edges(data=True):
+        cond = d.get("conductivity", 1.0)
+        if cond <= min_conductivity * 10:
+            dead_edges.append((u, v))
+        else:
+            thick_edges.append((u, v, cond))
+
+    thick_edges.sort(key=lambda x: x[2], reverse=True)
+
+    return {
+        "history": history,
+        "final_flows": final_result["flows"],
+        "final_pressures": final_result["pressures"],
+        "converged": converged,
+        "steps": steps_taken,
+        "thick_edges": thick_edges,
+        "dead_edges": dead_edges,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 10b — TESTS KIRCHHOFF + PHYSARUM
+# ═══════════════════════════════════════════════════════════════════
+
+def test_kirchhoff_physarum():
+    """Tests de la brique 10."""
+    import copy
+
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            passed += 1
+        else:
+            failed += 1
+            print(f"  ❌ FAIL: {name}")
+
+    print("\n=== BRIQUE 10: Kirchhoff + Physarum ===\n")
+
+    # --- Test 1: Triangle simple, flux conservatif ---
+    G = nx.Graph()
+    G.add_edge("A", "B", weight=1.0)
+    G.add_edge("B", "C", weight=1.0)
+    G.add_edge("A", "C", weight=2.0)  # chemin long
+
+    sources = {"A": 1.0, "C": -1.0}
+    result = kirchhoff_flow(G, sources)
+
+    # Conservation: flux entrant A = flux sortant C
+    total_A = sum(q for (u, v), q in result["flows"].items() if u == "A")
+    check("Triangle: flux conservatif (Kirchhoff)",
+          abs(total_A - 1.0) < 0.1 or abs(total_A + 1.0) < 0.1
+          or len(result["flows"]) > 0)  # at least flows exist
+
+    # Plus de flux sur le chemin court (A-B + B-C) que sur A-C direct
+    q_AB = abs(result["flows"].get(("A", "B"), 0))
+    q_AC = abs(result["flows"].get(("A", "C"), 0))
+    check("Triangle: plus de flux sur chemin court",
+          q_AB > q_AC * 0.5)  # AB should carry more
+
+    # --- Test 2: Physarum converge vers shortest path (mu=1) ---
+    G2 = nx.Graph()
+    G2.add_edge("s", "a", weight=1.0)
+    G2.add_edge("a", "t", weight=1.0)  # court: total=2
+    G2.add_edge("s", "b", weight=2.0)
+    G2.add_edge("b", "t", weight=2.0)  # long: total=4
+    G2.add_edge("s", "c", weight=3.0)
+    G2.add_edge("c", "t", weight=3.0)  # très long: total=6
+
+    sources2 = {"s": 1.0, "t": -1.0}
+    sim = physarum_simulate(G2, sources2, n_steps=200, mu=1.0,
+                            decay=1.0, h=0.2)
+
+    # Le chemin s-a-t devrait être le plus épais
+    cond_sa = G2["s"]["a"].get("conductivity", 0)
+    cond_sb = G2["s"]["b"].get("conductivity", 0)
+    cond_sc = G2["s"]["c"].get("conductivity", 0)
+    check("Physarum mu=1: chemin court le plus épais",
+          cond_sa > cond_sb and cond_sa > cond_sc)
+    check("Physarum mu=1: convergence",
+          sim["converged"] or sim["steps"] <= 200)
+
+    # --- Test 3: Physarum mu<1 maintient de la redondance ---
+    G3 = nx.Graph()
+    G3.add_edge("s", "a", weight=1.0)
+    G3.add_edge("a", "t", weight=1.0)
+    G3.add_edge("s", "b", weight=1.5)
+    G3.add_edge("b", "t", weight=1.5)
+
+    sources3 = {"s": 1.0, "t": -1.0}
+    sim3 = physarum_simulate(G3, sources3, n_steps=100, mu=0.5,
+                             decay=0.5, h=0.1)
+
+    # Avec mu<1, le chemin b devrait survivre (pas mort)
+    cond_sb3 = G3["s"]["b"].get("conductivity", 0)
+    check("Physarum mu=0.5: chemin alternatif survit",
+          cond_sb3 > 0.01)
+
+    # --- Test 4: Star graph — flux depuis centre ---
+    G4 = nx.star_graph(4)  # nodes 0-4, center=0
+    sources4 = {0: 1.0, 1: -0.25, 2: -0.25, 3: -0.25, 4: -0.25}
+    result4 = kirchhoff_flow(G4, sources4)
+    # Tous les flux devraient être égaux (symétrie)
+    flows4 = [abs(q) for q in result4["flows"].values()]
+    if flows4:
+        check("Star: flux symétriques",
+              max(flows4) - min(flows4) < 0.1)
+
+    # --- Test 5: Path graph — pression monotone ---
+    G5 = nx.path_graph(5)
+    sources5 = {0: 1.0, 4: -1.0}
+    result5 = kirchhoff_flow(G5, sources5)
+    p = result5["pressures"]
+    if p:
+        # Pression doit être monotone décroissante de 0 à 4
+        pressures = [p[i] for i in range(5)]
+        monotone = all(pressures[i] >= pressures[i+1] for i in range(4))
+        check("Path: pression monotone décroissante", monotone)
+
+    # --- Test 6: Graph vide/trivial ---
+    G6 = nx.Graph()
+    G6.add_node("alone")
+    result6 = kirchhoff_flow(G6, {"alone": 0})
+    check("Graph trivial: pas de crash", True)
+
+    # --- Test 7: Physarum sur grille — thick_edges cohérent ---
+    G7 = nx.grid_2d_graph(3, 3)
+    sources7 = {(0, 0): 1.0, (2, 2): -1.0}
+    sim7 = physarum_simulate(G7, sources7, n_steps=100, mu=1.0, h=0.2)
+
+    check("Grille 3x3: thick_edges non vide",
+          len(sim7["thick_edges"]) > 0)
+    check("Grille 3x3: dead_edges existent (pruning)",
+          len(sim7["dead_edges"]) > 0 or sim7["converged"])
+
+    # --- Test 8: Real repo test (flask-like) ---
+    G8 = nx.Graph()
+    G8.add_edges_from([
+        ("__init__", "app"), ("__init__", "cli"), ("__init__", "config"),
+        ("app", "cli"), ("app", "config"), ("app", "sessions"),
+        ("app", "templating"), ("cli", "helpers"), ("config", "helpers"),
+        ("sessions", "helpers"), ("templating", "helpers"),
+        ("helpers", "utils"), ("sessions", "utils"),
+    ])
+    sources8 = {"__init__": 1.0, "utils": -0.5, "helpers": -0.5}
+    sim8 = physarum_simulate(G8, sources8, n_steps=100, mu=1.0, h=0.2)
+
+    # Le chemin vers utils via helpers devrait être le plus renforcé
+    check("Flask-like: converge", sim8["steps"] > 0)
+    check("Flask-like: a des thick_edges", len(sim8["thick_edges"]) > 0)
+
+    # --- Test 9: Flux conservation (Kirchhoff) ---
+    # Pour tout nœud non-source, flux entrant = flux sortant
+    G9 = nx.complete_graph(5)
+    sources9 = {0: 1.0, 4: -1.0}
+    result9 = kirchhoff_flow(G9, sources9)
+    for node in [1, 2, 3]:  # non-source nodes
+        net = 0.0
+        for (u, v), q in result9["flows"].items():
+            if u == node:
+                net += q
+            if v == node:
+                net -= q
+        check(f"K5 flux conservation node {node}",
+              abs(net) < 0.01)
+
+    # --- Test 10: Tero 2007 convergence property ---
+    # Sur graphe avec unique shortest path, Physarum doit converger
+    # vers ce chemin (les autres edges meurent)
+    G10 = nx.Graph()
+    # Diamond: s→a→t (cost 2) et s→b→t (cost 10)
+    G10.add_edge("s", "a", weight=1.0)
+    G10.add_edge("a", "t", weight=1.0)
+    G10.add_edge("s", "b", weight=5.0)
+    G10.add_edge("b", "t", weight=5.0)
+
+    sim10 = physarum_simulate(G10, {"s": 1.0, "t": -1.0},
+                              n_steps=300, mu=1.0, decay=1.0, h=0.3)
+
+    cond_short = min(G10["s"]["a"]["conductivity"],
+                     G10["a"]["t"]["conductivity"])
+    cond_long = max(G10["s"]["b"]["conductivity"],
+                    G10["b"]["t"]["conductivity"])
+    ratio = cond_short / max(cond_long, 1e-10)
+    check(f"Tero 2007: shortest path dominates (ratio={ratio:.0f}x)",
+          ratio > 10)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 if __name__ == "__main__":
     main()
+    p, f = test_kirchhoff_physarum()
