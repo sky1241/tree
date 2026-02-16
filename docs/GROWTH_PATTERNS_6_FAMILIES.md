@@ -11,7 +11,7 @@
 | Conifère | Pyramide, tronc unique | Dominance apicale forte → pousse en HAUTEUR d'abord | Pipeline vertical (HSBC algo) |
 | Feuillu | Canopée large, ronde | Branches rivalisent avec le leader → pousse en LARGEUR | Multi-modules (3d-printer) |
 | Palmier | Colonne, couronne au sommet | Un seul méristème, zéro branche, tout passe par le sommet | Pipeline étroit, output riche (data pipeline) |
-| Baobab | Tronc massif, petite canopée | Stockage dans le tronc → consolider avant d'étendre | Moteur/core énorme, petite interface (MICR) |
+| Baobab | Tronc massif, petite canopée | Stockage dans le tronc → consolider avant d'étendre | Moteur/core énorme, petite interface (database, solveur) |
 | Buisson | Multi-tiges depuis la base | Pas de tronc dominant, expansion latérale | Collection d'outils indépendants (sky-toolkit) |
 | Liane | Grimpe sur un hôte | Parasite structurel, utilise l'infrastructure existante | Plugin, extension, wrapper d'API |
 
@@ -202,7 +202,7 @@ RÈGLE B6 : EXTREME_LONGEVITY
 - **Quand utiliser** : moteur/engine énorme avec une petite interface
 - **Priorité** : consolider le core d'abord. L'interface vient après.
 - **Danger** : si on tire trop d'eau du tronc (trop de features trop vite) → l'arbre s'effondre
-- **Exemple** : MICR (660 lignes de solveur, le user voit juste "solved: true")
+- **Exemple** : un solveur de contraintes (660 lignes de core, le user voit juste "solved: true")
 
 ---
 
@@ -369,7 +369,7 @@ Q6: Le projet wrappe-t-il un système existant ?
 |--------|---------|---------------|
 | HSBC-algo-genetic | 🌲 Conifère | Pipeline linéaire : signal → analyse → trade. Tronc = le moteur de décision. |
 | 3d-printer | 🍁 Feuillu | 8 briques parallèles, branches co-dominantes, canopée large. |
-| MICR | 🌳 Baobab | 660 lignes de solveur (tronc massif), output = "solved: true" (petite canopée). |
+| 3d-printer (MICR) | 🌳 Baobab | Solveur inverse de contraintes intégré au 3d-printer. Tronc massif, output = "solved: true". |
 | sky-toolkit | 🌿 Buisson | Collection d'outils indépendants, pas de hiérarchie, expansion horizontale. |
 | shazam-piano | 🌴 Palmier | Pipeline audio étroit : micro → FFT → pitch detection → affichage. |
 | infernal-wheel | 🍁 Feuillu | Dashboard + UX framework + mobile app → branches multiples. |
