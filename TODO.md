@@ -39,7 +39,7 @@
 | 22 | Arbuscules & Vésicules | 20 | Pimprikar 2018, Floss 2017, Genre 1997 |
 | 23 | Sporulation (boucle) | 21 | Kokkoris 2026, Pfeffer 1999, Bago 2002 |
 
-## ✅ Lifecycle chain v2 — 67 tests
+## ✅ Lifecycle chain v2 — 71 tests
 
 Pipeline `full_lifecycle_simulate()` — A→Z→A complet avec:
 - Phase 1.5: Appressorium (turgor, pénétration)
