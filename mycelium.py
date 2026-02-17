@@ -6300,14 +6300,37 @@ def full_lifecycle_simulate(
         nutrient_roots = [n for n in mature_graph.nodes()
                           if mature_graph.nodes[n].get('is_root')][:3]
 
+    # Extract root-connected subgraph: only nodes reachable from roots
+    # can actually deliver P. Orphan fragments uptake P but strand it.
+    # Source: Schnepf & Roose 2006 — "translocation within fungus"
+    # requires continuous path to root interface.
+    root_reachable = set()
+    for rn in nutrient_roots:
+        if rn in mature_graph:
+            root_reachable.update(nx.node_connected_component(mature_graph, rn))
+
+    if len(root_reachable) > 0:
+        active_graph = mature_graph.subgraph(root_reachable).copy()
+    else:
+        active_graph = mature_graph  # fallback
+
+    results['joint_2_3'] = {
+        'total_nodes': mature_graph.number_of_nodes(),
+        'root_connected_nodes': len(root_reachable),
+        'orphan_nodes': mature_graph.number_of_nodes() - len(root_reachable),
+        'connectivity_pct': len(root_reachable) / max(mature_graph.number_of_nodes(), 1) * 100,
+    }
+
     # ── PHASE 3: P uptake [brique 19] ──────────────────────────
+    # Run on root-connected subgraph only (P can reach root)
     phase3 = nutrient_simulate(
-        mature_graph, nutrient_roots,
+        active_graph, nutrient_roots,
         n_steps=nutrient_steps, params=nutrient_params, seed=seed)
 
     results['phase3_nutrients'] = {
         'total_p_root': phase3['total_p_root'],
         'depletion_zone': phase3['depletion_zone'],
+        'active_nodes': active_graph.number_of_nodes(),
     }
 
     # ── JOINT 3→4: P delivery → symbiosis exchange ─────────────
@@ -6316,8 +6339,8 @@ def full_lifecycle_simulate(
                           0.001)
 
     # ── PHASE 4: C↔P exchange [brique 20] ──────────────────────
-    # Fungal biomass proportional to network size
-    fungal_biomass = mature_graph.number_of_nodes() * 0.1
+    # Fungal biomass = root-connected network (active contribution)
+    fungal_biomass = active_graph.number_of_nodes() * 0.1
     phase4 = symbiosis_simulate(
         n_steps=symbiosis_steps, params=symbiosis_params,
         soil_p=soil_p_effective,
@@ -6409,10 +6432,21 @@ def test_lifecycle_chain():
           r['phase2b_spatial_fusion']['components_before'])
 
     # === TEST BLOCK 5: Phase 3 — P uptake ===
+    # === TEST BLOCK 5a: Joint 2→3 — Root connectivity ===
+    check("Joint 2→3: connectivity data present",
+          'joint_2_3' in r)
+    check("Joint 2→3: root-connected nodes > 0",
+          r['joint_2_3']['root_connected_nodes'] > 0)
+    check("Joint 2→3: connectivity % > 0",
+          r['joint_2_3']['connectivity_pct'] > 0)
+
+    # === TEST BLOCK 5b: Phase 3 — P uptake ===
     check("Phase 3: P delivered to root > 0",
           r['phase3_nutrients']['total_p_root'] > 0)
     check("Phase 3: soil depletion > 0",
           r['phase3_nutrients']['depletion_zone'] > 0)
+    check("Phase 3: active nodes tracked",
+          r['phase3_nutrients']['active_nodes'] > 0)
 
     # === TEST BLOCK 6: Phase 4 — C↔P exchange ===
     check("Phase 4: plant got P",
@@ -6481,7 +6515,7 @@ def test_lifecycle_chain():
     # === TEST BLOCK 12: All phases ran in order ===
     phases = ['phase0_root', 'phase1_germination', 'joint_1_2',
               'phase2_growth', 'phase2b_spatial_fusion', 'post_processing',
-              'phase3_nutrients', 'phase4_exchange',
+              'joint_2_3', 'phase3_nutrients', 'phase4_exchange',
               'phase5_metrics']
     all_present = all(p in r for p in phases)
     check("All phases present in results", all_present)
