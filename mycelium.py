@@ -4649,6 +4649,403 @@ def spore_germination_simulate(spore_positions, root_positions,
     }
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 18 — L-SYSTEM ROOT ARCHITECTURE (v2.0)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   [A] Leitner et al. 2010, Math. Comp. Model. Dyn. Syst. 16:575-587
+#     "The algorithmic beauty of plant roots — an L-System model"
+#     Parametric L-System with growth function λ(t).
+#     Root types: tap root (order 0), laterals (order 1,2).
+#     Branching interval ln, branching angle θ.
+#
+#   [B] Schnepf et al. 2018, Ann. Bot. 121:1033-1053
+#     "CRootBox: a structural-functional modelling framework"
+#     Direction: deflection angle α ~ N(0,σ), gravitropism N trials.
+#     Doussan model: Kirchhoff's law for water flow in root graph.
+#     Root types with per-type parameters.
+#
+# Equations:
+#   Growth: λ(t) = L_max · (1 - exp(-r·t / L_max))      [A]
+#   Elongation rate: dλ/dt = r · exp(-r·t / L_max)       [A]
+#   Branching: laterals at spacing ln along parent         [A]
+#   Direction: α ~ N(0, σ), β ~ U(0, 2π)                 [B]
+#   Gravitropism: pick best of N random trials             [B]
+# ═══════════════════════════════════════════════════════════════════
+
+
+class RootTypeParams:
+    """Parameters for one root type in L-System model.
+
+    Source: Leitner 2010 [A], Schnepf 2018 [B].
+    """
+    def __init__(self, order=0, r=1.0, l_max=20.0, sigma=0.3,
+                 theta=math.pi / 4, ln=2.0, n_laterals=5,
+                 n_tropism=3, segment_dx=1.0,
+                 successor_order=None):
+        self.order = order              # root type order (0=tap, 1=lateral...)
+        self.r = r                      # initial elongation rate [cm/day] [A]
+        self.l_max = l_max              # max root length [cm] [A]
+        self.sigma = sigma              # deflection angle std dev [B]
+        self.theta = theta              # branching angle from parent [A]
+        self.ln = ln                    # inter-lateral distance [cm] [A]
+        self.n_laterals = n_laterals    # max number of laterals
+        self.n_tropism = n_tropism      # N trials for gravitropism [B]
+        self.segment_dx = segment_dx    # segment length [cm] [B]
+        self.successor_order = successor_order or (order + 1)
+
+    def growth_length(self, t):
+        """Root length at local age t.
+
+        λ(t) = L_max · (1 - exp(-r·t / L_max))
+        Source: Leitner 2010 [A], eq. 3.1.
+        """
+        if t <= 0:
+            return 0.0
+        return self.l_max * (1.0 - math.exp(-self.r * t / self.l_max))
+
+    def elongation_rate(self, t):
+        """Elongation rate at local age t.
+
+        dλ/dt = r · exp(-r·t / L_max)
+        Source: derivative of [A] eq. 3.1.
+        """
+        if t <= 0:
+            return self.r
+        return self.r * math.exp(-self.r * t / self.l_max)
+
+
+def lsystem_root_generate(root_types=None, n_steps=20, seed=42,
+                           origin=(0.0, 0.0, 0.0),
+                           gravity_dir=(0.0, 0.0, -1.0)):
+    """Generate a root architecture graph using L-System rules.
+
+    Parameters
+    ----------
+    root_types : dict or None
+        {order: RootTypeParams}. Default: tap root + 1st order laterals.
+    n_steps : int
+        Time steps (days).
+    seed : int
+    origin : tuple
+        Root collar position.
+    gravity_dir : tuple
+        Direction of gravity (for gravitropism).
+
+    Returns
+    -------
+    dict with:
+        'graph': nx.Graph — root architecture
+        'history': list of step snapshots
+        'root_tips': list of current tip node names
+        'root_lengths': dict {root_id: current_length}
+    """
+    import random as _random
+    rng = _random.Random(seed)
+
+    if root_types is None:
+        root_types = {
+            0: RootTypeParams(order=0, r=2.0, l_max=30.0, sigma=0.2,
+                              theta=0, ln=3.0, n_laterals=8,
+                              n_tropism=5, segment_dx=1.0),
+            1: RootTypeParams(order=1, r=1.0, l_max=10.0, sigma=0.4,
+                              theta=math.pi / 3, ln=2.0, n_laterals=3,
+                              n_tropism=2, segment_dx=0.8),
+        }
+
+    G = nx.Graph()
+    name_counter = [0]
+
+    def new_name(prefix="rn"):
+        name_counter[0] += 1
+        return f"{prefix}_{name_counter[0]}"
+
+    # Initialize tap root
+    collar_name = new_name("collar")
+    G.add_node(collar_name, pos3d=origin, is_root=True,
+               root_order=0, root_id="tap_0", local_age=0.0,
+               is_root_tip=True)
+
+    # Track active roots: (tip_node, root_id, order, direction, local_age, length, branch_points)
+    active_roots = [{
+        'tip': collar_name,
+        'root_id': 'tap_0',
+        'order': 0,
+        'direction': _vec_normalize(gravity_dir),
+        'local_age': 0.0,
+        'length': 0.0,
+        'next_branch_at': root_types[0].ln if 0 in root_types else 999,
+        'n_branches': 0,
+    }]
+
+    root_lengths = {'tap_0': 0.0}
+    history = []
+    root_id_counter = [0]
+
+    for step in range(n_steps):
+        snapshot = {'step': step, 'n_nodes': G.number_of_nodes(),
+                    'n_active': len(active_roots)}
+        new_roots = []
+
+        for root in active_roots:
+            order = root['order']
+            if order not in root_types:
+                continue
+            rt = root_types[order]
+
+            root['local_age'] += 1.0
+            target_len = rt.growth_length(root['local_age'])
+            growth = target_len - root['length']
+
+            if growth < 0.01:
+                continue  # root has reached max length
+
+            # Number of segments to add this step
+            n_segs = max(1, int(growth / rt.segment_dx))
+            seg_len = growth / n_segs
+
+            for _ in range(n_segs):
+                tip_pos = G.nodes[root['tip']]['pos3d']
+
+                # Gravitropism: pick best of N random directions [B]
+                best_dir = root['direction']
+                best_score = -999
+                for _trial in range(rt.n_tropism):
+                    # Random deflection [B]: α ~ N(0,σ)
+                    alpha = rng.gauss(0, rt.sigma)
+                    beta = rng.uniform(0, 2 * math.pi)
+                    # Perturb current direction
+                    perp1, perp2 = _get_perpendiculars(root['direction'])
+                    candidate = _vec_normalize(_vec_add(
+                        _vec_scale(root['direction'], math.cos(alpha)),
+                        _vec_add(
+                            _vec_scale(perp1, math.sin(alpha) * math.cos(beta)),
+                            _vec_scale(perp2, math.sin(alpha) * math.sin(beta))
+                        )
+                    ))
+                    if candidate == (0.0, 0.0, 0.0):
+                        candidate = root['direction']
+                    # Score: alignment with gravity [B]
+                    score = _vec_dot(candidate, gravity_dir)
+                    if score > best_score:
+                        best_score = score
+                        best_dir = candidate
+
+                root['direction'] = best_dir
+                new_pos = _vec_add(tip_pos, _vec_scale(best_dir, seg_len))
+                nn = new_name("rn")
+                G.add_node(nn, pos3d=new_pos, is_root=True,
+                           root_order=order, root_id=root['root_id'],
+                           local_age=root['local_age'],
+                           is_root_tip=True)
+                G.add_edge(root['tip'], nn, length_3d=seg_len,
+                           is_root_segment=True, root_id=root['root_id'])
+                # Previous tip no longer tip
+                G.nodes[root['tip']]['is_root_tip'] = False
+                root['tip'] = nn
+                root['length'] += seg_len
+                root_lengths[root['root_id']] = root['length']
+
+                # Check if lateral should branch here [A]
+                if root['length'] >= root['next_branch_at']:
+                    succ_order = rt.successor_order
+                    if (succ_order in root_types and
+                            root['n_branches'] < rt.n_laterals):
+                        root['n_branches'] += 1
+                        root['next_branch_at'] += rt.ln
+
+                        # Branch direction: rotate by θ from parent [A]
+                        perp1, perp2 = _get_perpendiculars(root['direction'])
+                        rand_beta = rng.uniform(0, 2 * math.pi)
+                        branch_dir = _vec_normalize(_vec_add(
+                            _vec_scale(root['direction'], math.cos(rt.theta)),
+                            _vec_add(
+                                _vec_scale(perp1, math.sin(rt.theta) * math.cos(rand_beta)),
+                                _vec_scale(perp2, math.sin(rt.theta) * math.sin(rand_beta))
+                            )
+                        ))
+                        if branch_dir == (0.0, 0.0, 0.0):
+                            branch_dir = perp1
+
+                        root_id_counter[0] += 1
+                        new_rid = f"lat_{root_id_counter[0]}"
+                        new_roots.append({
+                            'tip': nn,  # starts from same node
+                            'root_id': new_rid,
+                            'order': succ_order,
+                            'direction': branch_dir,
+                            'local_age': 0.0,
+                            'length': 0.0,
+                            'next_branch_at': root_types[succ_order].ln,
+                            'n_branches': 0,
+                        })
+                        root_lengths[new_rid] = 0.0
+
+        active_roots.extend(new_roots)
+        snapshot['n_nodes_after'] = G.number_of_nodes()
+        snapshot['n_branches_total'] = len(active_roots)
+        history.append(snapshot)
+
+    root_tips = [n for n in G.nodes() if G.nodes[n].get('is_root_tip')]
+
+    return {
+        'graph': G,
+        'history': history,
+        'root_tips': root_tips,
+        'root_lengths': root_lengths,
+    }
+
+
+def _get_perpendiculars(direction):
+    """Get two orthogonal vectors perpendicular to direction."""
+    dx, dy, dz = direction
+    if abs(dx) < 0.9:
+        ref = (1.0, 0.0, 0.0)
+    else:
+        ref = (0.0, 1.0, 0.0)
+    # Cross product: direction × ref
+    p1 = _vec_normalize(_vec_cross(direction, ref))
+    p2 = _vec_normalize(_vec_cross(direction, p1))
+    return p1, p2
+
+
+def _vec_cross(a, b):
+    """Cross product of two 3D vectors."""
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+
+def _vec_dot(a, b):
+    """Dot product of two 3D vectors."""
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+
+
+def test_lsystem_root():
+    """Tests for brique 18 — L-System Root Architecture."""
+    print("\n=== BRIQUE 18: L-System Root Architecture ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: Growth function ---
+    rt0 = RootTypeParams(r=2.0, l_max=20.0)
+    check("Growth t=0: λ=0", abs(rt0.growth_length(0)) < 0.001)
+    check("Growth t→∞: λ→L_max", abs(rt0.growth_length(100) - 20.0) < 0.01)
+    check("Growth monotonic",
+          all(rt0.growth_length(t) <= rt0.growth_length(t+1)
+              for t in range(50)))
+
+    # --- Test 2: Elongation rate ---
+    check("Rate t=0: r=2.0", abs(rt0.elongation_rate(0) - 2.0) < 0.01)
+    check("Rate decreases",
+          rt0.elongation_rate(0) > rt0.elongation_rate(10))
+
+    # --- Test 3: Basic simulation ---
+    r3 = lsystem_root_generate(n_steps=10, seed=42)
+    check("Sim: graph created", r3['graph'] is not None)
+    check("Sim: nodes > 1", r3['graph'].number_of_nodes() > 1)
+    check("Sim: history = 10 steps", len(r3['history']) == 10)
+
+    # --- Test 4: root tips exist ---
+    check("Root tips: exist", len(r3['root_tips']) > 0)
+
+    # --- Test 5: tap root grows ---
+    check("Tap root: has length", r3['root_lengths'].get('tap_0', 0) > 0)
+
+    # --- Test 6: laterals produced ---
+    lat_roots = [k for k in r3['root_lengths'] if k.startswith('lat_')]
+    check("Laterals: at least 1 produced", len(lat_roots) > 0)
+
+    # --- Test 7: nodes have 3D coords ---
+    for node in list(r3['graph'].nodes())[:5]:
+        pos = r3['graph'].nodes[node].get('pos3d')
+        if pos is None:
+            check("Nodes: have 3D coords", False)
+            break
+    else:
+        check("Nodes: have 3D coords", True)
+
+    # --- Test 8: gravitropism → roots grow downward ---
+    tips_z = [r3['graph'].nodes[t]['pos3d'][2] for t in r3['root_tips']
+              if r3['graph'].nodes[t].get('pos3d')]
+    if tips_z:
+        avg_z = sum(tips_z) / len(tips_z)
+        check("Gravitropism: avg tip z < 0 (downward)", avg_z < 0)
+    else:
+        check("Gravitropism: tips exist", False)
+
+    # --- Test 9: edges have root_id ---
+    edges_data = list(r3['graph'].edges(data=True))
+    root_edges = [d for _, _, d in edges_data if d.get('is_root_segment')]
+    check("Edges: root segments have root_id",
+          len(root_edges) > 0 and 'root_id' in root_edges[0])
+
+    # --- Test 10: graph is a tree (no cycles) ---
+    check("Graph: is a tree (connected, no cycles)",
+          nx.is_tree(r3['graph']))
+
+    # --- Test 11: longer sim → more nodes ---
+    r11a = lsystem_root_generate(n_steps=5, seed=42)
+    r11b = lsystem_root_generate(n_steps=15, seed=42)
+    check("More steps → more nodes",
+          r11b['graph'].number_of_nodes() > r11a['graph'].number_of_nodes())
+
+    # --- Test 12: cross product helper ---
+    cx = _vec_cross((1, 0, 0), (0, 1, 0))
+    check("Cross product: i×j = k", abs(cx[2] - 1.0) < 0.001)
+
+    # --- Test 13: perpendiculars orthogonal ---
+    p1, p2 = _get_perpendiculars((0, 0, -1))
+    check("Perpendiculars: orthogonal to direction",
+          abs(_vec_dot(p1, (0, 0, -1))) < 0.01)
+    check("Perpendiculars: orthogonal to each other",
+          abs(_vec_dot(p1, p2)) < 0.01)
+
+    # --- Test 14: single root type (no laterals) ---
+    r14 = lsystem_root_generate(
+        root_types={0: RootTypeParams(order=0, r=1.0, l_max=10.0,
+                                       n_laterals=0)},
+        n_steps=10)
+    lat14 = [k for k in r14['root_lengths'] if k.startswith('lat_')]
+    check("No laterals param: 0 laterals produced", len(lat14) == 0)
+
+    # --- Test 15: integration 18→16 (root graph → AM fungi) ---
+    r15 = lsystem_root_generate(n_steps=8, seed=42)
+    rg = r15['graph']
+    root_tips = r15['root_tips'][:3]  # use some tips as AM interface
+    if root_tips:
+        n_before = rg.number_of_nodes()
+        am = am_fungi_simulate(rg, root_tips, n_steps=5, seed=42,
+                                use_edelstein=False, use_oscillatory=False)
+        check("Integration 18→16: root graph feeds into AM sim",
+              am['final_graph'].number_of_nodes() > n_before)
+    else:
+        check("Integration 18→16: skipped", True)
+
+    # --- Test 16: custom root types ---
+    custom = {
+        0: RootTypeParams(order=0, r=3.0, l_max=50.0, sigma=0.1,
+                          ln=5.0, n_laterals=10, n_tropism=10),
+    }
+    r16 = lsystem_root_generate(root_types=custom, n_steps=15)
+    check("Custom root: long tap root",
+          r16['root_lengths']['tap_0'] > 20)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 def test_spore_germination():
     """Tests for brique 17 — Spore Germination & Chemotaxis."""
     print("\n=== BRIQUE 17: Spore Germination & Chemotaxis ===\n")
@@ -5067,8 +5464,9 @@ if __name__ == "__main__":
     p6, f6 = test_hyphal_mechanics_3d()
     p7, f7 = test_am_fungi_root_growth()
     p8, f8 = test_spore_germination()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8
+    p9, f9 = test_lsystem_root()
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-17: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-18: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
