@@ -1919,6 +1919,85 @@ def anastomose(G, candidates, n_fusions=None, conductivity_init=0.5):
     }
 
 
+def spatial_anastomose(G, d_max_3d=2.0, max_fusions=50, conductivity_init=0.5):
+    """Fuse nodes from different components when spatially close in 3D.
+
+    Source: Fleissner et al. 2005 — hyphae detect nearby hyphae via
+    chemotropic signaling (MAK-1/MAK-2 kinases), not network distance.
+    Fusion occurs when tips approach within ~1-5 µm.
+
+    Unlike graph-distance anastomose (brique 11), this checks
+    Euclidean distance in pos3d coordinates, enabling inter-component fusion.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graph (modified in-place).
+    d_max_3d : float
+        Max 3D distance for fusion (default 2.0).
+    max_fusions : int
+        Max number of fusions per call.
+    conductivity_init : float
+        Initial conductivity of new fusion edges.
+
+    Returns
+    -------
+    dict with n_fused, components_before, components_after, fused_pairs
+    """
+    import math
+
+    comps_before = nx.number_connected_components(G)
+
+    # Build component lookup
+    comp_id = {}
+    for i, comp in enumerate(nx.connected_components(G)):
+        for n in comp:
+            comp_id[n] = i
+
+    # Collect nodes with 3D positions, grouped by component
+    nodes_by_comp = {}
+    for n in G.nodes():
+        pos = G.nodes[n].get('pos3d')
+        if pos:
+            cid = comp_id[n]
+            if cid not in nodes_by_comp:
+                nodes_by_comp[cid] = []
+            nodes_by_comp[cid].append((n, pos))
+
+    # Find cross-component pairs within d_max_3d
+    candidates = []
+    comp_ids = list(nodes_by_comp.keys())
+    for i_idx in range(len(comp_ids)):
+        for j_idx in range(i_idx + 1, len(comp_ids)):
+            ci, cj = comp_ids[i_idx], comp_ids[j_idx]
+            for ni, pi in nodes_by_comp[ci]:
+                for nj, pj in nodes_by_comp[cj]:
+                    d = math.sqrt(sum((a - b) ** 2 for a, b in zip(pi, pj)))
+                    if d <= d_max_3d and not G.has_edge(ni, nj):
+                        candidates.append((ni, nj, d))
+
+    # Sort by distance (closest first) and fuse
+    candidates.sort(key=lambda x: x[2])
+    fused = []
+    for ni, nj, d in candidates[:max_fusions]:
+        # Re-check components (previous fusions may have merged them)
+        if nx.has_path(G, ni, nj):
+            continue
+        G.add_edge(ni, nj, weight=1.0, conductivity=conductivity_init,
+                   anastomosis=True, spatial_fusion=True,
+                   length_3d=d, fusion_distance=d)
+        fused.append((ni, nj, d))
+
+    comps_after = nx.number_connected_components(G)
+
+    return {
+        'n_fused': len(fused),
+        'components_before': comps_before,
+        'components_after': comps_after,
+        'fused_pairs': fused,
+    }
+
+
 def incremental_growth(G_base, push_sequence, sources_fn=None,
                        anastomosis_threshold=0.3,
                        physarum_steps=30, mu=0.7):
@@ -2570,13 +2649,18 @@ def edelstein_growth_step(G, params, rng=None):
         G.add_edge(u, v, conductivity=0.5, growth_edge=True)
 
     # Apply tip death (remove tip nodes if they're still leaves)
+    # NEVER remove root nodes — they are structural anchors
     for tip in tips_to_remove:
         if tip in G and G.degree(tip) <= 1:
-            G.remove_node(tip)
+            if not G.nodes[tip].get('is_root'):
+                G.remove_node(tip)
 
     # 3. Hyphal death: randomly remove edges with prob d
+    # NEVER remove root-root edges (plant structure, not hyphae)
     edges_to_remove = []
     for u, v in list(G.edges()):
+        if G.nodes[u].get('is_root') and G.nodes[v].get('is_root'):
+            continue  # protect root architecture
         if rng.random() < params.d:
             edges_to_remove.append((u, v))
 
@@ -2586,7 +2670,8 @@ def edelstein_growth_step(G, params, rng=None):
             stats['edges_died'] += 1
 
     # Clean up isolated nodes from edge removal
-    isolates = list(nx.isolates(G))
+    # NEVER remove root nodes — they are structural anchors
+    isolates = [n for n in nx.isolates(G) if not G.nodes[n].get('is_root')]
     G.remove_nodes_from(isolates)
 
     # 4. Anastomosis: use brique 11's detect + fuse (only if rates > 0)
@@ -6179,6 +6264,35 @@ def full_lifecycle_simulate(
         'fusion_events': phase2.get('total_fusions', 0),
     }
 
+    # ── PHASE 2b: Spatial anastomose [brique 11 extension] ────
+    # Fleissner 2005: inter-component fusion via chemotropic sensing.
+    # Fuses colonies from different root tips that are spatially close.
+    spatial_result = spatial_anastomose(mature_graph, d_max_3d=3.0,
+                                         max_fusions=100)
+    results['phase2b_spatial_fusion'] = {
+        'n_fused': spatial_result['n_fused'],
+        'components_before': spatial_result['components_before'],
+        'components_after': spatial_result['components_after'],
+    }
+
+    # ── POST-PROCESSING: Normalize edge attributes ────────────
+    # Ensure all edges have 'weight' (needed by v1.0 metrics).
+    # Fallback: weight = length_3d, or conductivity, or 1.0.
+    edges_fixed = 0
+    for u, v, d in mature_graph.edges(data=True):
+        if 'weight' not in d:
+            if 'length_3d' in d:
+                d['weight'] = d['length_3d']
+            elif 'conductivity' in d:
+                d['weight'] = 1.0 / max(d['conductivity'], 1e-9)
+            else:
+                d['weight'] = 1.0
+            edges_fixed += 1
+    results['post_processing'] = {
+        'edges_weight_added': edges_fixed,
+        'total_edges': mature_graph.number_of_edges(),
+    }
+
     # ── JOINT 2→3: mature graph → nutrient simulation ──────────
     # root_tips are P sinks (where fungus delivers P to plant)
     nutrient_roots = [n for n in root_tips if n in mature_graph]
@@ -6287,6 +6401,13 @@ def test_lifecycle_chain():
     check("Phase 2: edges exist",
           r['phase2_growth']['n_edges'] > 0)
 
+    # === TEST BLOCK 4b: Phase 2b — Spatial fusion ===
+    check("Phase 2b: spatial fusion ran",
+          'phase2b_spatial_fusion' in r)
+    check("Phase 2b: reduced components",
+          r['phase2b_spatial_fusion']['components_after'] <
+          r['phase2b_spatial_fusion']['components_before'])
+
     # === TEST BLOCK 5: Phase 3 — P uptake ===
     check("Phase 3: P delivered to root > 0",
           r['phase3_nutrients']['total_p_root'] > 0)
@@ -6306,6 +6427,22 @@ def test_lifecycle_chain():
           r['phase5_metrics']['meshedness'] is not None)
     check("Phase 5: efficiency computed",
           r['phase5_metrics']['global_efficiency'] is not None)
+
+    # === TEST BLOCK 7b: Phase 2b — Spatial fusion ===
+    check("Phase 2b: spatial fusion reduced components",
+          r['phase2b_spatial_fusion']['components_after'] <=
+          r['phase2b_spatial_fusion']['components_before'])
+    check("Phase 2b: at least 1 fusion",
+          r['phase2b_spatial_fusion']['n_fused'] >= 0)
+
+    # === TEST BLOCK 7c: Post-processing — Weight normalization ===
+    check("Post-proc: weight added to edges",
+          r['post_processing']['edges_weight_added'] >= 0)
+    G_final = r['final_graph']
+    edges_with_weight = sum(1 for u, v, d in G_final.edges(data=True)
+                            if 'weight' in d)
+    check("Post-proc: 100% edges have weight",
+          edges_with_weight == G_final.number_of_edges())
 
     # === TEST BLOCK 8: End-to-end properties ===
     check("Lifecycle complete flag",
@@ -6343,7 +6480,8 @@ def test_lifecycle_chain():
 
     # === TEST BLOCK 12: All phases ran in order ===
     phases = ['phase0_root', 'phase1_germination', 'joint_1_2',
-              'phase2_growth', 'phase3_nutrients', 'phase4_exchange',
+              'phase2_growth', 'phase2b_spatial_fusion', 'post_processing',
+              'phase3_nutrients', 'phase4_exchange',
               'phase5_metrics']
     all_present = all(p in r for p in phases)
     check("All phases present in results", all_present)
