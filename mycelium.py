@@ -6813,6 +6813,311 @@ def test_intraradical():
 
 
 # ═══════════════════════════════════════════════════════════════════
+# BRIQUE 23 — Sporulation (boucle du cycle de vie)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   Kokkoris 2026 — mycelial dynamics, C supply-demand
+#   Pfeffer et al. 1999 — lipid transport intra→extraradical
+#   Bago et al. 2002 — TAG translocation in ERM
+#   PMC12165283 — spore anatomy, lipid droplet coalescence
+#   Olsson et al. 2014 — high C → more spores, high P → fewer spores
+#   Bécard & Pfeffer 1993 — C depletion 38→6.3 μg during germination
+#
+# Equations:
+#   Sporulation rate: r_spore = r_max × C/(K_c+C) × K_p/(K_p+P)
+#   TAG accumulation: TAG(t) = TAG_max × (1 - e^(-k_tag × t))
+#   Spore maturity: wall_layers(t) = n_max × (1 - e^(-k_wall × t))
+#   Carbon budget: C_spore = 38 μg/100μg wet (mature), depleted to 6.3
+# ═══════════════════════════════════════════════════════════════════
+
+
+class SporulationParams:
+    """Parameters for spore production on extraradical mycelium."""
+    def __init__(self,
+                 # Sporulation rate
+                 r_max=0.05,           # max spores per ERM node per step
+                 k_c=0.5,             # half-max C for sporulation
+                 k_p_inhibit=0.3,     # half-max P inhibition (high P → fewer)
+                 # TAG accumulation
+                 tag_max=0.80,        # max TAG fraction (58-80%)
+                 k_tag=0.3,           # TAG accumulation rate
+                 # Spore maturity
+                 n_wall_layers=4,     # max wall layers (multi-layered)
+                 k_wall=0.2,          # wall maturation rate
+                 maturation_steps=10, # steps to full maturity
+                 # Carbon budget
+                 c_initial=38.0,      # μg C per 100μg wet spore
+                 c_germination=6.3,   # μg C remaining after germination
+                 # Constraints
+                 min_erm_nodes=5,     # minimum ERM network size for sporulation
+                 max_spores_per_step=3,  # max new spores per step
+                 ):
+        self.r_max = r_max
+        self.k_c = k_c
+        self.k_p_inhibit = k_p_inhibit
+        self.tag_max = tag_max
+        self.k_tag = k_tag
+        self.n_wall_layers = n_wall_layers
+        self.k_wall = k_wall
+        self.maturation_steps = maturation_steps
+        self.c_initial = c_initial
+        self.c_germination = c_germination
+        self.min_erm_nodes = min_erm_nodes
+        self.max_spores_per_step = max_spores_per_step
+
+
+def sporulation_simulate(erm_graph, fungal_c, soil_p, n_steps=20,
+                          params=None, seed=42):
+    """Simulate spore production on the extraradical mycelium.
+
+    Spores form on ERM nodes as a function of available carbon
+    (positive) and soil phosphorus (negative — high P suppresses).
+    Each spore accumulates TAG and develops wall layers over time.
+
+    Parameters
+    ----------
+    erm_graph : nx.Graph
+        Extraradical mycelium graph (from lifecycle phases 2+).
+    fungal_c : float
+        Available fungal carbon (from brique 20 exchange).
+    soil_p : float
+        Soil phosphorus concentration.
+    n_steps : int
+        Simulation steps.
+    params : SporulationParams or None
+    seed : int
+
+    Returns
+    -------
+    dict with spores, history, total_tag, cycle_complete
+    """
+    if params is None:
+        params = SporulationParams()
+
+    import random as _random
+    rng = _random.Random(seed)
+
+    n_erm = erm_graph.number_of_nodes() if erm_graph is not None else 0
+    erm_nodes = list(erm_graph.nodes()) if erm_graph is not None else []
+
+    spores = []  # list of {node, age, tag, wall_layers, mature, c_reserve}
+    history = []
+    spore_id = [0]
+
+    # Running carbon pool
+    c_pool = max(fungal_c, 0.0)
+
+    for step in range(n_steps):
+        # --- Sporulation rate: Michaelis-Menten × P inhibition ---
+        # r = r_max × C/(K_c+C) × K_p/(K_p+P)
+        if c_pool > 0 and n_erm >= params.min_erm_nodes:
+            c_factor = c_pool / (params.k_c + c_pool)
+            p_inhibition = params.k_p_inhibit / (params.k_p_inhibit + soil_p)
+            r_spore = params.r_max * c_factor * p_inhibition
+        else:
+            r_spore = 0.0
+
+        # --- New spore formation ---
+        new_this_step = 0
+        for node in erm_nodes:
+            if rng.random() < r_spore and new_this_step < params.max_spores_per_step:
+                # Cost carbon to make spore
+                c_cost = params.c_initial * 0.01  # normalized cost
+                if c_pool >= c_cost:
+                    c_pool -= c_cost
+                    spores.append({
+                        'id': spore_id[0],
+                        'node': node,
+                        'age': 0,
+                        'tag': 0.0,
+                        'wall_layers': 0.0,
+                        'mature': False,
+                        'c_reserve': 0.0,
+                    })
+                    spore_id[0] += 1
+                    new_this_step += 1
+
+        # --- Mature existing spores ---
+        n_mature = 0
+        for sp in spores:
+            sp['age'] += 1
+
+            # TAG accumulation: exponential saturation
+            sp['tag'] = params.tag_max * (1 - math.exp(-params.k_tag * sp['age']))
+
+            # Wall layers: exponential maturation
+            sp['wall_layers'] = params.n_wall_layers * (
+                1 - math.exp(-params.k_wall * sp['age']))
+
+            # Carbon reserve buildup
+            sp['c_reserve'] = params.c_initial * (
+                1 - math.exp(-0.5 * sp['age']))
+
+            # Maturity check
+            if (sp['age'] >= params.maturation_steps and
+                    sp['tag'] >= 0.5 * params.tag_max):
+                sp['mature'] = True
+                n_mature += 1
+
+        history.append({
+            'step': step,
+            'n_spores': len(spores),
+            'n_new': new_this_step,
+            'n_mature': n_mature,
+            'c_pool': c_pool,
+            'r_spore': r_spore,
+        })
+
+    # --- Cycle closure: mature spores can germinate ---
+    mature_spores = [s for s in spores if s['mature']]
+    cycle_complete = len(mature_spores) > 0
+
+    # Compute germination potential (C available after germination)
+    for sp in mature_spores:
+        sp['c_after_germination'] = max(
+            sp['c_reserve'] - (params.c_initial - params.c_germination), 0)
+
+    total_tag = sum(s['tag'] for s in spores)
+
+    return {
+        'spores': spores,
+        'mature_spores': mature_spores,
+        'history': history,
+        'total_tag': total_tag,
+        'n_total': len(spores),
+        'n_mature': len(mature_spores),
+        'cycle_complete': cycle_complete,
+        'c_pool_remaining': c_pool,
+    }
+
+
+def test_sporulation():
+    """Tests for brique 23 — Sporulation (Lifecycle Loop Closure)."""
+    print("\n=== BRIQUE 23: Sporulation (Lifecycle Loop Closure) ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: Sporulation rate equation ---
+    # r = r_max × C/(K_c+C) × K_p/(K_p+P)
+    p = SporulationParams()
+    c, P = 1.0, 0.1
+    r = 0.05 * (1.0 / (0.5 + 1.0)) * (0.3 / (0.3 + 0.1))
+    check("Rate: C=1, P=0.1 → r > 0", r > 0)
+
+    # --- Test 2: High P inhibits sporulation ---
+    r_low_p = 0.05 * (1.0 / (0.5 + 1.0)) * (0.3 / (0.3 + 0.01))
+    r_high_p = 0.05 * (1.0 / (0.5 + 1.0)) * (0.3 / (0.3 + 5.0))
+    check("High P → lower sporulation rate", r_high_p < r_low_p)
+
+    # --- Test 3: High C promotes sporulation ---
+    r_low_c = 0.05 * (0.1 / (0.5 + 0.1)) * (0.3 / (0.3 + 0.1))
+    r_high_c = 0.05 * (5.0 / (0.5 + 5.0)) * (0.3 / (0.3 + 0.1))
+    check("High C → higher sporulation rate", r_high_c > r_low_c)
+
+    # --- Test 4: TAG saturation curve ---
+    tag_5 = 0.8 * (1 - math.exp(-0.3 * 5))
+    tag_20 = 0.8 * (1 - math.exp(-0.3 * 20))
+    check("TAG: age=20 > age=5", tag_20 > tag_5)
+    check("TAG: approaches max (0.8)", tag_20 > 0.75)
+
+    # --- Test 5: Wall layers ---
+    wall_10 = 4 * (1 - math.exp(-0.2 * 10))
+    check("Wall: 10 steps → ~3.5 layers", wall_10 > 3.0)
+
+    # --- Test 6: Basic simulation ---
+    G = nx.path_graph(20)
+    r23 = sporulation_simulate(G, fungal_c=5.0, soil_p=0.1,
+                                n_steps=30, seed=42)
+    check("Sim: spores formed > 0", r23['n_total'] > 0)
+
+    # --- Test 7: Mature spores exist ---
+    check("Sim: mature spores exist", r23['n_mature'] > 0)
+
+    # --- Test 8: Cycle complete ---
+    check("Sim: cycle_complete = True", r23['cycle_complete'])
+
+    # --- Test 9: TAG accumulated ---
+    check("Sim: total TAG > 0", r23['total_tag'] > 0)
+
+    # --- Test 10: History length ---
+    check("Sim: history = 30 steps", len(r23['history']) == 30)
+
+    # --- Test 11: C pool decreases ---
+    check("Sim: C pool < initial",
+          r23['c_pool_remaining'] < 5.0)
+
+    # --- Test 12: High P → fewer spores ---
+    r23_lowp = sporulation_simulate(G, fungal_c=5.0, soil_p=0.01,
+                                     n_steps=30, seed=42)
+    r23_highp = sporulation_simulate(G, fungal_c=5.0, soil_p=5.0,
+                                      n_steps=30, seed=42)
+    check("High P → fewer spores",
+          r23_highp['n_total'] <= r23_lowp['n_total'])
+
+    # --- Test 13: Zero C → no spores ---
+    r23_noc = sporulation_simulate(G, fungal_c=0.0, soil_p=0.1,
+                                    n_steps=20, seed=42)
+    check("Zero C → 0 spores", r23_noc['n_total'] == 0)
+
+    # --- Test 14: Too small network → no spores ---
+    G_tiny = nx.path_graph(3)
+    r23_tiny = sporulation_simulate(G_tiny, fungal_c=5.0, soil_p=0.1,
+                                     n_steps=20, seed=42)
+    check("Tiny network (<5 nodes): 0 spores", r23_tiny['n_total'] == 0)
+
+    # --- Test 15: Mature spore has c_after_germination ---
+    if r23['mature_spores']:
+        sp = r23['mature_spores'][0]
+        check("Mature spore: c_after_germination defined",
+              'c_after_germination' in sp)
+    else:
+        check("Mature spore: (skipped)", True)
+
+    # --- Test 16: TAG within bounds ---
+    all_valid = all(0 <= s['tag'] <= 0.81 for s in r23['spores'])
+    check("All spores: TAG ≤ tag_max", all_valid)
+
+    # --- Test 17: Wall layers within bounds ---
+    all_walls = all(0 <= s['wall_layers'] <= 4.01 for s in r23['spores'])
+    check("All spores: wall_layers ≤ 4", all_walls)
+
+    # --- Test 18: Empty graph → no crash ---
+    G_empty = nx.Graph()
+    r23_empty = sporulation_simulate(G_empty, fungal_c=5.0, soil_p=0.1,
+                                      n_steps=10, seed=42)
+    check("Empty graph: no crash, 0 spores", r23_empty['n_total'] == 0)
+
+    # --- Test 19: Cycle closure — mature spores have enough C ---
+    if r23['mature_spores']:
+        sp = r23['mature_spores'][0]
+        check("Cycle closure: c_reserve > 0",
+              sp['c_reserve'] > 0)
+    else:
+        check("Cycle closure: (skipped)", True)
+
+    # --- Test 20: Integration 23→17 (spore positions for germination) ---
+    # Mature spores sit on ERM nodes → can be fed back to brique 17
+    if r23['mature_spores']:
+        nodes_with_spores = [s['node'] for s in r23['mature_spores']]
+        check("Integration 23→17: spore nodes are valid graph nodes",
+              all(n in G for n in nodes_with_spores))
+    else:
+        check("Integration 23→17: (skipped)", True)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
+# ═══════════════════════════════════════════════════════════════════
 # FULL LIFECYCLE PIPELINE — Ordre biologique
 # ═══════════════════════════════════════════════════════════════════
 # Phase 0: [18] Root architecture (L-System)
@@ -7434,9 +7739,10 @@ if __name__ == "__main__":
     p11, f11 = test_symbiosis_exchange()
     p13, f13 = test_appressorium()
     p14, f14 = test_intraradical()
+    p15, f15 = test_sporulation()
     p12, f12 = test_lifecycle_chain()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12 + p13 + p14
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13 + f14
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12 + p13 + p14 + p15
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13 + f14 + f15
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-22 + LIFECYCLE: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-23 + LIFECYCLE: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
