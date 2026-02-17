@@ -4923,6 +4923,302 @@ def _vec_dot(a, b):
     return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 19 — NUTRIENT TRANSPORT & P UPTAKE (v2.0)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   [A] Schnepf & Roose 2006, New Phytol. 171:669-682
+#     "Modelling the contribution of AM fungi to plant phosphate uptake"
+#     P transport in soil: ∂c/∂t = D·∇²c - F·ρ
+#     Michaelis-Menten uptake: F = F_max·c / (K_m + c)
+#     Uptake dominated by front of growing mycelium.
+#     Translocation within fungus so fast → not rate-limiting.
+#
+#   [B] Schnepf et al. 2008, Plant & Soil 312:85-99
+#     "Impact of growth and uptake patterns on P uptake"
+#     Uptake by all hyphae vs tips only → different optima.
+#     Anastomosis growth pattern most effective when all hyphae uptake.
+#
+#   [C] Leitner et al. 2010, Bull. Math. Biol. 73:2059-2084
+#     "Modelling nutrient uptake by individual hyphae"
+#     Single-hypha: ∂c/∂t = D·(1/r)·∂/∂r(r·∂c/∂r) - F(c)
+#     Michaelis-Menten: F(c) = F_max·c/(K_m+c) at hyphal surface.
+#
+# Discrete translation for graphs:
+#   Each node stores local soil P concentration [P_soil].
+#   Hyphae uptake: node removes P proportional to F_max·c/(K_m+c).
+#   Transport: P flows along edges toward root (pressure-driven).
+#   Root accumulates total P = sum of transported P.
+# ═══════════════════════════════════════════════════════════════════
+
+
+class NutrientParams:
+    """Parameters for P uptake and transport model.
+
+    Sources: Schnepf 2006 [A], Leitner 2010 [C].
+    """
+    def __init__(self,
+                 d_soil=0.01,         # D: P diffusion in soil [cm²/day]
+                 f_max=0.05,          # F_max: max uptake rate [µmol/cm/day]
+                 k_m=0.005,           # K_m: Michaelis-Menten constant [µmol/cm³]
+                 c_initial=0.01,      # initial soil P concentration [µmol/cm³]
+                 transport_rate=0.8,  # fraction transported per step toward root
+                 ):
+        self.d_soil = d_soil
+        self.f_max = f_max
+        self.k_m = k_m
+        self.c_initial = c_initial
+        self.transport_rate = transport_rate
+
+    def uptake_rate(self, c):
+        """Michaelis-Menten uptake rate.
+
+        F = F_max · c / (K_m + c)
+        Source: Schnepf 2006 [A], eq. main model.
+        """
+        if c <= 0:
+            return 0.0
+        return self.f_max * c / (self.k_m + c)
+
+
+def nutrient_simulate(G, root_nodes, n_steps=20, params=None, seed=42):
+    """Simulate P uptake and transport on a mycelial graph.
+
+    Each non-root node uptakes P from local soil (Michaelis-Menten).
+    P is transported along edges toward nearest root (pressure-driven).
+    Root nodes accumulate total P.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Mycelial network (from am_fungi_simulate or similar).
+    root_nodes : list
+        Root interface nodes (P sinks).
+    n_steps : int
+    params : NutrientParams or None
+    seed : int
+
+    Returns
+    -------
+    dict with:
+        'total_p_root': float — total P delivered to root
+        'p_history': list of total P at each step
+        'soil_p': dict — final soil P at each node
+        'node_p_internal': dict — P stored in each node
+        'depletion_zone': float — avg soil P depletion
+    """
+    if params is None:
+        params = NutrientParams()
+
+    # Initialize soil P at each node
+    soil_p = {}
+    for node in G.nodes():
+        soil_p[node] = params.c_initial
+
+    # Internal P (absorbed by fungus, not yet transported)
+    internal_p = {node: 0.0 for node in G.nodes()}
+    root_p_total = 0.0
+    p_history = []
+
+    # Precompute shortest path to nearest root for transport direction
+    # Use BFS from each root
+    nearest_root = {}
+    for rn in root_nodes:
+        if rn in G:
+            lengths = nx.single_source_shortest_path_length(G, rn)
+            for node, dist in lengths.items():
+                if node not in nearest_root or dist < nearest_root[node][1]:
+                    nearest_root[node] = (rn, dist)
+
+    for step in range(n_steps):
+        step_uptake = 0.0
+
+        # Phase 1: Uptake from soil (Michaelis-Menten) [A]
+        for node in G.nodes():
+            if node in root_nodes:
+                continue  # roots don't uptake from soil
+            c = soil_p.get(node, 0)
+            f = params.uptake_rate(c)
+            uptake = min(f, c)  # can't uptake more than available
+            soil_p[node] = c - uptake
+            internal_p[node] += uptake
+            step_uptake += uptake
+
+        # Phase 2: Diffusion in soil (simple neighbor averaging) [A]
+        new_soil = {}
+        for node in G.nodes():
+            neighbors = list(G.neighbors(node))
+            if not neighbors:
+                new_soil[node] = soil_p.get(node, 0)
+                continue
+            avg_neighbor = sum(soil_p.get(n, 0) for n in neighbors) / len(neighbors)
+            # Diffusion: move toward average
+            c = soil_p.get(node, 0)
+            new_soil[node] = c + params.d_soil * (avg_neighbor - c)
+        soil_p = new_soil
+
+        # Phase 3: Transport toward root [A] "translocation so fast"
+        # Move internal_p along shortest path to root
+        step_delivered = 0.0
+        # Sort nodes by distance to root (farthest first)
+        nodes_by_dist = sorted(
+            [(n, nearest_root[n][1]) for n in G.nodes()
+             if n in nearest_root and n not in root_nodes],
+            key=lambda x: -x[1]
+        )
+        for node, dist in nodes_by_dist:
+            if internal_p[node] <= 0:
+                continue
+            transport = internal_p[node] * params.transport_rate
+            internal_p[node] -= transport
+
+            # Find next node on path to root
+            root_target, _ = nearest_root[node]
+            try:
+                path = nx.shortest_path(G, node, root_target)
+                if len(path) > 1:
+                    next_node = path[1]
+                    if next_node in root_nodes:
+                        root_p_total += transport
+                        step_delivered += transport
+                    else:
+                        internal_p[next_node] = internal_p.get(next_node, 0) + transport
+                else:
+                    root_p_total += transport
+                    step_delivered += transport
+            except nx.NetworkXNoPath:
+                internal_p[node] += transport  # return if no path
+
+        p_history.append({
+            'step': step,
+            'uptake': step_uptake,
+            'delivered': step_delivered,
+            'total_root_p': root_p_total,
+        })
+
+    # Compute depletion zone
+    initial_total = params.c_initial * len(soil_p)
+    final_total = sum(soil_p.values())
+    depletion = 1.0 - (final_total / max(initial_total, 1e-10))
+
+    return {
+        'total_p_root': root_p_total,
+        'p_history': p_history,
+        'soil_p': soil_p,
+        'node_p_internal': internal_p,
+        'depletion_zone': depletion,
+        'params': params,
+    }
+
+
+def test_nutrient_uptake():
+    """Tests for brique 19 — Nutrient Transport & P Uptake."""
+    print("\n=== BRIQUE 19: Nutrient Transport & P Uptake ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: Michaelis-Menten uptake ---
+    p1 = NutrientParams(f_max=1.0, k_m=0.01)
+    check("MM: high c → F≈F_max", abs(p1.uptake_rate(100) - 1.0) < 0.01)
+    check("MM: c=0 → F=0", abs(p1.uptake_rate(0)) < 0.001)
+    check("MM: c=K_m → F=F_max/2",
+          abs(p1.uptake_rate(0.01) - 0.5) < 0.001)
+
+    # --- Test 2: Uptake monotonically increasing ---
+    vals = [p1.uptake_rate(c) for c in [0, 0.001, 0.01, 0.1, 1, 10]]
+    check("MM: monotonic", all(vals[i] <= vals[i+1] for i in range(len(vals)-1)))
+
+    # --- Test 3: Basic simulation on path graph ---
+    G3 = nx.path_graph(10)  # 0-1-2-...-9
+    for n in G3.nodes():
+        G3.nodes[n]['pos3d'] = (float(n), 0.0, 0.0)
+    r3 = nutrient_simulate(G3, [0], n_steps=10)
+    check("Sim: total P > 0", r3['total_p_root'] > 0)
+    check("Sim: history = 10 steps", len(r3['p_history']) == 10)
+    check("Sim: P increases over time",
+          r3['p_history'][-1]['total_root_p'] >= r3['p_history'][0]['total_root_p'])
+
+    # --- Test 4: Soil depletion ---
+    check("Depletion > 0", r3['depletion_zone'] > 0)
+
+    # --- Test 5: Soil P decreases over time ---
+    params5 = NutrientParams(c_initial=0.1)
+    r5 = nutrient_simulate(G3, [0], n_steps=20, params=params5)
+    # All non-root nodes should have less P than initial
+    all_depleted = all(r5['soil_p'][n] < 0.1 for n in G3.nodes() if n != 0)
+    check("Soil P: all nodes depleted below initial", all_depleted)
+
+    # --- Test 6: More hyphae → more uptake ---
+    G6a = nx.path_graph(5)
+    G6b = nx.path_graph(20)
+    for n in G6a.nodes():
+        G6a.nodes[n]['pos3d'] = (float(n), 0, 0)
+    for n in G6b.nodes():
+        G6b.nodes[n]['pos3d'] = (float(n), 0, 0)
+    r6a = nutrient_simulate(G6a, [0], n_steps=10)
+    r6b = nutrient_simulate(G6b, [0], n_steps=10)
+    check("More hyphae → more P uptake",
+          r6b['total_p_root'] >= r6a['total_p_root'])
+
+    # --- Test 7: No nutrients → no uptake ---
+    r7 = nutrient_simulate(G3, [0], n_steps=5,
+                            params=NutrientParams(c_initial=0.0))
+    check("No soil P → 0 uptake", abs(r7['total_p_root']) < 0.001)
+
+    # --- Test 8: Empty graph → no crash ---
+    G8 = nx.Graph()
+    G8.add_node("root", pos3d=(0, 0, 0))
+    r8 = nutrient_simulate(G8, ["root"], n_steps=5)
+    check("Single root node: no crash", r8['total_p_root'] >= 0)
+
+    # --- Test 9: Disconnected node → P stays internal ---
+    G9 = nx.Graph()
+    G9.add_node("root", pos3d=(0, 0, 0))
+    G9.add_node("island", pos3d=(10, 0, 0))
+    r9 = nutrient_simulate(G9, ["root"], n_steps=10)
+    check("Disconnected node: P not transported",
+          r9['node_p_internal']['island'] > 0 or
+          r9['soil_p']['island'] < NutrientParams().c_initial)
+
+    # --- Test 10: Transport rate effect ---
+    r10a = nutrient_simulate(G3, [0], n_steps=10,
+                              params=NutrientParams(transport_rate=0.1))
+    r10b = nutrient_simulate(G3, [0], n_steps=10,
+                              params=NutrientParams(transport_rate=0.9))
+    check("Higher transport rate → more P at root",
+          r10b['total_p_root'] >= r10a['total_p_root'])
+
+    # --- Test 11: Integration 19+16 — AM graph + nutrients ---
+    G11 = nx.Graph()
+    am = am_fungi_simulate(G11, ["root"], n_steps=10, seed=42,
+                            params=AMFungiParams(tip_flux_base=2.0),
+                            use_oscillatory=False)
+    fg = am['final_graph']
+    r11 = nutrient_simulate(fg, ["root"], n_steps=10)
+    check("Integration 19+16: P uptake on AM graph",
+          r11['total_p_root'] > 0)
+
+    # --- Test 12: F_max effect ---
+    r12a = nutrient_simulate(G3, [0], n_steps=10,
+                              params=NutrientParams(f_max=0.01))
+    r12b = nutrient_simulate(G3, [0], n_steps=10,
+                              params=NutrientParams(f_max=1.0))
+    check("Higher F_max → more uptake",
+          r12b['total_p_root'] >= r12a['total_p_root'])
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 def test_lsystem_root():
     """Tests for brique 18 — L-System Root Architecture."""
     print("\n=== BRIQUE 18: L-System Root Architecture ===\n")
@@ -5465,8 +5761,9 @@ if __name__ == "__main__":
     p7, f7 = test_am_fungi_root_growth()
     p8, f8 = test_spore_germination()
     p9, f9 = test_lsystem_root()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9
+    p10, f10 = test_nutrient_uptake()
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-18: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-19: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
