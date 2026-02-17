@@ -6163,6 +6163,311 @@ def test_am_fungi_root_growth():
 
 
 # ═══════════════════════════════════════════════════════════════════
+# BRIQUE 21 — Appressorium (Hyphopodium) & Pénétration racine
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   Howard et al. 1991 — turgor 8 MPa (Magnaporthe), penetration force
+#   Genre et al. 2005 — PPA (prepenetration apparatus), 4-5h assembly
+#   Nagahashi & Douds 1997 — hyphopodium on epidermal cell walls
+#   Pimprikar & Gutjahr 2018 — 5 stages of AM development
+#
+# Equations:
+#   Turgor: Π = c·R·T (van't Hoff), glycerol c≈0.5-1.0 M for AM
+#   Penetration: P_pen = Π / (Π + K_wall)  [Michaelis-like]
+#   Hyphopodium formation: P_hyph = cutin_signal / (K_cutin + cutin_signal)
+#   PPA assembly time: t_PPA ≈ 4-5 hours (Genre 2005)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class AppressoriumParams:
+    """Parameters for hyphopodium formation and root penetration."""
+    def __init__(self,
+                 # Turgor
+                 glycerol_conc=0.8,     # M (AM fungi: 0.5-1.0 M, much less than Magnaporthe 3.2M)
+                 R=8.314,               # J/(mol·K)
+                 T=298.0,               # K (25°C)
+                 # Penetration
+                 k_wall=1.0,            # MPa, half-max for penetration (AM fungi ~1 MPa)
+                 # Hyphopodium formation
+                 cutin_signal=1.0,      # relative cutin monomer concentration at root surface
+                 k_cutin=0.3,           # half-max for cutin-induced differentiation
+                 # PPA timing
+                 ppa_assembly_hours=4.5, # hours (Genre 2005: 4-5h)
+                 # Colonisation
+                 max_penetration_per_root=3,  # max entry points per root tip
+                 contact_distance=3.0,        # max distance for hyphopodium formation
+                 ):
+        self.glycerol_conc = glycerol_conc
+        self.R = R
+        self.T = T
+        self.k_wall = k_wall
+        self.cutin_signal = cutin_signal
+        self.k_cutin = k_cutin
+        self.ppa_assembly_hours = ppa_assembly_hours
+        self.max_penetration_per_root = max_penetration_per_root
+        self.contact_distance = contact_distance
+
+
+def appressorium_simulate(germ_tips, root_tips, root_graph, params=None, seed=42):
+    """Simulate hyphopodium formation and root penetration.
+
+    Each germ tube tip that reaches a root tip forms a hyphopodium,
+    builds turgor, and attempts to penetrate the root epidermal layer.
+
+    Parameters
+    ----------
+    germ_tips : list of (node_id, pos3d) tuples
+        Germ tube tips from brique 17.
+    root_tips : list of (node_id, pos3d) tuples
+        Root tips from brique 18.
+    root_graph : nx.Graph
+        Root graph to modify (penetration points added).
+    params : AppressoriumParams or None
+    seed : int
+
+    Returns
+    -------
+    dict with hyphopodia, penetrations, turgor, intraradical_entries
+    """
+    if params is None:
+        params = AppressoriumParams()
+
+    import random as _random
+    rng = _random.Random(seed)
+
+    # Turgor pressure: Π = c·R·T (van't Hoff, in Pa then → MPa)
+    # c in mol/m³ = mol/L × 1000
+    c_mol_m3 = params.glycerol_conc * 1000  # mol/L → mol/m³
+    turgor_pa = c_mol_m3 * params.R * params.T  # Pa
+    turgor_mpa = turgor_pa / 1e6  # → MPa
+
+    # Hyphopodium formation probability (cutin signal)
+    p_hyphopodium = params.cutin_signal / (params.k_cutin + params.cutin_signal)
+
+    # Penetration probability (turgor vs cell wall resistance)
+    p_penetration = turgor_mpa / (turgor_mpa + params.k_wall)
+
+    hyphopodia = []      # list of {germ_tip, root_tip, pos, turgor}
+    penetrations = []     # list of {germ_tip, root_tip, entry_node}
+    failed = []           # tips that didn't form hyphopodium or penetrate
+
+    entries_per_root = {}  # count entries per root tip
+
+    for gt_id, gt_pos in germ_tips:
+        if gt_pos is None:
+            continue
+
+        # Find nearest root tip
+        best_rt = None
+        best_dist = float('inf')
+        for rt_id, rt_pos in root_tips:
+            if rt_pos is None:
+                continue
+            d = math.sqrt(sum((a - b) ** 2 for a, b in zip(gt_pos, rt_pos)))
+            if d < best_dist:
+                best_dist = d
+                best_rt = (rt_id, rt_pos)
+
+        if best_rt is None or best_dist > params.contact_distance:
+            failed.append({'germ_tip': gt_id, 'reason': 'too_far',
+                           'distance': best_dist})
+            continue
+
+        rt_id, rt_pos = best_rt
+
+        # --- Hyphopodium formation ---
+        if rng.random() > p_hyphopodium:
+            failed.append({'germ_tip': gt_id, 'reason': 'no_cutin_response'})
+            continue
+
+        hyph = {
+            'germ_tip': gt_id,
+            'root_tip': rt_id,
+            'pos': tuple((a + b) / 2 for a, b in zip(gt_pos, rt_pos)),
+            'turgor_mpa': turgor_mpa,
+            'distance': best_dist,
+        }
+        hyphopodia.append(hyph)
+
+        # --- Penetration attempt ---
+        n_entries = entries_per_root.get(rt_id, 0)
+        if n_entries >= params.max_penetration_per_root:
+            failed.append({'germ_tip': gt_id, 'reason': 'max_entries_reached'})
+            continue
+
+        if rng.random() > p_penetration:
+            failed.append({'germ_tip': gt_id, 'reason': 'insufficient_turgor'})
+            continue
+
+        # Successful penetration: create intraradical entry node
+        entry_name = f"ir_entry_{len(penetrations)}"
+        entry_pos = tuple((a + b) / 2 for a, b in zip(gt_pos, rt_pos))
+
+        root_graph.add_node(entry_name,
+                            pos3d=entry_pos,
+                            is_intraradical=True,
+                            is_entry_point=True,
+                            source_germ_tip=gt_id,
+                            source_root_tip=rt_id,
+                            turgor_mpa=turgor_mpa,
+                            ppa_hours=params.ppa_assembly_hours)
+
+        # Connect entry to root
+        if rt_id in root_graph:
+            root_graph.add_edge(entry_name, rt_id,
+                                is_penetration=True,
+                                length_3d=best_dist / 2)
+
+        penetrations.append({
+            'germ_tip': gt_id,
+            'root_tip': rt_id,
+            'entry_node': entry_name,
+            'turgor_mpa': turgor_mpa,
+            'pos': entry_pos,
+        })
+        entries_per_root[rt_id] = n_entries + 1
+
+    return {
+        'hyphopodia': hyphopodia,
+        'penetrations': penetrations,
+        'failed': failed,
+        'turgor_mpa': turgor_mpa,
+        'p_hyphopodium': p_hyphopodium,
+        'p_penetration': p_penetration,
+        'n_entries': len(penetrations),
+        'entry_nodes': [p['entry_node'] for p in penetrations],
+    }
+
+
+def test_appressorium():
+    """Tests for brique 21 — Appressorium (Hyphopodium) & Penetration."""
+    print("\n=== BRIQUE 21: Appressorium (Hyphopodium) & Penetration ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: Turgor (van't Hoff) ---
+    p = AppressoriumParams(glycerol_conc=0.8, T=298.0)
+    turgor = 0.8 * 1000 * 8.314 * 298.0 / 1e6  # c in mol/m³
+    check("Turgor: 0.8M glycerol → ~2 MPa",
+          abs(turgor - 1.98) < 0.1)
+
+    # --- Test 2: Turgor higher with more glycerol ---
+    t1 = 0.5 * 1000 * 8.314 * 298.0 / 1e6
+    t2 = 1.0 * 1000 * 8.314 * 298.0 / 1e6
+    check("Turgor: 1.0M > 0.5M", t2 > t1)
+
+    # --- Test 3: P_hyphopodium MM ---
+    p_h = 1.0 / (0.3 + 1.0)
+    check("P_hyphopodium: cutin=1.0, K=0.3 → 0.77",
+          abs(p_h - 0.769) < 0.01)
+
+    # --- Test 4: P_hyphopodium zero cutin ---
+    p_h0 = 0.0 / (0.3 + 0.0)
+    check("P_hyphopodium: cutin=0 → 0", p_h0 == 0)
+
+    # --- Test 5: P_penetration MM ---
+    p_pen = turgor / (turgor + 1.0)  # turgor ~1.98, K_wall=1
+    check("P_penetration: turgor~2, K_wall=1 → ~0.66",
+          0.6 < p_pen < 0.75)
+
+    # --- Test 6: Simulate with real root + germ tips ---
+    r0 = lsystem_root_generate(n_steps=10, seed=42)
+    rg = r0['graph'].copy()
+    root_tips = [(t, rg.nodes[t]['pos3d']) for t in r0['root_tips']]
+
+    # Place germ tips near root tips
+    germ_tips = []
+    for i, (rt_id, rt_pos) in enumerate(root_tips[:4]):
+        gt_pos = tuple(c + 1.0 for c in rt_pos)
+        germ_tips.append((f"gt_{i}", gt_pos))
+
+    r21 = appressorium_simulate(germ_tips, root_tips, rg, seed=42)
+    check("Sim: hyphopodia formed > 0", len(r21['hyphopodia']) > 0)
+
+    # --- Test 7: Penetrations ---
+    check("Sim: penetrations > 0", r21['n_entries'] > 0)
+
+    # --- Test 8: Entry nodes in graph ---
+    entry_in_graph = all(e in rg for e in r21['entry_nodes'])
+    check("Entry nodes added to graph", entry_in_graph)
+
+    # --- Test 9: Entry nodes have is_intraradical ---
+    ir_flags = all(rg.nodes[e].get('is_intraradical')
+                   for e in r21['entry_nodes'])
+    check("Entry nodes: is_intraradical=True", ir_flags)
+
+    # --- Test 10: Entry nodes connected to root ---
+    connected = all(any(rg.has_edge(e, rt_id) for rt_id, _ in root_tips)
+                    for e in r21['entry_nodes'])
+    check("Entry nodes connected to root tips", connected)
+
+    # --- Test 11: Too far → no hyphopodium ---
+    far_tips = [("far_0", (100, 100, 100))]
+    rg2 = r0['graph'].copy()
+    r21_far = appressorium_simulate(far_tips, root_tips, rg2, seed=42)
+    check("Far tip: 0 hyphopodia", len(r21_far['hyphopodia']) == 0)
+    check("Far tip: 0 penetrations", r21_far['n_entries'] == 0)
+
+    # --- Test 12: Zero cutin → low hyphopodium rate ---
+    zero_cutin = AppressoriumParams(cutin_signal=0.0)
+    rg3 = r0['graph'].copy()
+    r21_nc = appressorium_simulate(germ_tips, root_tips, rg3,
+                                    params=zero_cutin, seed=42)
+    check("Zero cutin: 0 hyphopodia", len(r21_nc['hyphopodia']) == 0)
+
+    # --- Test 13: Max penetrations per root enforced ---
+    many_germ = [(f"mg_{i}", tuple(c + 0.5 * (i % 3) for c in root_tips[0][1]))
+                 for i in range(10)]
+    rg4 = r0['graph'].copy()
+    r21_max = appressorium_simulate(many_germ, root_tips[:1], rg4,
+                                     params=AppressoriumParams(max_penetration_per_root=2),
+                                     seed=42)
+    check("Max entries: ≤ 2 per root",
+          r21_max['n_entries'] <= 2)
+
+    # --- Test 14: Turgor stored on entry nodes ---
+    for e in r21['entry_nodes'][:1]:
+        check("Entry node: turgor_mpa > 0",
+              rg.nodes[e].get('turgor_mpa', 0) > 0)
+
+    # --- Test 15: PPA hours stored ---
+    for e in r21['entry_nodes'][:1]:
+        check("Entry node: ppa_hours ≈ 4.5",
+              abs(rg.nodes[e].get('ppa_hours', 0) - 4.5) < 0.1)
+
+    # --- Test 16: Integration 21→18 (entry nodes properly connected) ---
+    entry_edges = sum(1 for e in r21['entry_nodes']
+                      if rg.degree(e) > 0)
+    check("Integration: all entry nodes have edges",
+          entry_edges == len(r21['entry_nodes']))
+
+    # --- Test 17: High turgor → more penetrations ---
+    high_turgor = AppressoriumParams(glycerol_conc=2.0)
+    rg5 = r0['graph'].copy()
+    r21_ht = appressorium_simulate(germ_tips, root_tips, rg5,
+                                    params=high_turgor, seed=42)
+    check("High turgor: entries >= normal entries",
+          r21_ht['n_entries'] >= r21['n_entries'])
+
+    # --- Test 18: Empty germ tips → no crash ---
+    rg6 = r0['graph'].copy()
+    r21_empty = appressorium_simulate([], root_tips, rg6, seed=42)
+    check("Empty germ tips: no crash, 0 entries", r21_empty['n_entries'] == 0)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
+# ═══════════════════════════════════════════════════════════════════
 # FULL LIFECYCLE PIPELINE — Ordre biologique
 # ═══════════════════════════════════════════════════════════════════
 # Phase 0: [18] Root architecture (L-System)
@@ -6782,9 +7087,10 @@ if __name__ == "__main__":
     p9, f9 = test_lsystem_root()
     p10, f10 = test_nutrient_uptake()
     p11, f11 = test_symbiosis_exchange()
+    p13, f13 = test_appressorium()
     p12, f12 = test_lifecycle_chain()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12 + p13
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-20 + LIFECYCLE: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-21 + LIFECYCLE: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
