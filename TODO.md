@@ -1,6 +1,6 @@
 # MYCELIUM ENGINE — TODO
 
-## ✅ Complété (v1.0)
+## ✅ Complété (v1.0 — analyse statique)
 
 | Brique | Nom | Tests | Source |
 |--------|-----|-------|--------|
@@ -17,7 +17,7 @@
 | 10 | Kirchhoff + Physarum | 16 | Tero 2007, Ito 2011, Tero 2010 |
 | 11 | Anastomose | 14 | Edelstein 1982, Glass 2006 |
 | 12 | Intégration complète | 39 | — |
-| **TOTAL v1.0** | | **120** | |
+| **TOTAL v1.0** | | **51** | |
 
 ## ✅ Complété (v2.0 — modèles de croissance)
 
@@ -31,59 +31,74 @@
 | 18 | L-System root architecture | 22 | Leitner 2010, Schnepf 2018 (CRootBox) | ✅ DONE |
 | 19 | Nutrient transport & P uptake | 16 | Schnepf & Roose 2006, Leitner 2010 | ✅ DONE |
 | 20 | C↔P symbiosis exchange | 19 | Kiers 2011, Fellbaum 2012, Chevalier 2025 | ✅ DONE |
-| **TOTAL v2.0** | | **205** | | |
+| **TOTAL v2.0** | | **274** | | |
 
-### Compteur total: 325 tests (120 v1.0 + 205 v2.0), 6048 lignes
+## ✅ Complété — LIFECYCLE CHAIN (ordre biologique)
 
-## 🔨 CHANTIER 2 — Audit ordre biologique
-
-### Problème
-Les briques ont été codées dans l'ordre de développement (13→14→15→16→17→18→19→20),
-pas dans l'ordre du cycle de vie réel du champignon. Le pipeline am_fungi_simulate()
-appelle les phases dans un ordre technique, pas biologique.
-
-### Ordre biologique réel (cycle de vie AM fungi)
+Pipeline `full_lifecycle_simulate()` — toutes les briques dans l'ordre du cycle de vie :
 
 ```
 PHASE 0: SETUP
-  [18] L-System root → la racine existe dans le sol
-  [17] Germination spore → spore détecte strigolactone, germe, tube germinatif
-
-PHASE 1: COLONISATION
-  [16] Root emission → hyphes émis depuis l'interface racine-champignon
-  [13] Edelstein growth → branching, death, densité du réseau
-
-PHASE 2: MATURATION
-  [15] 3D mechanics → orientation, Spitzenkörper, Lockhart elongation
-  [14] Oscillatory signaling → tips se cherchent via FHN
-  [11] Anastomose → fusion des hyphes synchronisés (14→11)
-
-PHASE 3: FONCTION
-  [19] P uptake → le réseau mature absorbe le phosphore du sol
-  [20] C↔P exchange → la plante paie en carbone, reçoit du phosphore
-
-PHASE 4: ANALYSE (v1.0)
-  [0-10] Métriques → meshedness, efficacité, Physarum, robustesse, etc.
+  [18] L-System root → racine 3D dans le sol
+       ↓ root_tips + positions
+PHASE 1: GERMINATION
+  [17] Spore germination → chemotaxis vers strigolactone
+       ↓ germ tube tips → connectés aux root tips
+PHASE 2: COLONISATION + MATURATION
+  [16] Root emission → hyphes depuis interface racine
+  [13] Edelstein growth → branching, death, densité
+  [15] 3D mechanics → Lockhart, Spitzenkörper, gravitropisme
+  [14] Oscillatory signaling → FHN, tips se cherchent
+  [11] Anastomose → fusion des hyphes synchronisés
+       ↓ réseau mature
+PHASE 2b: SPATIAL FUSION
+  Intra-component fusion for connectivity
+PHASE 2c: PRUNING
+  Orphan component removal → active graph (1 component)
+       ↓ graphe mature connecté
+PHASE 3: FONCTION — P UPTAKE
+  [19] Michaelis-Menten uptake + diffusion sol + transport vers racine
+       ↓ total P delivered
+PHASE 4: FONCTION — C↔P EXCHANGE
+  [20] Reciprocal rewards (Kiers 2011), obligate biotroph
+       ↓ plant P, fungal C, symbiosis stability
+PHASE 5: ANALYSE
+  [0-10] Toutes métriques v1.0 sur graphe final :
+         meshedness, efficiency, root_eff, volume_mst,
+         bottlenecks, robustness, strategy, kirchhoff,
+         physarum, small_world σ+ω
 ```
 
-### TODO audit
-- [ ] Vérifier que chaque brique reçoit les bonnes données d'entrée de la brique précédente
-- [ ] Vérifier que le format de sortie de chaque brique est compatible avec l'entrée de la suivante
-- [ ] Créer un pipeline full_lifecycle_simulate() qui enchaîne tout dans l'ordre biologique
-- [ ] Identifier les "joints" manquants entre briques
-- [ ] Test d'intégration end-to-end : spore → réseau mature → P delivery
+### Joints vérifiés
+
+| Joint | De → Vers | Mécanisme |
+|-------|-----------|-----------|
+| 0→1 | Root → Spore | root_tip positions = source SL |
+| 1→2 | Spore → AM | germ tips connectés aux root tips, fake roots skippés |
+| 2→2b | AM → Spatial fusion | intra-component fusion |
+| 2b→2c | Fusion → Pruning | remove orphan components |
+| 2→3 | AM → Nutrient | graphe mature direct, root nodes = P sinks |
+| 3→4 | Nutrient → Symbiosis | real P from phase 3 → soil_p for exchange |
+| 4→5 | Exchange → Metrics | v1.0 metrics on pruned active graph |
+
+### Tests lifecycle : 49
+
+## Compteur total
+
+| Suite | Tests |
+|-------|-------|
+| v1.0 (analyse) | 51 |
+| v2.0 (croissance) | 274 |
+| Lifecycle chain | 49 |
+| **TOTAL** | **374** |
+
+**6790 lignes — 21 briques — 1 pipeline lifecycle complet**
 
 ## Notes
 
 v1.0 = moteur d'**analyse** (photo du réseau à un instant t)
 v2.0 = moteur de **croissance** (le réseau pousse dans le temps)
-
-Pipeline actuel am_fungi_simulate() (ordre technique):
-- Phase 1: Root emission (brique 16 — Schnepf boundary)
-- Phase 2: Edelstein growth/death (brique 13)
-- Phase 3: 3D mechanics (brique 15 — Lockhart/VSC/Spitzenkörper)
-- Phase 4: Oscillatory signaling (brique 14 — FHN coupling)
-- Phase 5: Fusion completion (brique 14 → 11 — anastomose)
+Lifecycle = **chaîne complète** spore → réseau mature → P delivery → métriques
 
 Chaque brique v2.0 suit le même workflow:
 1. Recherche internet (papiers)
