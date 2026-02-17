@@ -5,7 +5,7 @@ WINTER TREE v2 — MYCELIUM ENGINE
 Simulation complète du cycle de vie des champignons mycorhiziens
 arbusculaires (AM fungi), de la spore à la sporulation.
 
-24 briques — 452 tests — 7900 lignes
+24 briques — 456 tests — cycle A→Z→A vérifié
 
 ═══════════════════════════════════════════════════════════════
 ARBRE DU CODE — Ordre biologique complet A→Z→A
@@ -7866,11 +7866,23 @@ def test_lifecycle_chain():
 
     # === TEST BLOCK 12: All phases ran in order ===
     phases = ['phase0_root', 'phase1_germination', 'joint_1_2',
+              'phase1_5_appressorium', 'phase1_6_intraradical',
               'phase2_growth', 'phase2b_spatial_fusion', 'post_processing',
               'phase2c_pruning', 'joint_2_3', 'phase3_nutrients',
-              'phase4_exchange', 'phase5_metrics']
+              'phase4_exchange', 'phase4_5_sporulation', 'phase5_metrics']
     all_present = all(p in r for p in phases)
-    check("All phases present in results", all_present)
+    check("All 14 phases present in results", all_present)
+
+    # === TEST BLOCK 13: New phases produce real data ===
+    app = r.get('phase1_5_appressorium', {})
+    check("Appressorium ran (turgor > 0)", app.get('turgor_mpa', 0) > 0)
+
+    intra = r.get('phase1_6_intraradical', {})
+    check("Intraradical ran (arbuscules > 0)", intra.get('n_arbuscules', 0) > 0)
+
+    sporu = r.get('phase4_5_sporulation', {})
+    check("Sporulation ran (spores > 0)", sporu.get('n_spores', 0) > 0)
+    check("Cycle complete", sporu.get('cycle_complete', False))
 
     print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
     return passed, failed
