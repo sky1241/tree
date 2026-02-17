@@ -1,6 +1,6 @@
 # MYCELIUM ENGINE — TODO
 
-## ✅ Complété (v1.0 — analyse statique)
+## ✅ Complété (v1.0 — analyse statique) — 51 tests
 
 | Brique | Nom | Tests | Source |
 |--------|-----|-------|--------|
@@ -17,92 +17,93 @@
 | 10 | Kirchhoff + Physarum | 16 | Tero 2007, Ito 2011, Tero 2010 |
 | 11 | Anastomose | 14 | Edelstein 1982, Glass 2006 |
 | 12 | Intégration complète | 39 | — |
-| **TOTAL v1.0** | | **51** | |
 
-## ✅ Complété (v2.0 — modèles de croissance)
+## ✅ Complété (v2.0 — croissance extraradical) — 274 tests
 
 | Brique | Nom | Tests | Source | Status |
 |--------|-----|-------|--------|--------|
-| 13 | Edelstein growth (branching + death + densité) | 30 | Edelstein 1982, Schnepf 2008, Du 2019 | ✅ DONE |
-| 14 | Oscillatory signaling (hyphes qui se cherchent) | 22 | Goryachev 2012, Wernet 2023, Fleissner 2009 | ✅ DONE |
-| 15 | 3D hyphal mechanics (croissance filament) | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004 | ✅ DONE |
-| 16 | AM fungi root growth (croissance depuis racine) | 42 | Schnepf & Roose 2008, Schnepf 2016 | ✅ DONE |
-| 17 | Germination de spores & chemotaxis | 24 | Peleg 2013, Besserer 2006, Chiu 2001 | ✅ DONE |
-| 18 | L-System root architecture | 22 | Leitner 2010, Schnepf 2018 (CRootBox) | ✅ DONE |
-| 19 | Nutrient transport & P uptake | 16 | Schnepf & Roose 2006, Leitner 2010 | ✅ DONE |
-| 20 | C↔P symbiosis exchange | 19 | Kiers 2011, Fellbaum 2012, Chevalier 2025 | ✅ DONE |
-| **TOTAL v2.0** | | **274** | | |
+| 13 | Edelstein growth | 30 | Edelstein 1982, Schnepf 2008, Du 2019 | ✅ |
+| 14 | Oscillatory signaling | 22 | Goryachev 2012, Wernet 2023, Fleissner 2009 | ✅ |
+| 15 | 3D hyphal mechanics | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004 | ✅ |
+| 16 | AM fungi root growth | 42 | Schnepf & Roose 2008, Schnepf 2016 | ✅ |
+| 17 | Spore germination & chemotaxis | 24 | Peleg 2013, Besserer 2006, Chiu 2001 | ✅ |
+| 18 | L-System root architecture | 22 | Leitner 2010, Schnepf 2018 | ✅ |
+| 19 | Nutrient transport & P uptake | 16 | Schnepf & Roose 2006, Leitner 2010 | ✅ |
+| 20 | C↔P symbiosis exchange | 19 | Kiers 2011, Fellbaum 2012, Chevalier 2025 | ✅ |
 
-## ✅ Complété — LIFECYCLE CHAIN (ordre biologique)
+## ✅ Complété — Lifecycle chain v1 — 49 tests
 
-Pipeline `full_lifecycle_simulate()` — toutes les briques dans l'ordre du cycle de vie :
+Pipeline `full_lifecycle_simulate()` — réseau extraradical complet.
+
+## 🔨 v2.1 — Phase intraradical (briques 21-23)
+
+Le cycle de vie COMPLET d'un AM fungi :
 
 ```
-PHASE 0: SETUP
-  [18] L-System root → racine 3D dans le sol
-       ↓ root_tips + positions
-PHASE 1: GERMINATION
-  [17] Spore germination → chemotaxis vers strigolactone
-       ↓ germ tube tips → connectés aux root tips
-PHASE 2: COLONISATION + MATURATION
-  [16] Root emission → hyphes depuis interface racine
-  [13] Edelstein growth → branching, death, densité
-  [15] 3D mechanics → Lockhart, Spitzenkörper, gravitropisme
-  [14] Oscillatory signaling → FHN, tips se cherchent
-  [11] Anastomose → fusion des hyphes synchronisés
-       ↓ réseau mature
-PHASE 2b: SPATIAL FUSION
-  Intra-component fusion for connectivity
-PHASE 2c: PRUNING
-  Orphan component removal → active graph (1 component)
-       ↓ graphe mature connecté
-PHASE 3: FONCTION — P UPTAKE
-  [19] Michaelis-Menten uptake + diffusion sol + transport vers racine
-       ↓ total P delivered
-PHASE 4: FONCTION — C↔P EXCHANGE
-  [20] Reciprocal rewards (Kiers 2011), obligate biotroph
-       ↓ plant P, fungal C, symbiosis stability
-PHASE 5: ANALYSE
-  [0-10] Toutes métriques v1.0 sur graphe final :
-         meshedness, efficiency, root_eff, volume_mst,
-         bottlenecks, robustness, strategy, kirchhoff,
-         physarum, small_world σ+ω
+                    ┌─────────────────────────────────────────┐
+                    │          CYCLE COMPLET AM FUNGI          │
+                    └─────────────────────────────────────────┘
+
+SOL (extraradical)                    RACINE (intraradical)
+══════════════════                    ═════════════════════
+
+[17] Spore germe                      
+  ↓ chemotaxis SL                    
+[17] Tube germinatif ──────→ [21] Appressorium (hyphopodium)
+                                ↓ pénétration épiderme
+[18] Racine L-System            [22] Hyphes intraradicaux
+                                  ↓
+                                [22] ARBUSCULES ←──── échange C↔P réel
+                                  ↓ (turnover 4-10 jours)
+                                [22] Vésicules (stockage lipides)
+                                  ↓
+[16] Émission depuis racine ←── sortie vers sol
+  ↓
+[13] Branching Edelstein
+[15] Mécanique 3D
+[14] Signaling oscillatoire
+[11] Anastomose/fusion
+  ↓
+[19] P uptake sol (MM)
+[20] C↔P exchange (système)
+  ↓
+[23] SPORULATION ──→ nouvelles spores ──→ retour [17]
+  ↓
+[0-10] Métriques réseau
 ```
 
-### Joints vérifiés
+### Brique 21 — Appressorium & pénétration
+- Hyphopodium : structure d'ancrage sur épiderme racine
+- Turgor pressure buildup (mélanine, glycérol)
+- Penetration peg → traverse paroi cellulaire
+- Prepenetration apparatus (PPA) côté plante
+- Status: 🔍 RECHERCHE
 
-| Joint | De → Vers | Mécanisme |
-|-------|-----------|-----------|
-| 0→1 | Root → Spore | root_tip positions = source SL |
-| 1→2 | Spore → AM | germ tips connectés aux root tips, fake roots skippés |
-| 2→2b | AM → Spatial fusion | intra-component fusion |
-| 2b→2c | Fusion → Pruning | remove orphan components |
-| 2→3 | AM → Nutrient | graphe mature direct, root nodes = P sinks |
-| 3→4 | Nutrient → Symbiosis | real P from phase 3 → soil_p for exchange |
-| 4→5 | Exchange → Metrics | v1.0 metrics on pruned active graph |
+### Brique 22 — Phase intraradical (arbuscules + vésicules)
+- Hyphes intercellulaires dans cortex racinaire
+- ARBUSCULES : structures arborescentes intracellulaires
+  - Formation (branching dichotomique dans cellule)
+  - Maturité (surface échange max, membrane périarbusculaire)
+  - Sénescence + collapse (turnover 4-10 jours)
+  - C'est ICI que P↔C s'échange vraiment
+- VÉSICULES : stockage lipides (TAG), pas chez Gigasporales
+- Status: 🔍 TODO
 
-### Tests lifecycle : 49
+### Brique 23 — Sporulation (boucle du cycle)
+- Production nouvelles spores depuis ERM
+- Accumulation lipides (TAG → réserve énergétique)
+- Maturation spore (paroi épaisse, multi-nucléée)
+- Ferme le cycle : [23] → [17] germination
+- Status: 🔍 TODO
 
-## Compteur total
+## Compteur
 
 | Suite | Tests |
 |-------|-------|
 | v1.0 (analyse) | 51 |
-| v2.0 (croissance) | 274 |
-| Lifecycle chain | 49 |
-| **TOTAL** | **374** |
+| v2.0 (extraradical) | 274 |
+| Lifecycle chain v1 | 49 |
+| v2.1 (intraradical) | 0 — EN COURS |
+| **TOTAL actuel** | **374** |
 
-**6790 lignes — 21 briques — 1 pipeline lifecycle complet**
-
-## Notes
-
-v1.0 = moteur d'**analyse** (photo du réseau à un instant t)
-v2.0 = moteur de **croissance** (le réseau pousse dans le temps)
-Lifecycle = **chaîne complète** spore → réseau mature → P delivery → métriques
-
-Chaque brique v2.0 suit le même workflow:
-1. Recherche internet (papiers)
-2. Extraction des équations
-3. Traduction code discret
-4. Tests unitaires
-5. Push git
+**6790 lignes — 21 briques done — 3 à faire**
