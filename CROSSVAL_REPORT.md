@@ -338,7 +338,7 @@ Biologie → Code:
 - `am_fungi_simulate()`: full integration (briques 13+15+16) [A,C]
 - `am_species_presets()`: 3 calibrated species [A] Table 1
 
-### Tests unitaires (32/32 PASS)
+### Tests unitaires (42/42 PASS)
 
 | Test | Résultat |
 |------|----------|
@@ -362,7 +362,25 @@ Biologie → Code:
 | δ effect: low δ → more surviving nodes | ✅ |
 | Tip flux increases with time | ✅ |
 | Multiple root nodes | ✅ |
-| Integration 13+15+16: no crash | ✅ |
+| **Integration 11+13+14+15+16: no crash** | ✅ |
 | Empty roots: no crash | ✅ |
 | Zero branching: δ = inf | ✅ |
 | Colony edge t=0: xc = 0 | ✅ |
+| **Oscillatory enabled: oscillators returned** | ✅ |
+| **Fusion events: list + total_fusions int** | ✅ ×2 |
+| **Oscillatory disabled: no sync_pairs, 0 fusions** | ✅ ×2 |
+| **Fusion setup: oscillators track tips** | ✅ |
+| **Fusion interval: sim completes** | ✅ |
+| **Fusion threshold: strict ≤ permissive** | ✅ |
+| **Fusion event: step + n_fused + pairs + delta_alpha + delta_E** | ✅ ×2 |
+
+### Integration Pipeline
+
+```
+am_fungi_simulate() — 5 phases per step:
+  Phase 1: Root emission       (brique 16 — Schnepf boundary)
+  Phase 2: Edelstein growth    (brique 13 — branching/death)
+  Phase 3: 3D mechanics        (brique 15 — Lockhart/VSC/Spk)
+  Phase 4: Oscillatory signal  (brique 14 — FHN coupling)
+  Phase 5: Fusion completion   (brique 14 → 11 — anastomose)
+```

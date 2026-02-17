@@ -26,7 +26,7 @@
 | 13 | Edelstein growth (branching + death + densité) | 30 | Edelstein 1982, Schnepf 2008, Du 2019 | ✅ DONE |
 | 14 | Oscillatory signaling (hyphes qui se cherchent) | 22 | Goryachev 2012, Wernet 2023, Fleissner 2009 | ✅ DONE |
 | 15 | 3D hyphal mechanics (croissance filament) | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004, Money 2025, Lew 2011 | ✅ DONE |
-| 16 | AM fungi root growth (croissance depuis racine) | 32 | Schnepf & Roose 2008, Schnepf 2016, PNAS 2025 | ✅ DONE |
+| 16 | AM fungi root growth (croissance depuis racine) | 42 | Schnepf & Roose 2008, Schnepf 2016, PNAS 2025 | ✅ DONE |
 
 ## 🔨 À faire
 
@@ -34,12 +34,19 @@
 |--------|-----|--------|--------|
 | 17 | Nutrient transport & P uptake | Schnepf & Roose 2006, Bücking 2012 | TODO |
 
-### Compteur total: 234 tests (120 v1.0 + 114 v2.0), 4507 lignes
+### Compteur total: 244 tests (51 briques 0-9 + 193 briques 10-16), 4643 lignes
 
 ### Notes
 
 v1.0 = moteur d'**analyse** (photo du réseau à un instant t)
 v2.0 = moteur de **croissance** (le réseau pousse dans le temps)
+
+Pipeline intégré `am_fungi_simulate()`:
+- Phase 1: Root emission (brique 16 — Schnepf boundary)
+- Phase 2: Edelstein growth/death (brique 13)
+- Phase 3: 3D mechanics (brique 15 — Lockhart/VSC/Spitzenkörper)
+- Phase 4: Oscillatory signaling (brique 14 — FHN coupling)
+- Phase 5: Fusion completion (brique 14 → 11 — anastomose)
 
 Chaque brique v2.0 suit le même workflow:
 1. Recherche internet (papiers)
