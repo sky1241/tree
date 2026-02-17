@@ -6390,9 +6390,14 @@ def full_lifecycle_simulate(
             active_graph.nodes[node]['internal_p'] = phase3['node_p_internal'][node]
 
     # ── JOINT 3→4: P delivery → symbiosis exchange ─────────────
-    # Use actual P from phase 3 as soil_p proxy for phase 4
-    soil_p_effective = max(phase3['total_p_root'] / max(nutrient_steps, 1),
-                          0.001)
+    # Phase 3 already simulated fungal P uptake from soil.
+    # For Phase 4, we need the ONGOING P supply rate (not residual soil P,
+    # which is near-zero after depletion).
+    # P delivery rate = total P absorbed / n_steps = sustained supply.
+    # Source: Schnepf & Roose 2006 — uptake dominated by advancing front;
+    # the network continuously encounters fresh soil.
+    p_delivery_rate = phase3['total_p_root'] / max(nutrient_steps, 1)
+    soil_p_effective = max(p_delivery_rate, 0.001)
 
     # ── PHASE 4: C↔P exchange [brique 20] ──────────────────────
     # Fungal biomass = root-connected network (active contribution)
@@ -6438,10 +6443,101 @@ def full_lifecycle_simulate(
     except Exception:
         vol_ratio = None
 
+    # Root efficiency [brique 2] — needs a root node
+    root_eff = None
+    root_for_metrics = nutrient_roots[0] if nutrient_roots else None
+    if root_for_metrics:
+        try:
+            root_eff = root_efficiency(active_graph, root_for_metrics)
+        except Exception:
+            root_eff = None
+
+    # Bottlenecks [brique 4]
+    try:
+        bottles = find_bottlenecks(active_graph, top_n=5)
+    except Exception:
+        bottles = []
+
+    # Robustness [brique 5] — betweenness attack
+    try:
+        rob = robustness_test(active_graph, attack='betweenness', steps=10)
+        # rob is list of (fraction_removed, fraction_connected)
+        if rob and len(rob) > 1:
+            # AUC via trapezoidal rule
+            rob_auc = sum(0.5 * (rob[i][1] + rob[i+1][1]) *
+                          (rob[i+1][0] - rob[i][0])
+                          for i in range(len(rob)-1))
+        else:
+            rob_auc = None
+    except Exception:
+        rob_auc = None
+
+    # Strategy classification [brique 8]
+    strategy = None
+    if alpha is not None and eff is not None and root_eff is not None:
+        try:
+            strat = classify_strategy(alpha, eff, root_eff, vol_ratio)
+            strategy = strat.get('strategy', None)
+        except Exception:
+            strategy = None
+
+    # Kirchhoff flow [brique 9] — from tips through network to root
+    kirchhoff_total = None
+    if root_for_metrics and nutrient_roots:
+        try:
+            tips = [n for n in active_graph.nodes()
+                    if active_graph.degree(n) == 1
+                    and n not in nutrient_roots][:10]
+            if tips:
+                n_tips = len(tips)
+                n_sinks = min(len(nutrient_roots), 3)
+                src_dict = {t: 1.0 / n_tips for t in tips}
+                sink_dict = {r: 1.0 / n_sinks for r in nutrient_roots[:n_sinks]}
+                kf = kirchhoff_flow(active_graph, sources=src_dict,
+                                    sinks=sink_dict)
+                if isinstance(kf, dict) and 'flows' in kf:
+                    kirchhoff_total = sum(abs(f) for f in kf['flows'].values()) / 2
+                elif isinstance(kf, dict):
+                    kirchhoff_total = sum(abs(f) for f in kf.values()) / 2
+        except Exception:
+            kirchhoff_total = None
+
+    # Physarum [brique 10] — adaptive flow
+    physarum_eff = None
+    if root_for_metrics:
+        try:
+            tips = [n for n in active_graph.nodes()
+                    if active_graph.degree(n) == 1
+                    and n not in nutrient_roots][:5]
+            if tips and nutrient_roots:
+                # Build source/sink dict for Physarum
+                n_tips = len(tips)
+                n_sinks = min(len(nutrient_roots), 3)
+                phys_sources = {t: 1.0 / n_tips for t in tips}
+                for r_node in nutrient_roots[:n_sinks]:
+                    phys_sources[r_node] = phys_sources.get(r_node, 0) - 1.0 / n_sinks
+                phys = physarum_simulate(active_graph, sources=phys_sources,
+                                         n_steps=10)
+                # Efficiency = fraction of edges that remain "thick" (active)
+                if phys:
+                    n_thick = len(phys.get('thick_edges', []))
+                    n_dead = len(phys.get('dead_edges', []))
+                    total_e = n_thick + n_dead
+                    if total_e > 0:
+                        physarum_eff = n_thick / total_e
+        except Exception:
+            physarum_eff = None
+
     results['phase5_metrics'] = {
         'meshedness': alpha,
         'global_efficiency': eff,
+        'root_efficiency': root_eff,
         'volume_mst_ratio': vol_ratio,
+        'bottlenecks': bottles,
+        'robustness_auc': rob_auc,
+        'strategy': strategy,
+        'kirchhoff_total_flow': kirchhoff_total,
+        'physarum_efficiency': physarum_eff,
         'n_components': nx.number_connected_components(active_graph),
         'n_components_full': nx.number_connected_components(mature_graph),
     }
@@ -6534,11 +6630,26 @@ def test_lifecycle_chain():
     check("Phase 4: fungus alive",
           r['phase4_exchange']['fungus_alive'])
 
-    # === TEST BLOCK 7: Phase 5 — Metrics ===
+    # === TEST BLOCK 7: Phase 5 — ALL v1.0 Metrics ===
+    m = r['phase5_metrics']
     check("Phase 5: meshedness computed",
-          r['phase5_metrics']['meshedness'] is not None)
-    check("Phase 5: efficiency computed",
-          r['phase5_metrics']['global_efficiency'] is not None)
+          m['meshedness'] is not None)
+    check("Phase 5: global efficiency computed",
+          m['global_efficiency'] is not None)
+    check("Phase 5: root efficiency computed",
+          m['root_efficiency'] is not None)
+    check("Phase 5: volume_mst_ratio ≥ 1",
+          m['volume_mst_ratio'] is not None and m['volume_mst_ratio'] >= 1.0)
+    check("Phase 5: bottlenecks found",
+          len(m['bottlenecks']) > 0)
+    check("Phase 5: robustness AUC computed",
+          m['robustness_auc'] is not None)
+    check("Phase 5: strategy classified",
+          m['strategy'] is not None)
+    check("Phase 5: Kirchhoff flow computed",
+          m['kirchhoff_total_flow'] is not None)
+    check("Phase 5: Physarum efficiency computed",
+          m['physarum_efficiency'] is not None)
 
     # === TEST BLOCK 7b: Phase 2b — Spatial fusion ===
     check("Phase 2b: spatial fusion reduced components",
