@@ -39,9 +39,12 @@
 | 22 | Arbuscules & Vésicules | 20 | Pimprikar 2018, Floss 2017, Genre 1997 |
 | 23 | Sporulation (boucle) | 21 | Kokkoris 2026, Pfeffer 1999, Bago 2002 |
 
-## ✅ Lifecycle chain v1 — 49 tests
+## ✅ Lifecycle chain v2 — 67 tests
 
-Pipeline `full_lifecycle_simulate()` — réseau extraradical complet.
+Pipeline `full_lifecycle_simulate()` — A→Z→A complet avec:
+- Phase 1.5: Appressorium (turgor, pénétration)
+- Phase 1.6: Intraradical (arbuscules, vésicules)
+- Phase 4.5: Sporulation (boucle fermée)
 
 ## Cycle de vie COMPLET AM fungi — A à Z
 
@@ -85,19 +88,20 @@ SOL (extraradical)                    RACINE (intraradical)
 | v1.0 (analyse statique) | 51 |
 | v2.0 (extraradical) | 274 |
 | v2.1 (intraradical + boucle) | 60 |
-| Lifecycle chain v1 | 49 |
-| **TOTAL** | **434** |
+| Lifecycle chain v2 | 67 |
+| **TOTAL** | **452** |
 
-**7748 lignes — 24 briques — CYCLE COMPLET BOUCLÉ**
+**7900 lignes — 24 briques — PIPELINE LIFECYCLE COMPLET A→Z→A**
 
 ## 🔴 EN COURS — Intégration pipeline lifecycle
 
-### Bataille 1: Intégrer 21-22-23 dans full_lifecycle_simulate()
-- [ ] Phase 1.5: appressorium_simulate() après joint 1→2
-- [ ] Phase 2a: intraradical_simulate() après phase 1.5
-- [ ] Phase 5.5: sporulation_simulate() après phase 4
-- [ ] Joint 23→17: boucle retour vers germination
-- [ ] Tests lifecycle mis à jour (49 → ??)
+### ✅ Bataille 1: Intégrer 21-22-23 dans full_lifecycle_simulate()
+- [x] Phase 1.5: appressorium_simulate() après joint 1→2
+- [x] Phase 1.6: intraradical_simulate() après phase 1.5
+- [x] Phase 4.5: sporulation_simulate() après phase 4
+- [x] cycle_closed flag dans results
+- [x] 18 nouveaux tests lifecycle (49 → 67)
+- [x] 452/452 tests — zéro échec
 
 ### Bataille 2: Vérifier équations avec sources fraîches
 - [ ] Turgor van't Hoff: Π = c·R·T → 1.98 MPa

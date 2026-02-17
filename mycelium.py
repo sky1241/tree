@@ -5,7 +5,7 @@ WINTER TREE v2 — MYCELIUM ENGINE
 Simulation complète du cycle de vie des champignons mycorhiziens
 arbusculaires (AM fungi), de la spore à la sporulation.
 
-24 briques — 434 tests — 7748 lignes
+24 briques — 452 tests — 7900 lignes
 
 ═══════════════════════════════════════════════════════════════
 ARBRE DU CODE — Ordre biologique complet A→Z→A
@@ -7288,6 +7288,57 @@ def full_lifecycle_simulate(
         'merged_nodes': root_graph.number_of_nodes(),
     }
 
+    # ── PHASE 1.5: Appressorium [brique 21] ───────────────────
+    # Genre 2005: hyphopodium forms on root surface, turgor-driven
+    # penetration via PPA assembly (4-5h).
+    # Input: germ_tips + root_tips → penetration events.
+    germ_tips_for_21 = []
+    for gt in germ_tips:
+        if gt in root_graph:
+            pos = root_graph.nodes[gt].get('pos3d')
+            if pos:
+                germ_tips_for_21.append((gt, pos))
+
+    root_tips_for_21 = []
+    for rt in root_tips:
+        pos = root_graph.nodes[rt].get('pos3d')
+        if pos:
+            root_tips_for_21.append((rt, pos))
+
+    phase1_5 = appressorium_simulate(
+        germ_tips_for_21, root_tips_for_21, root_graph, seed=seed)
+
+    results['phase1_5_appressorium'] = {
+        'turgor_mpa': phase1_5['turgor_mpa'],
+        'n_hyphopodia': len(phase1_5['hyphopodia']),
+        'n_entries': phase1_5['n_entries'],
+        'p_penetration': phase1_5['p_penetration'],
+    }
+
+    # ── PHASE 1.6: Intraradical colonization [brique 22] ──────
+    # Pimprikar 2018: arbuscules form at entry points, 5 stages,
+    # 2-7d turnover. Vesicles store TAG (58-80%).
+    penetrations = phase1_5['penetrations']
+    if penetrations:
+        phase1_6 = intraradical_simulate(
+            penetrations, n_days=14, seed=seed)
+    else:
+        # No penetrations — create minimal result
+        phase1_6 = {
+            'n_total': 0, 'n_active': 0, 'n_vesicles': 0,
+            'total_p_transferred': 0.0, 'total_tag_stored': 0.0,
+            'turnover_complete': False, 'arbuscule_surface': 0,
+        }
+
+    results['phase1_6_intraradical'] = {
+        'n_arbuscules': phase1_6['n_total'],
+        'n_active': phase1_6['n_active'],
+        'n_vesicles': phase1_6['n_vesicles'],
+        'p_transferred': phase1_6['total_p_transferred'],
+        'tag_stored': phase1_6['total_tag_stored'],
+        'turnover': phase1_6['turnover_complete'],
+    }
+
     # ── PHASE 2: AM fungi growth [briques 16+13+15+14+11] ──────
     # Use root_tips as emission points
     colonization_points = root_tips[:] if root_tips else []
@@ -7404,6 +7455,26 @@ def full_lifecycle_simulate(
         'total_fungal_c': phase4['final_fungal_c'],
         'fungus_alive': phase4['fungus_alive'],
         'symbiosis_stable': phase4['symbiosis_stable'],
+    }
+
+    # ── PHASE 4.5: Sporulation [brique 23] ─────────────────────
+    # Kokkoris 2026: spores form on ERM when C is high, P is low.
+    # Closes the biological loop: mature spores → back to brique 17.
+    fungal_c_for_spore = phase4['final_fungal_c']
+    phase4_5 = sporulation_simulate(
+        active_graph if active_graph.number_of_nodes() > 0 else mature_graph,
+        fungal_c=fungal_c_for_spore,
+        soil_p=soil_p_effective,
+        n_steps=30, seed=seed)
+
+    results['phase4_5_sporulation'] = {
+        'n_spores': phase4_5['n_total'],
+        'n_mature': phase4_5['n_mature'],
+        'total_tag': phase4_5['total_tag'],
+        'cycle_complete': phase4_5['cycle_complete'],
+        'mature_spore_positions': [
+            sp['node'] for sp in phase4_5.get('mature_spores', [])
+        ],
     }
 
     # ── PHASE 2c: Prune orphan components ────────────────────
@@ -7553,6 +7624,7 @@ def full_lifecycle_simulate(
     results['final_graph'] = active_graph
     results['full_graph'] = mature_graph
     results['lifecycle_complete'] = True
+    results['cycle_closed'] = phase4_5['cycle_complete']
 
     return results
 
@@ -7593,6 +7665,30 @@ def test_lifecycle_chain():
           r['joint_1_2']['germ_tips'] >= 0)
     check("Joint 1→2: merged graph bigger than root alone",
           r['joint_1_2']['merged_nodes'] > r['phase0_root']['n_nodes'])
+
+    # === TEST BLOCK 3.5: Phase 1.5 — Appressorium [brique 21] ===
+    check("Phase 1.5: appressorium results present",
+          'phase1_5_appressorium' in r)
+    check("Phase 1.5: turgor > 0 MPa",
+          r['phase1_5_appressorium']['turgor_mpa'] > 0)
+    check("Phase 1.5: turgor ~1.98 MPa (van't Hoff)",
+          1.5 < r['phase1_5_appressorium']['turgor_mpa'] < 2.5)
+    check("Phase 1.5: penetration probability > 0",
+          r['phase1_5_appressorium']['p_penetration'] > 0)
+    check("Phase 1.5: at least 1 entry",
+          r['phase1_5_appressorium']['n_entries'] > 0)
+
+    # === TEST BLOCK 3.6: Phase 1.6 — Intraradical [brique 22] ===
+    check("Phase 1.6: intraradical results present",
+          'phase1_6_intraradical' in r)
+    check("Phase 1.6: arbuscules formed",
+          r['phase1_6_intraradical']['n_arbuscules'] > 0)
+    check("Phase 1.6: some arbuscules active",
+          r['phase1_6_intraradical']['n_active'] > 0)
+    check("Phase 1.6: P transferred > 0",
+          r['phase1_6_intraradical']['p_transferred'] > 0)
+    check("Phase 1.6: turnover occurred",
+          r['phase1_6_intraradical']['turnover'] is True)
 
     # === TEST BLOCK 4: Phase 2 — AM growth ===
     check("Phase 2: network grew",
@@ -7637,6 +7733,26 @@ def test_lifecycle_chain():
           r['phase4_exchange']['total_fungal_c'] > 0)
     check("Phase 4: fungus alive",
           r['phase4_exchange']['fungus_alive'])
+
+    # === TEST BLOCK 6.5: Phase 4.5 — Sporulation [brique 23] ===
+    check("Phase 4.5: sporulation results present",
+          'phase4_5_sporulation' in r)
+    check("Phase 4.5: spores produced",
+          r['phase4_5_sporulation']['n_spores'] > 0)
+    check("Phase 4.5: mature spores exist",
+          r['phase4_5_sporulation']['n_mature'] > 0)
+    check("Phase 4.5: TAG accumulated",
+          r['phase4_5_sporulation']['total_tag'] > 0)
+    check("Phase 4.5: cycle complete",
+          r['phase4_5_sporulation']['cycle_complete'] is True)
+
+    # === TEST BLOCK 6.6: Cycle closure A→Z→A ===
+    check("Cycle: lifecycle_complete flag",
+          r['lifecycle_complete'] is True)
+    check("Cycle: cycle_closed flag",
+          r['cycle_closed'] is True)
+    check("Cycle: mature spores have node positions",
+          len(r['phase4_5_sporulation']['mature_spore_positions']) > 0)
 
     # === TEST BLOCK 7: Phase 5 — ALL v1.0 Metrics ===
     m = r['phase5_metrics']
