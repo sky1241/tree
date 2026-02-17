@@ -17,13 +17,13 @@
 | 10 | Kirchhoff + Physarum | 16 | Tero 2007, Ito 2011, Tero 2010 |
 | 11 | Anastomose | 14 | Edelstein 1982, Glass 2006 |
 | 12 | Intégration complète | 39 | — |
-| **TOTAL** | | **120** | |
+| **TOTAL** | | **150** | |
 
 ## 🔨 À faire (v2.0 — modèles de croissance)
 
 | Brique | Nom | Source | Status |
 |--------|-----|--------|--------|
-| 13 | Edelstein growth (branching + death + densité) | Edelstein 1982 J. Theor. Biol. 98:679 | TODO |
+| 13 | Edelstein growth (branching + death + densité) | Edelstein 1982 J. Theor. Biol. 98:679, Schnepf & Roose 2008 J. R. Soc. Interface 5:773 | ✅ DONE (30 tests) |
 | 14 | Oscillatory signaling (hyphes qui se cherchent) | eLife 2023 (Fleissner), Goryachev 2006 | TODO |
 | 15 | 3D hyphal mechanics (croissance filament) | Phys. Rev. E 2025 (bmx suite) | TODO |
 | 16 | AM fungi root growth (croissance depuis racine) | Schnepf & Roose 2006 Proc. R. Soc. B | TODO |
