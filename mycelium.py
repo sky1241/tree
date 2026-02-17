@@ -6529,13 +6529,13 @@ class IntraradicalParams:
                  # Arbuscule lifecycle (days)
                  formation_rate=0.3,     # new arbuscules per entry per day
                  maturation_days=2.0,    # days to reach full maturity
-                 active_lifespan=3.0,    # days of active nutrient exchange
+                 active_lifespan=4.0,    # days of active nutrient exchange (~8.5d total, Javot 2007)
                  senescence_days=2.0,    # days to degrade after active phase
                  # Branching
                  branch_depth=6,         # dichotomous branching levels
                  branch_ratio=2,         # dichotomous = 2
                  cell_surface_um2=2000,  # cortical cell surface (μm²)
-                 surface_multiplier=10,  # arbuscule increases surface ×10
+                 surface_multiplier=15,  # arbuscule increases surface ×15 (Toth 1984: ×20)
                  # P exchange at arbuscule
                  p_transfer_rate=0.1,    # P transfer per unit surface per day
                  # Vesicles
@@ -6750,8 +6750,8 @@ def test_intraradical():
     check("Branching: 2^6 = 64 tips", n_tips == 64)
 
     # --- Test 2: Surface multiplier ---
-    surface = 2000 * 10
-    check("Surface: 2000 μm² × 10 = 20000 μm²", surface == 20000)
+    surface = 2000 * 15  # Toth 1984: ~20×, we use 15× as conservative estimate
+    check("Surface: 2000 μm² × 15 = 30000 μm²", surface == 30000)
 
     # --- Test 3: Basic simulation ---
     entries = [{'entry_node': 'ir_entry_0'}, {'entry_node': 'ir_entry_1'}]
@@ -6779,8 +6779,8 @@ def test_intraradical():
     check("Sim: TAG stored > 0", r22['total_tag_stored'] > 0)
 
     # --- Test 10: Arbuscule surface computed ---
-    check("Arbuscule surface = 20000 μm²",
-          r22['arbuscule_surface'] == 20000)
+    check("Arbuscule surface = 30000 μm²",
+          r22['arbuscule_surface'] == 30000)
 
     # --- Test 11: No vesicles for Gigasporales ---
     giga = IntraradicalParams(has_vesicles=False)
