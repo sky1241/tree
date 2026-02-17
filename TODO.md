@@ -90,8 +90,25 @@ SOL (extraradical)                    RACINE (intraradical)
 
 **7748 lignes — 24 briques — CYCLE COMPLET BOUCLÉ**
 
-## TODO: intégrer briques 21-23 dans full_lifecycle_simulate()
+## 🔴 EN COURS — Intégration pipeline lifecycle
 
-Le pipeline actuel couvre phases 0-5 (extraradical).
-Prochaine étape: ajouter phases 1.5 (appressorium), 2.5 (intraradical), 
-et 5.5 (sporulation) dans le pipeline lifecycle pour un run A→Z→A complet.
+### Bataille 1: Intégrer 21-22-23 dans full_lifecycle_simulate()
+- [ ] Phase 1.5: appressorium_simulate() après joint 1→2
+- [ ] Phase 2a: intraradical_simulate() après phase 1.5
+- [ ] Phase 5.5: sporulation_simulate() après phase 4
+- [ ] Joint 23→17: boucle retour vers germination
+- [ ] Tests lifecycle mis à jour (49 → ??)
+
+### Bataille 2: Vérifier équations avec sources fraîches
+- [ ] Turgor van't Hoff: Π = c·R·T → 1.98 MPa
+- [ ] Arbuscule turnover: 2-7 jours
+- [ ] TAG fraction: 58-80%
+- [ ] Sporulation rate: r = r_max × C/(Kc+C) × Kp/(Kp+P)
+- [ ] Carbon budget: 38 → 6.3 μg
+
+### Bataille 3: Bug hunting systématique
+- [ ] Edge cases (0 spores, 0 tips, empty graphs)
+- [ ] Division par zéro
+- [ ] Cohérence d'unités entre briques
+- [ ] Overflow / underflow
+- [ ] Re-run 434+ tests
