@@ -3441,7 +3441,7 @@ def _vec_norm(v):
 def _vec_normalize(v):
     n = _vec_norm(v)
     if n < 1e-10:
-        return (1.0, 0.0, 0.0)
+        return (0.0, 0.0, 0.0)  # zero vector stays zero (no arbitrary bias)
     return (v[0]/n, v[1]/n, v[2]/n)
 
 def _vec_distance(a, b):
@@ -4099,6 +4099,10 @@ def am_root_emit_tips(G, root_nodes, step, params, rng, name_counter):
 
             name_counter[0] += 1
             new_name = f"am_{name_counter[0]}"
+            # Avoid name collision with existing nodes
+            while new_name in G:
+                name_counter[0] += 1
+                new_name = f"am_{name_counter[0]}"
             G.add_node(new_name, pos3d=new_pos,
                        spk_direction=direction,
                        is_am_tip=True,
@@ -4166,14 +4170,17 @@ def am_hyphal_density_profile(G, root_nodes, n_bins=5):
     for i in range(n_bins):
         d_min = i * bin_width
         d_max = (i + 1) * bin_width
+        is_last = (i == n_bins - 1)
 
         nodes_in_bin = [n for n, d in node_distances.items()
-                        if d_min <= d < d_max]
+                        if d_min <= d < d_max or (is_last and d == d_max)]
         edges_in_bin = sum(1 for u, v in G.edges()
                           if (node_distances.get(u, -1) >= d_min and
-                              node_distances.get(u, -1) < d_max) or
+                              (node_distances.get(u, -1) < d_max or
+                               (is_last and node_distances.get(u, -1) == d_max))) or
                           (node_distances.get(v, -1) >= d_min and
-                              node_distances.get(v, -1) < d_max))
+                              (node_distances.get(v, -1) < d_max or
+                               (is_last and node_distances.get(v, -1) == d_max))))
 
         bins.append((d_min, d_max, edges_in_bin, len(nodes_in_bin)))
 
