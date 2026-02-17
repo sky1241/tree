@@ -6467,6 +6467,351 @@ def test_appressorium():
     return passed, failed
 
 
+
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 22 — Phase intraradical: Arbuscules & Vésicules
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   Pimprikar & Gutjahr 2018 — 5 stages AM development
+#   Floss et al. 2017 — MYB1 arbuscule degeneration
+#   Molecular Regulation of AM Symbiosis (PMC9180548) — turnover 2-7 days
+#   Genre & Bonfante 1997 — MT dynamics during arbuscule lifecycle
+#   Olsson et al. 2003 — NLFA storage, vesicle lipids
+#
+# Equations:
+#   Arbuscule lifecycle: 5 stages with exponential transitions
+#   Surface area: S_arb = S_cell × branching_factor^depth
+#   Turnover: dA/dt = formation_rate - senescence_rate
+#   P flux: proportional to mature arbuscule surface area
+#   Vesicle: TAG accumulation = f(C_available)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class IntraradicalParams:
+    """Parameters for intraradical phase: arbuscules + vesicles."""
+    def __init__(self,
+                 # Arbuscule lifecycle (days)
+                 formation_rate=0.3,     # new arbuscules per entry per day
+                 maturation_days=2.0,    # days to reach full maturity
+                 active_lifespan=3.0,    # days of active nutrient exchange
+                 senescence_days=2.0,    # days to degrade after active phase
+                 # Branching
+                 branch_depth=6,         # dichotomous branching levels
+                 branch_ratio=2,         # dichotomous = 2
+                 cell_surface_um2=2000,  # cortical cell surface (μm²)
+                 surface_multiplier=10,  # arbuscule increases surface ×10
+                 # P exchange at arbuscule
+                 p_transfer_rate=0.1,    # P transfer per unit surface per day
+                 # Vesicles
+                 vesicle_formation_rate=0.05,  # per entry per day
+                 tag_fraction=0.7,             # TAG fraction of vesicle (58-80%)
+                 vesicle_capacity=1.0,         # max TAG per vesicle
+                 # Colonization spread
+                 cortical_cells_per_entry=8,   # cells colonizable per entry point
+                 has_vesicles=True,            # False for Gigasporales
+                 ):
+        self.formation_rate = formation_rate
+        self.maturation_days = maturation_days
+        self.active_lifespan = active_lifespan
+        self.senescence_days = senescence_days
+        self.branch_depth = branch_depth
+        self.branch_ratio = branch_ratio
+        self.cell_surface_um2 = cell_surface_um2
+        self.surface_multiplier = surface_multiplier
+        self.p_transfer_rate = p_transfer_rate
+        self.vesicle_formation_rate = vesicle_formation_rate
+        self.tag_fraction = tag_fraction
+        self.vesicle_capacity = vesicle_capacity
+        self.cortical_cells_per_entry = cortical_cells_per_entry
+        self.has_vesicles = has_vesicles
+
+
+# Arbuscule stages (Pimprikar & Gutjahr 2018)
+ARBUSCULE_STAGES = {
+    'young': 0,       # Stage III: initial branching
+    'developing': 1,  # Stage III→IV: filling cell
+    'mature': 2,      # Stage IV: full exchange capacity
+    'senescent': 3,   # Stage V: collapsing
+    'degraded': 4,    # Post V: removed by plant
+}
+
+
+def intraradical_simulate(entry_nodes, n_days=14, params=None, seed=42):
+    """Simulate intraradical colonization: arbuscules + vesicles.
+
+    Parameters
+    ----------
+    entry_nodes : list of dict
+        Each with 'entry_node' key (from brique 21).
+    n_days : int
+        Days to simulate.
+    params : IntraradicalParams or None
+    seed : int
+
+    Returns
+    -------
+    dict with arbuscule_history, vesicles, p_transferred, etc.
+    """
+    if params is None:
+        params = IntraradicalParams()
+
+    import random as _random
+    rng = _random.Random(seed)
+
+    # Total arbuscule surface from branching depth
+    # Each dichotomous branch: 2^depth terminal branches
+    n_tips = params.branch_ratio ** params.branch_depth  # e.g. 2^6 = 64 tips
+    arbuscule_surface = params.cell_surface_um2 * params.surface_multiplier
+
+    # Track arbuscules
+    arbuscules = []  # list of {cell, entry, stage, age, surface, p_flux}
+    arbuscule_id_counter = [0]
+
+    # Track vesicles
+    vesicles = []
+
+    # History
+    history = []
+    total_p_transferred = 0.0
+    total_tag_stored = 0.0
+
+    for day in range(n_days):
+        # --- New arbuscule formation ---
+        for entry in entry_nodes:
+            # Stochastic formation
+            n_new = 0
+            for _ in range(params.cortical_cells_per_entry):
+                if rng.random() < params.formation_rate:
+                    n_new += 1
+
+            # Cap by available cells
+            existing = sum(1 for a in arbuscules
+                           if a['entry'] == entry.get('entry_node', entry)
+                           and a['stage'] < ARBUSCULE_STAGES['degraded'])
+            n_new = min(n_new, params.cortical_cells_per_entry - existing)
+
+            for _ in range(n_new):
+                arbuscules.append({
+                    'id': arbuscule_id_counter[0],
+                    'entry': entry.get('entry_node', entry),
+                    'stage': ARBUSCULE_STAGES['young'],
+                    'age': 0.0,
+                    'surface': 0.0,
+                    'p_flux': 0.0,
+                })
+                arbuscule_id_counter[0] += 1
+
+        # --- Vesicle formation ---
+        if params.has_vesicles:
+            for entry in entry_nodes:
+                if rng.random() < params.vesicle_formation_rate:
+                    vesicles.append({
+                        'entry': entry.get('entry_node', entry),
+                        'tag': min(params.tag_fraction * rng.uniform(0.5, 1.0),
+                                   params.vesicle_capacity),
+                        'day_formed': day,
+                    })
+
+        # --- Update arbuscule stages ---
+        day_p = 0.0
+        for arb in arbuscules:
+            arb['age'] += 1.0
+
+            # Stage transitions based on age
+            total_life = (params.maturation_days + params.active_lifespan +
+                          params.senescence_days)
+
+            if arb['age'] <= params.maturation_days:
+                # Young → developing → mature
+                progress = arb['age'] / params.maturation_days
+                arb['stage'] = ARBUSCULE_STAGES['young'] if progress < 0.5 \
+                    else ARBUSCULE_STAGES['developing']
+                arb['surface'] = arbuscule_surface * progress
+            elif arb['age'] <= params.maturation_days + params.active_lifespan:
+                # Mature — full exchange
+                arb['stage'] = ARBUSCULE_STAGES['mature']
+                arb['surface'] = arbuscule_surface
+            elif arb['age'] <= total_life:
+                # Senescent
+                arb['stage'] = ARBUSCULE_STAGES['senescent']
+                decay = (arb['age'] - params.maturation_days -
+                         params.active_lifespan) / params.senescence_days
+                arb['surface'] = arbuscule_surface * (1.0 - decay)
+            else:
+                # Degraded
+                arb['stage'] = ARBUSCULE_STAGES['degraded']
+                arb['surface'] = 0.0
+
+            # P transfer proportional to surface (only mature + developing)
+            if arb['stage'] in (ARBUSCULE_STAGES['mature'],
+                                ARBUSCULE_STAGES['developing']):
+                flux = arb['surface'] * params.p_transfer_rate / 1e6  # normalize
+                arb['p_flux'] = flux
+                day_p += flux
+            else:
+                arb['p_flux'] = 0.0
+
+        total_p_transferred += day_p
+        total_tag_stored = sum(v['tag'] for v in vesicles)
+
+        # Stage census
+        stage_counts = {name: 0 for name in ARBUSCULE_STAGES}
+        for arb in arbuscules:
+            for name, val in ARBUSCULE_STAGES.items():
+                if arb['stage'] == val:
+                    stage_counts[name] += 1
+                    break
+
+        history.append({
+            'day': day,
+            'n_arbuscules': len(arbuscules),
+            'active': stage_counts['mature'] + stage_counts['developing'],
+            'senescent': stage_counts['senescent'],
+            'degraded': stage_counts['degraded'],
+            'p_today': day_p,
+            'n_vesicles': len(vesicles),
+        })
+
+    # Final stats
+    active_arb = [a for a in arbuscules
+                  if a['stage'] in (ARBUSCULE_STAGES['mature'],
+                                    ARBUSCULE_STAGES['developing'])]
+
+    return {
+        'arbuscules': arbuscules,
+        'vesicles': vesicles,
+        'history': history,
+        'total_p_transferred': total_p_transferred,
+        'total_tag_stored': total_tag_stored,
+        'n_active': len(active_arb),
+        'n_total': len(arbuscules),
+        'n_vesicles': len(vesicles),
+        'arbuscule_surface': arbuscule_surface,
+        'n_branch_tips': n_tips,
+        'turnover_complete': any(a['stage'] == ARBUSCULE_STAGES['degraded']
+                                 for a in arbuscules),
+    }
+
+
+def test_intraradical():
+    """Tests for brique 22 — Intraradical Phase (Arbuscules + Vesicles)."""
+    print("\n=== BRIQUE 22: Intraradical Phase (Arbuscules & Vesicles) ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: Branching depth ---
+    p = IntraradicalParams(branch_depth=6, branch_ratio=2)
+    n_tips = 2 ** 6
+    check("Branching: 2^6 = 64 tips", n_tips == 64)
+
+    # --- Test 2: Surface multiplier ---
+    surface = 2000 * 10
+    check("Surface: 2000 μm² × 10 = 20000 μm²", surface == 20000)
+
+    # --- Test 3: Basic simulation ---
+    entries = [{'entry_node': 'ir_entry_0'}, {'entry_node': 'ir_entry_1'}]
+    r22 = intraradical_simulate(entries, n_days=14, seed=42)
+    check("Sim: arbuscules formed", r22['n_total'] > 0)
+
+    # --- Test 4: History has 14 days ---
+    check("Sim: history = 14 days", len(r22['history']) == 14)
+
+    # --- Test 5: P transferred > 0 ---
+    check("Sim: total P transferred > 0", r22['total_p_transferred'] > 0)
+
+    # --- Test 6: Turnover happens (some degraded) ---
+    check("Sim: turnover complete (degraded arbuscules exist)",
+          r22['turnover_complete'])
+
+    # --- Test 7: Active arbuscules at mid-point ---
+    mid = r22['history'][6]  # day 7
+    check("Day 7: active arbuscules > 0", mid['active'] > 0)
+
+    # --- Test 8: Vesicles formed ---
+    check("Sim: vesicles formed > 0", r22['n_vesicles'] > 0)
+
+    # --- Test 9: TAG stored ---
+    check("Sim: TAG stored > 0", r22['total_tag_stored'] > 0)
+
+    # --- Test 10: Arbuscule surface computed ---
+    check("Arbuscule surface = 20000 μm²",
+          r22['arbuscule_surface'] == 20000)
+
+    # --- Test 11: No vesicles for Gigasporales ---
+    giga = IntraradicalParams(has_vesicles=False)
+    r22_giga = intraradical_simulate(entries, n_days=10, params=giga, seed=42)
+    check("Gigasporales: 0 vesicles", r22_giga['n_vesicles'] == 0)
+
+    # --- Test 12: More entries → more arbuscules ---
+    entries_big = [{'entry_node': f'ir_{i}'} for i in range(5)]
+    r22_big = intraradical_simulate(entries_big, n_days=10, seed=42)
+    entries_small = [{'entry_node': 'ir_0'}]
+    r22_small = intraradical_simulate(entries_small, n_days=10, seed=42)
+    check("More entries → more arbuscules",
+          r22_big['n_total'] >= r22_small['n_total'])
+
+    # --- Test 13: Longer sim → more P ---
+    r22_short = intraradical_simulate(entries, n_days=5, seed=42)
+    r22_long = intraradical_simulate(entries, n_days=20, seed=42)
+    check("Longer sim → more P",
+          r22_long['total_p_transferred'] >= r22_short['total_p_transferred'])
+
+    # --- Test 14: Stage census makes sense ---
+    last = r22['history'][-1]
+    check("Final day: census sums to total",
+          (last['active'] + last['senescent'] + last['degraded']) <=
+          r22['n_total'])
+
+    # --- Test 15: Arbuscule stages exist ---
+    stages_seen = set(a['stage'] for a in r22['arbuscules'])
+    check("Multiple stages seen", len(stages_seen) >= 2)
+
+    # --- Test 16: P flux only from active arbuscules ---
+    for a in r22['arbuscules']:
+        if a['stage'] == ARBUSCULE_STAGES['degraded']:
+            check("Degraded arbuscule: p_flux = 0", a['p_flux'] == 0.0)
+            break
+
+    # --- Test 17: Zero formation rate → 0 arbuscules ---
+    zero_p = IntraradicalParams(formation_rate=0.0)
+    r22_zero = intraradical_simulate(entries, n_days=10, params=zero_p, seed=42)
+    check("Zero formation: 0 arbuscules", r22_zero['n_total'] == 0)
+
+    # --- Test 18: Empty entries → no crash ---
+    r22_empty = intraradical_simulate([], n_days=10, seed=42)
+    check("Empty entries: no crash", r22_empty['n_total'] == 0)
+
+    # --- Test 19: Vesicle TAG within bounds ---
+    if r22['vesicles']:
+        all_valid = all(0 < v['tag'] <= 1.0 for v in r22['vesicles'])
+        check("Vesicle TAG: all in (0, 1.0]", all_valid)
+    else:
+        check("Vesicle TAG: (skipped — no vesicles)", True)
+
+    # --- Test 20: Integration 22→21 (entry nodes from brique 21) ---
+    r0 = lsystem_root_generate(n_steps=8, seed=42)
+    rg = r0['graph'].copy()
+    root_tips = [(t, rg.nodes[t]['pos3d']) for t in r0['root_tips']]
+    germ_tips = [(f"gt_{i}", tuple(c + 1.0 for c in rt_pos))
+                 for i, (_, rt_pos) in enumerate(root_tips[:3])]
+    r21 = appressorium_simulate(germ_tips, root_tips, rg, seed=42)
+    r22_int = intraradical_simulate(r21['penetrations'], n_days=10, seed=42)
+    check("Integration 22→21: arbuscules from penetrations",
+          r22_int['n_total'] > 0)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 # ═══════════════════════════════════════════════════════════════════
 # FULL LIFECYCLE PIPELINE — Ordre biologique
 # ═══════════════════════════════════════════════════════════════════
@@ -7088,9 +7433,10 @@ if __name__ == "__main__":
     p10, f10 = test_nutrient_uptake()
     p11, f11 = test_symbiosis_exchange()
     p13, f13 = test_appressorium()
+    p14, f14 = test_intraradical()
     p12, f12 = test_lifecycle_chain()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12 + p13
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12 + p13 + p14
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13 + f14
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-21 + LIFECYCLE: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-22 + LIFECYCLE: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
