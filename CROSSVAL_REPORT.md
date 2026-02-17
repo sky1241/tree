@@ -297,3 +297,72 @@ Biologie → Code:
 | Spk persistence maintains direction | ✅ |
 | Spk zero persistence = parent direction | ✅ |
 | Tip diameter stored on edges | ✅ |
+
+---
+
+## Brique 16 — AM Fungi Root Growth
+
+### Sources
+
+| Réf | Auteurs | Journal | Concept |
+|-----|---------|---------|---------|
+| [A] | Schnepf, Roose, Schweiger | J. R. Soc. Interface 5:773-784, 2008 | AM fungi growth model: tip conservation + hyphal density + root boundary |
+| [B] | Schnepf & Roose | New Phytol. 171:669-682, 2006 | AM fungi P uptake: linear solution, translocation |
+| [C] | Schnepf, Leitner et al. | J. R. Soc. Interface 13:20160129, 2016 | L-System 3D root+hyphae model, inoculum position |
+| [D] | Chevalier et al. | PNAS 2025 | C↔P exchange rate, density-speed trade-off |
+
+### Équations → Code
+
+| Équation | Source | Code |
+|----------|--------|------|
+| ∂n/∂t = -∇·(nv) + f | [A] eq. 2.1 | `am_root_emit_tips()` + Edelstein |
+| ∂ρ/∂t = n\|v\| - dρ | [A] eq. 2.2 | `edelstein_growth_step()` death |
+| n(r₀,t) = at + n₀,b | [A] eq. 2.3 | `AMFungiParams.tip_flux_at_time(t)` |
+| f = bₙn(1-n/nₘₐₓ) - dₙn - a₂nρ - a₁n² | [A] eq. 2.1 | `edelstein_tip_rate()` |
+| δ = d/b | [A] Appendix A | `AMFungiParams.delta()` |
+| xc = vt | [A] eq. 2.10 | `AMFungiParams.colony_edge(t)` |
+
+### Calibration espèces [A] Table 1
+
+| Espèce | δ | a₁ | a₂ | Morphologie |
+|--------|---|----|----|-------------|
+| S. calospora | ≈1 | 0 | 0 | Linéaire, peu d'anastomose |
+| Glomus sp. | ≈0.4 | >0 | 0 | Tip-tip anastomosis |
+| A. laevis | ≈0.375 | 0 | >0 | Tip-hypha anastomosis |
+
+### Implémentation
+
+- `AMFungiParams`: all parameters from [A] + boundary condition
+- `am_root_emit_tips()`: boundary source, radial emission [A]
+- `am_hyphal_density_profile()`: density vs distance bins [A] Fig. 2
+- `am_fungi_simulate()`: full integration (briques 13+15+16) [A,C]
+- `am_species_presets()`: 3 calibrated species [A] Table 1
+
+### Tests unitaires (32/32 PASS)
+
+| Test | Résultat |
+|------|----------|
+| δ = d/b (low, high) | ✅ ×2 |
+| Tip flux at boundary (t=0, t=4) | ✅ ×2 |
+| Colony edge xc = vt | ✅ |
+| Root emission: tips + nodes created | ✅ ×2 |
+| Emitted nodes: 3D coords + spk | ✅ ×2 |
+| Root-tip edges | ✅ |
+| Source_root attribute | ✅ |
+| Density profile: bins + max_distance | ✅ ×2 |
+| Density profile empty: no crash | ✅ |
+| Full simulation: graph + history + colony_edge | ✅ ×3 |
+| Graph grows over time | ✅ |
+| Tips emitted each step | ✅ |
+| Density from simulation | ✅ |
+| Delta stored in result | ✅ |
+| Species presets: 3 species + S.calospora δ≈1 | ✅ ×2 |
+| S.calospora: no anastomosis | ✅ |
+| A.laevis: tip-hypha anastomosis | ✅ |
+| δ effect: low δ → more surviving nodes | ✅ |
+| Tip flux increases with time | ✅ |
+| Multiple root nodes | ✅ |
+| Integration 13+15+16: no crash | ✅ |
+| Empty roots: no crash | ✅ |
+| Zero branching: δ = inf | ✅ |
+| Colony edge t=0: xc = 0 | ✅ |

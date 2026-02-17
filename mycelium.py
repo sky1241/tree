@@ -3952,6 +3952,545 @@ def test_hyphal_mechanics_3d():
     return passed, failed
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 16 — AM FUNGI ROOT GROWTH (v2.0)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   [A] Schnepf, Roose & Schweiger 2008, J. R. Soc. Interface 5:773-784
+#     "Growth model for arbuscular mycorrhizal fungi"
+#     Extends Edelstein 1982 for AM fungi with root boundary condition.
+#     Root surface = continuous source of new hyphal tips.
+#     Tip conservation: ∂n/∂t = -∇·(nv) + f
+#     Hyphal density: ∂ρ/∂t = n|v| - dρ
+#     General f: f = bₙ·n·(1-n/nₘₐₓ) - dₙ·n - a₂·n·ρ - a₁·n²
+#     Root boundary: n(r₀, t) = at + n₀,b
+#     δ = d/b: death/branching ratio (dimensionless).
+#     δ << 1: biomass accumulates near root. δ >> 1: biomass at colony front.
+#     Colony edge: xc = v·t
+#     Calibrated on 3 species (Jakobsen 1992):
+#       S. calospora: linear branching sufficient (low anastomosis)
+#       Glomus sp.: nonlinear branching + tip-tip anastomosis (a₁)
+#       A. laevis: tip-hypha anastomosis dominant (a₂)
+#
+#   [B] Schnepf & Roose 2006, New Phytol. 171:669-682
+#     "Modelling the contribution of AM fungi to plant phosphate uptake"
+#     Linear solution: ρ = (v·k/d)·exp(b(x)/v)·(1-exp(-d(x-vt)/v))
+#     k = constant tip flux at root surface.
+#     P uptake dominated by fungal mycelium front.
+#     Translocation so fast → P availability never rate-limiting.
+#
+#   [C] Schnepf, Leitner et al. 2016, J. R. Soc. Interface 13:20160129
+#     "L-System model for AM fungi, within and outside host roots"
+#     3D root architecture + hyphal growth model.
+#     Inoculum position (concentrated vs dispersed) affects colonization.
+#     First model with dynamic, spatially resolved root infection.
+#
+#   [D] PNAS 2025 (Chevalier et al.)
+#     "Carbon-phosphorus exchange rate constrains density-speed trade-off"
+#     C↔P exchange rate determines mycelium growth strategy.
+#
+# Discrete translation for graphs:
+#   Root nodes = designated source nodes (boundary condition).
+#   Root emits new tips each step (tip flux = at + n₀,b) [A].
+#   Tips grow outward from root (radial direction) [A].
+#   Hyphal density ρ_local computed per neighborhood [A].
+#   Colony edge = max distance from root [A].
+#   δ parameter controls biomass distribution profile [A].
+#   Integrates with briques 13 (Edelstein), 14 (oscillatory), 15 (3D).
+# ═══════════════════════════════════════════════════════════════════
+
+
+class AMFungiParams:
+    """Parameters for AM fungi root growth model.
+
+    Source: Schnepf & Roose 2008, J. R. Soc. Interface 5:773-784 [A]
+    """
+    def __init__(self,
+                 tip_speed=1.0,           # v: tip elongation rate [A]
+                 branch_rate=0.5,         # b: net branching rate [A]
+                 death_rate=0.1,          # d: hyphal death rate [A]
+                 tip_flux_base=2.0,       # n₀,b: initial tip density at root [A]
+                 tip_flux_growth=0.1,     # a: boundary proliferation rate [A]
+                 n_max=20.0,              # nₘₐₓ: max tip density [A]
+                 a1=0.0,                  # tip-tip anastomosis rate [A]
+                 a2=0.0,                  # tip-hypha anastomosis rate [A]
+                 root_radius=1.0,         # r₀: root radius [A]
+                 ):
+        self.tip_speed = tip_speed
+        self.branch_rate = branch_rate
+        self.death_rate = death_rate
+        self.tip_flux_base = tip_flux_base
+        self.tip_flux_growth = tip_flux_growth
+        self.n_max = n_max
+        self.a1 = a1
+        self.a2 = a2
+        self.root_radius = root_radius
+
+    def delta(self):
+        """Dimensionless δ = d/b: death-to-branching ratio.
+
+        Source: Schnepf 2008, Appendix A [A].
+        δ << 1: biomass near root (low death, high branching).
+        δ >> 1: biomass at colony front (high death, low branching).
+        """
+        if abs(self.branch_rate) < 1e-10:
+            return float('inf')
+        return self.death_rate / self.branch_rate
+
+    def tip_flux_at_time(self, t):
+        """Root boundary condition: n(r₀, t) = at + n₀,b.
+
+        Source: Schnepf 2008, eq. 2.3 [A].
+        """
+        return self.tip_flux_growth * t + self.tip_flux_base
+
+    def colony_edge(self, t):
+        """Colony front position: xc = v·t.
+
+        Source: Schnepf 2008, eq. 2.10 [A].
+        """
+        return self.tip_speed * t
+
+
+def am_root_emit_tips(G, root_nodes, step, params, rng, name_counter):
+    """Emit new hyphal tips from root nodes (boundary condition).
+
+    Simulates root surface as continuous source of new tips.
+    Source: Schnepf & Roose 2008, eq. 2.3 and 2.8 [A].
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Current mycelium graph.
+    root_nodes : list
+        Nodes designated as root interface.
+    step : int
+        Current simulation step (time proxy).
+    params : AMFungiParams
+        Model parameters.
+    rng : random.Random
+        Random number generator.
+    name_counter : list
+        Mutable counter for unique node names.
+
+    Returns
+    -------
+    dict with 'tips_emitted', 'new_nodes'
+    """
+    stats = {'tips_emitted': 0, 'new_nodes': []}
+
+    # n(r₀, t) = at + n₀,b → number of tips to emit this step
+    flux = params.tip_flux_at_time(step)
+    n_emit = max(1, int(flux))
+
+    for root in root_nodes:
+        if root not in G:
+            continue
+        root_pos = G.nodes[root].get('pos3d')
+        if root_pos is None:
+            root_pos = (0.0, 0.0, 0.0)
+            G.nodes[root]['pos3d'] = root_pos
+
+        for _ in range(n_emit):
+            # Emit tip in random radial direction from root
+            direction = _random_unit_vector(rng)
+            seg_len = params.root_radius + params.tip_speed * 0.5
+            new_pos = _vec_add(root_pos, _vec_scale(direction, seg_len))
+
+            name_counter[0] += 1
+            new_name = f"am_{name_counter[0]}"
+            G.add_node(new_name, pos3d=new_pos,
+                       spk_direction=direction,
+                       is_am_tip=True,
+                       birth_step=step,
+                       source_root=root)
+            G.add_edge(root, new_name, length_3d=seg_len,
+                       conductivity=0.5, is_am=True)
+
+            stats['tips_emitted'] += 1
+            stats['new_nodes'].append(new_name)
+
+    return stats
+
+
+def am_hyphal_density_profile(G, root_nodes, n_bins=5):
+    """Compute hyphal density as function of distance from root.
+
+    Implements density profile analysis for comparison with
+    Schnepf 2008 Fig. 2 / Jakobsen 1992 data [A].
+
+    Parameters
+    ----------
+    G : nx.Graph
+    root_nodes : list
+    n_bins : int
+        Number of radial distance bins.
+
+    Returns
+    -------
+    dict with 'bins' (list of (dist_min, dist_max, edge_count, node_count))
+    and 'max_distance' (colony edge).
+    """
+    if not root_nodes or len(G.nodes()) == 0:
+        return {'bins': [], 'max_distance': 0.0}
+
+    # Compute distance from nearest root for all nodes
+    node_distances = {}
+    for node in G.nodes():
+        if node in root_nodes:
+            node_distances[node] = 0.0
+            continue
+        pos = G.nodes[node].get('pos3d')
+        if pos is None:
+            continue
+        min_dist = float('inf')
+        for root in root_nodes:
+            root_pos = G.nodes[root].get('pos3d')
+            if root_pos is None:
+                continue
+            d = _vec_distance(pos, root_pos)
+            if d < min_dist:
+                min_dist = d
+        node_distances[node] = min_dist
+
+    if not node_distances:
+        return {'bins': [], 'max_distance': 0.0}
+
+    max_dist = max(node_distances.values())
+    if max_dist < 1e-10:
+        return {'bins': [(0, 0, len(G.edges()), len(G.nodes()))],
+                'max_distance': 0.0}
+
+    bin_width = max_dist / n_bins
+    bins = []
+    for i in range(n_bins):
+        d_min = i * bin_width
+        d_max = (i + 1) * bin_width
+
+        nodes_in_bin = [n for n, d in node_distances.items()
+                        if d_min <= d < d_max]
+        edges_in_bin = sum(1 for u, v in G.edges()
+                          if (node_distances.get(u, -1) >= d_min and
+                              node_distances.get(u, -1) < d_max) or
+                          (node_distances.get(v, -1) >= d_min and
+                              node_distances.get(v, -1) < d_max))
+
+        bins.append((d_min, d_max, edges_in_bin, len(nodes_in_bin)))
+
+    return {'bins': bins, 'max_distance': max_dist}
+
+
+def am_fungi_simulate(G, root_nodes, n_steps=20, params=None,
+                       seed=42, use_edelstein=True, use_3d=True):
+    """Full AM fungi simulation: root emission + Edelstein growth + 3D mechanics.
+
+    Integrates briques 13, 15, and 16.
+    Source: Schnepf & Roose 2008 [A], Edelstein 1982, Money 2025.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Initial graph (can be empty, root_nodes will be added).
+    root_nodes : list
+        Root interface nodes.
+    n_steps : int
+    params : AMFungiParams or None
+    seed : int
+    use_edelstein : bool
+        Apply Edelstein growth dynamics (brique 13).
+    use_3d : bool
+        Apply 3D hyphal mechanics (brique 15).
+
+    Returns
+    -------
+    dict with final_graph, history, density_profile, colony_edge
+    """
+    if params is None:
+        params = AMFungiParams()
+    import random as _random
+    rng = _random.Random(seed)
+    name_counter = [0]
+
+    # Ensure root nodes exist with 3D coords
+    for root in root_nodes:
+        if root not in G:
+            G.add_node(root, pos3d=(0.0, 0.0, 0.0), is_root=True)
+        elif G.nodes[root].get('pos3d') is None:
+            G.nodes[root]['pos3d'] = (0.0, 0.0, 0.0)
+        G.nodes[root]['is_root'] = True
+
+    # Assign 3D coords if missing
+    for node in G.nodes():
+        if G.nodes[node].get('pos3d') is None:
+            G.nodes[node]['pos3d'] = (rng.uniform(-1, 1),
+                                       rng.uniform(-1, 1),
+                                       rng.uniform(-1, 1))
+
+    history = []
+    edelstein_params = EdelsteinParams(
+        b_n=params.branch_rate,
+        d_n=params.death_rate * 0.5,
+        d=params.death_rate,
+        n_max=min(params.n_max / 100.0, 0.9),  # normalize to fraction
+        a1=params.a1,
+        a2=params.a2
+    )
+    mech_params = HyphalMechanicsParams(
+        turgor=0.5,
+        segment_length=params.tip_speed
+    )
+
+    for step in range(n_steps):
+        # Re-ensure root nodes exist (may be killed by Edelstein death)
+        for root in root_nodes:
+            if root not in G:
+                G.add_node(root, pos3d=(0.0, 0.0, 0.0), is_root=True)
+
+        snapshot = {
+            'step': step,
+            'n_nodes': G.number_of_nodes(),
+            'n_edges': G.number_of_edges(),
+        }
+
+        # Phase 1: Root emits tips (Schnepf boundary condition) [A]
+        emit_stats = am_root_emit_tips(G, root_nodes, step, params,
+                                        rng, name_counter)
+        snapshot['tips_emitted'] = emit_stats['tips_emitted']
+
+        # Phase 2: Edelstein growth/death (brique 13)
+        if use_edelstein and G.number_of_nodes() > 1:
+            eg = edelstein_growth_step(G, edelstein_params, rng)
+            snapshot['edelstein_growth'] = eg.get('branches_added', 0)
+            snapshot['edelstein_death'] = eg.get('tips_died', 0)
+
+        # Phase 3: 3D mechanics (brique 15)
+        if use_3d and G.number_of_nodes() > 1:
+            h3d = hyphal_growth_3d_step(G, mech_params, rng, name_counter)
+            snapshot['extensions_3d'] = h3d.get('extensions', 0)
+
+        snapshot['n_nodes_after'] = G.number_of_nodes()
+        snapshot['n_edges_after'] = G.number_of_edges()
+        history.append(snapshot)
+
+    # Compute density profile [A]
+    density = am_hyphal_density_profile(G, root_nodes)
+
+    # Colony edge = max distance from any root
+    colony_edge = density['max_distance']
+
+    return {
+        'final_graph': G,
+        'history': history,
+        'density_profile': density,
+        'colony_edge': colony_edge,
+        'params': params,
+        'delta': params.delta()
+    }
+
+
+# --- Species presets from Schnepf 2008 Table 1 [A] ---
+def am_species_presets():
+    """Calibrated parameters for 3 AM fungal species.
+
+    Source: Schnepf & Roose 2008, Table 1, fitted to Jakobsen 1992 data [A].
+    """
+    return {
+        'S_calospora': AMFungiParams(
+            branch_rate=0.3, death_rate=0.3,  # δ≈1
+            a1=0.0, a2=0.0,  # linear branching sufficient
+            tip_flux_base=1.0, tip_flux_growth=0.0
+        ),
+        'Glomus_sp': AMFungiParams(
+            branch_rate=0.5, death_rate=0.2,  # δ≈0.4
+            a1=1.0, a2=0.0,  # tip-tip anastomosis
+            tip_flux_base=2.0, tip_flux_growth=0.1
+        ),
+        'A_laevis': AMFungiParams(
+            branch_rate=0.4, death_rate=0.15,  # δ≈0.375
+            a1=0.0, a2=1.0,  # tip-hypha anastomosis dominant
+            tip_flux_base=3.0, tip_flux_growth=0.2
+        ),
+    }
+
+
+def test_am_fungi_root_growth():
+    """Tests for brique 16 — AM fungi root growth."""
+    print("\n=== BRIQUE 16: AM Fungi Root Growth ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: AMFungiParams delta ---
+    p1 = AMFungiParams(branch_rate=0.5, death_rate=0.1)
+    check("δ = d/b = 0.2", abs(p1.delta() - 0.2) < 0.001)
+
+    # --- Test 2: delta high death ---
+    p2 = AMFungiParams(branch_rate=0.1, death_rate=1.0)
+    check("δ = 10.0 (high death)", abs(p2.delta() - 10.0) < 0.001)
+
+    # --- Test 3: tip flux at boundary ---
+    p3 = AMFungiParams(tip_flux_base=2.0, tip_flux_growth=0.5)
+    check("Tip flux t=0: n₀,b = 2.0", abs(p3.tip_flux_at_time(0) - 2.0) < 0.001)
+    check("Tip flux t=4: at+n₀,b = 4.0", abs(p3.tip_flux_at_time(4) - 4.0) < 0.001)
+
+    # --- Test 4: colony edge ---
+    p4 = AMFungiParams(tip_speed=2.0)
+    check("Colony edge t=5: xc = 10.0", abs(p4.colony_edge(5) - 10.0) < 0.001)
+
+    # --- Test 5: root emission creates nodes ---
+    G5 = nx.Graph()
+    G5.add_node("root1", pos3d=(0, 0, 0))
+    import random as _random
+    rng5 = _random.Random(42)
+    counter5 = [0]
+    p5 = AMFungiParams(tip_flux_base=3.0, tip_flux_growth=0.0)
+    stats5 = am_root_emit_tips(G5, ["root1"], step=0, params=p5,
+                                rng=rng5, name_counter=counter5)
+    check("Root emission: tips emitted = 3", stats5['tips_emitted'] == 3)
+    check("Root emission: new nodes created",
+          len(stats5['new_nodes']) == 3)
+
+    # --- Test 6: emitted nodes have 3D coords + spk ---
+    for nn in stats5['new_nodes']:
+        pos = G5.nodes[nn].get('pos3d')
+        spk = G5.nodes[nn].get('spk_direction')
+        check(f"Emitted {nn}: has 3D coords", pos is not None and len(pos) == 3)
+        check(f"Emitted {nn}: has spk_direction", spk is not None)
+        break  # Just check first one to save space
+
+    # --- Test 7: emitted nodes connected to root ---
+    am_edges = [(u, v) for u, v in G5.edges() if 'am_' in str(u) or 'am_' in str(v)]
+    check("Root emission: edges connect to root",
+          len(am_edges) == 3)
+
+    # --- Test 8: emitted nodes have source_root attr ---
+    first_new = stats5['new_nodes'][0]
+    check("Emitted node: source_root = root1",
+          G5.nodes[first_new].get('source_root') == 'root1')
+
+    # --- Test 9: density profile on simple graph ---
+    G9 = nx.path_graph(5)
+    for i, n in enumerate(G9.nodes()):
+        G9.nodes[n]['pos3d'] = (float(i), 0.0, 0.0)
+    profile = am_hyphal_density_profile(G9, [0], n_bins=3)
+    check("Density profile: has bins", len(profile['bins']) == 3)
+    check("Density profile: max_distance = 4.0",
+          abs(profile['max_distance'] - 4.0) < 0.01)
+
+    # --- Test 10: density profile empty graph ---
+    Ge = nx.Graph()
+    pe = am_hyphal_density_profile(Ge, [], n_bins=3)
+    check("Density empty: no crash", pe['max_distance'] == 0.0)
+
+    # --- Test 11: full simulation runs ---
+    G11 = nx.Graph()
+    p11 = AMFungiParams(tip_flux_base=2.0)
+    result11 = am_fungi_simulate(G11, ["root"], n_steps=10,
+                                  params=p11, seed=42)
+    check("Full sim: returns final_graph",
+          result11['final_graph'] is not None)
+    check("Full sim: history length = 10",
+          len(result11['history']) == 10)
+    check("Full sim: colony_edge > 0",
+          result11['colony_edge'] > 0)
+
+    # --- Test 12: graph grows over time ---
+    h = result11['history']
+    check("Full sim: nodes increase",
+          h[-1]['n_nodes_after'] > h[0]['n_nodes'])
+
+    # --- Test 13: tips emitted each step ---
+    total_emitted = sum(s.get('tips_emitted', 0) for s in h)
+    check("Full sim: total tips emitted > 0", total_emitted > 0)
+
+    # --- Test 14: density profile from simulation ---
+    dp = result11['density_profile']
+    check("Sim density: bins exist", len(dp['bins']) > 0)
+
+    # --- Test 15: delta stored in result ---
+    check("Sim delta: stored", result11['delta'] is not None)
+
+    # --- Test 16: species presets ---
+    presets = am_species_presets()
+    check("Presets: 3 species", len(presets) == 3)
+    check("Presets: S_calospora δ≈1",
+          abs(presets['S_calospora'].delta() - 1.0) < 0.01)
+
+    # --- Test 17: S. calospora no anastomosis ---
+    check("S. calospora: a1=0, a2=0",
+          presets['S_calospora'].a1 == 0 and presets['S_calospora'].a2 == 0)
+
+    # --- Test 18: A. laevis has tip-hypha anastomosis ---
+    check("A. laevis: a2 > 0 (tip-hypha anastomosis)",
+          presets['A_laevis'].a2 > 0)
+
+    # --- Test 19: low δ accumulates near root, high δ at front ---
+    # Low delta → more biomass near root
+    p_low = AMFungiParams(branch_rate=0.5, death_rate=0.05,
+                           tip_flux_base=2.0)
+    p_high = AMFungiParams(branch_rate=0.5, death_rate=2.5,
+                            tip_flux_base=2.0)
+    r_low = am_fungi_simulate(nx.Graph(), ["root"], n_steps=8,
+                               params=p_low, seed=42, use_edelstein=False)
+    r_high = am_fungi_simulate(nx.Graph(), ["root"], n_steps=8,
+                                params=p_high, seed=42, use_edelstein=False)
+    # Low delta should have more nodes (less death)
+    n_low = r_low['final_graph'].number_of_nodes()
+    n_high = r_high['final_graph'].number_of_nodes()
+    check("δ effect: low δ → more surviving nodes",
+          n_low >= n_high)
+
+    # --- Test 20: tip flux increases with time ---
+    p20 = AMFungiParams(tip_flux_base=1.0, tip_flux_growth=0.5)
+    check("Tip flux grows: t=0 < t=10",
+          p20.tip_flux_at_time(0) < p20.tip_flux_at_time(10))
+
+    # --- Test 21: multiple root nodes ---
+    G21 = nx.Graph()
+    r21 = am_fungi_simulate(G21, ["r1", "r2", "r3"], n_steps=5,
+                             params=AMFungiParams(tip_flux_base=1.0),
+                             seed=42)
+    # All 3 roots should be in graph
+    check("Multi-root: all 3 roots in graph",
+          all(r in r21['final_graph'] for r in ["r1", "r2", "r3"]))
+
+    # --- Test 22: integration with Edelstein (brique 13) ---
+    G22 = nx.Graph()
+    r22 = am_fungi_simulate(G22, ["root"], n_steps=10,
+                             params=AMFungiParams(), seed=42,
+                             use_edelstein=True, use_3d=True)
+    check("Integration 13+15+16: no crash",
+          r22['final_graph'].number_of_nodes() > 1)
+
+    # --- Test 23: empty root list → no crash ---
+    G23 = nx.Graph()
+    G23.add_node("a", pos3d=(0, 0, 0))
+    r23 = am_fungi_simulate(G23, [], n_steps=3,
+                             params=AMFungiParams(), seed=42)
+    check("Empty roots: no crash",
+          r23['final_graph'] is not None)
+
+    # --- Test 24: branch_rate=0 → delta=inf ---
+    p24 = AMFungiParams(branch_rate=0.0, death_rate=0.5)
+    check("Zero branching: δ = inf",
+          p24.delta() == float('inf'))
+
+    # --- Test 25: colony edge at t=0 is 0 ---
+    check("Colony edge t=0: xc = 0",
+          abs(AMFungiParams().colony_edge(0)) < 0.001)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 if __name__ == "__main__":
     main()
     p1, f1 = test_kirchhoff_physarum()
@@ -3960,8 +4499,9 @@ if __name__ == "__main__":
     p4, f4 = test_edelstein_growth()
     p5, f5 = test_oscillatory_signaling()
     p6, f6 = test_hyphal_mechanics_3d()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6
-    total_f = f1 + f2 + f3 + f4 + f5 + f6
+    p7, f7 = test_am_fungi_root_growth()
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-15: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-16: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")

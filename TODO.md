@@ -26,14 +26,15 @@
 | 13 | Edelstein growth (branching + death + densité) | 30 | Edelstein 1982, Schnepf 2008, Du 2019 | ✅ DONE |
 | 14 | Oscillatory signaling (hyphes qui se cherchent) | 22 | Goryachev 2012, Wernet 2023, Fleissner 2009 | ✅ DONE |
 | 15 | 3D hyphal mechanics (croissance filament) | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004, Money 2025, Lew 2011 | ✅ DONE |
+| 16 | AM fungi root growth (croissance depuis racine) | 32 | Schnepf & Roose 2008, Schnepf 2016, PNAS 2025 | ✅ DONE |
 
 ## 🔨 À faire
 
 | Brique | Nom | Source | Status |
 |--------|-----|--------|--------|
-| 16 | AM fungi root growth (croissance depuis racine) | Schnepf & Roose 2008 J. R. Soc. Interface 5:773 | TODO |
+| 17 | Nutrient transport & P uptake | Schnepf & Roose 2006, Bücking 2012 | TODO |
 
-### Compteur total: 202 tests (120 v1.0 + 82 v2.0), 3967 lignes
+### Compteur total: 234 tests (120 v1.0 + 114 v2.0), 4507 lignes
 
 ### Notes
 

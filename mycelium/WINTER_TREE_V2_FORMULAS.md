@@ -838,3 +838,49 @@ P(branch) ≈ 0.15 per step
 angle ∈ [30°, 90°]
 branch_dir = rotate(growth_dir, angle, random_axis)  // Rodrigues
 ```
+
+---
+
+## Brique 16 — AM Fungi Root Growth [Schnepf & Roose 2008]
+
+### Tip Conservation
+```
+∂n/∂t = -∇·(nv) + f
+f = bₙ·n·(1 - n/nₘₐₓ) - dₙ·n - a₂·n·ρ - a₁·n²
+```
+| Term | Description |
+|------|-------------|
+| bₙ·n·(1-n/nₘₐₓ) | Logistic branching |
+| dₙ·n | Tip death |
+| a₂·n·ρ | Tip-hypha anastomosis (A. laevis) |
+| a₁·n² | Tip-tip anastomosis (Glomus sp.) |
+
+### Hyphal Length Density
+```
+∂ρ/∂t = n|v| - dρ
+```
+
+### Root Boundary Condition
+```
+n(r₀, t) = at + n₀,b
+```
+Root surface acts as continuous source of hyphal tips.
+
+### Dimensionless Ratios
+```
+δ = d/b    (death/branching ratio)
+```
+| δ | Biomass distribution |
+|---|---------------------|
+| δ << 1 | Accumulated near root |
+| δ >> 1 | At colony front |
+
+### Colony Edge
+```
+xc = v·t
+```
+
+### VSC Tip Diameter (from brique 15)
+```
+d = π·N/V
+```
