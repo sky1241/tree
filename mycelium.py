@@ -2,15 +2,51 @@
 """
 WINTER TREE v2 — MYCELIUM ENGINE
 =================================
-Métriques réseau pour projets logiciels.
-Basé sur les modèles mathématiques de réseaux fongiques.
+Simulation complète du cycle de vie des champignons mycorhiziens
+arbusculaires (AM fungi), de la spore à la sporulation.
 
-Sources :
-- Bebber et al. 2007 (Proc. R. Soc. B 274:2307-2315)
-- Latora & Marchiori 2001 (Phys. Rev. Lett.)
-- Watts & Strogatz 1998 (Nature)
-- Tero et al. 2010 (Science 327:439-442)
-- Edelstein 1982 (J. Theor. Biol.)
+24 briques — 434 tests — 7748 lignes
+
+═══════════════════════════════════════════════════════════════
+ARBRE DU CODE — Ordre biologique complet A→Z→A
+═══════════════════════════════════════════════════════════════
+
+[18] L-System Root Architecture          ← Phase 0: la plante pousse
+  ↓ root_tips (positions 3D)
+[17] Spore Germination & Chemotaxis      ← Phase 1: spores dans le sol
+  ↓ germ_tips → contact avec racines
+[21] Appressorium (Hyphopodium)          ← Phase 1.5: ancrage + pénétration
+  ↓ turgor van't Hoff → entry_nodes        (turgor ~2 MPa, PPA 4-5h)
+[22] Arbuscules & Vésicules              ← Phase 2a: colonisation intraradical
+  ↓ 5 stades, turnover 2-7j                (surface ×10, TAG storage)
+[16] AM Root Emission                    ← Phase 2b: hyphes sortent de la racine
+  ↓ emission_rate × root_tips
+[13] Edelstein Branching                 ← Phase 2c: croissance extraradical
+[15] 3D Hyphal Mechanics                 ←   mécanique + tropisme
+[14] Oscillatory Signaling               ←   FitzHugh-Nagumo Ca²⁺
+[11] Anastomose / Fusion                 ← Phase 2d: réseau se connecte
+  ↓ mature network
+[19] Nutrient Transport (P uptake)       ← Phase 3: absorption phosphore
+  ↓ Michaelis-Menten + diffusion
+[20] C↔P Symbiosis Exchange             ← Phase 4: échange réciproque
+  ↓ fungal_c, soil_p
+[23] Sporulation                         ← Phase 5: nouvelles spores
+  ↓ mature spores (TAG 58-80%)             (High C+, High P-)
+  └──→ retour [17] ← BOUCLE FERMÉE
+
+[0-10] Métriques réseau (v1.0)           ← Analyse sur graphe final
+  0: Construction graphe     7: Small-world σ
+  1: Meshedness α            8: Small-world ω
+  2: Efficacité globale      9: Stratégie phalanx/guerrilla
+  3: Efficacité root        10: Kirchhoff + Physarum
+  4: Volume-MST ratio       11: Anastomose
+  5: Betweenness centrality 12: Intégration complète
+  6: Robustesse
+
+Sources principales:
+  Bebber 2007, Latora 2001, Tero 2010, Edelstein 1982,
+  Schnepf 2008, Howard 1991, Genre 2005, Pimprikar 2018,
+  Kiers 2011, Kokkoris 2026, Pfeffer 1999, Bago 2002
 
 Auteur : Sky — l'architecte de l'architecte
 """
