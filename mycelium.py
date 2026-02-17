@@ -1964,8 +1964,8 @@ def spatial_anastomose(G, d_max_3d=2.0, max_fusions=50, conductivity_init=0.5):
                 nodes_by_comp[cid] = []
             nodes_by_comp[cid].append((n, pos))
 
-    # Find cross-component pairs within d_max_3d
-    candidates = []
+    # Find cross-component pairs within d_max_3d (inter-component fusion)
+    inter_candidates = []
     comp_ids = list(nodes_by_comp.keys())
     for i_idx in range(len(comp_ids)):
         for j_idx in range(i_idx + 1, len(comp_ids)):
@@ -1974,27 +1974,65 @@ def spatial_anastomose(G, d_max_3d=2.0, max_fusions=50, conductivity_init=0.5):
                 for nj, pj in nodes_by_comp[cj]:
                     d = math.sqrt(sum((a - b) ** 2 for a, b in zip(pi, pj)))
                     if d <= d_max_3d and not G.has_edge(ni, nj):
-                        candidates.append((ni, nj, d))
+                        inter_candidates.append((ni, nj, d, 'inter'))
 
-    # Sort by distance (closest first) and fuse
-    candidates.sort(key=lambda x: x[2])
-    fused = []
-    for ni, nj, d in candidates[:max_fusions]:
-        # Re-check components (previous fusions may have merged them)
-        if nx.has_path(G, ni, nj):
+    # Find intra-component pairs within d_max_3d (creates cycles = meshedness)
+    # Source: Hickey et al. 2002 — "self-fusion" within same colony creates
+    # redundant paths. Only fuse if graph distance >> Euclidean distance,
+    # indicating a shortcut (not trivial neighbor fusion).
+    # min_graph_hops: minimum graph distance to prevent trivial fusions.
+    min_graph_hops = 4
+    intra_candidates = []
+    for cid, node_list in nodes_by_comp.items():
+        if len(node_list) < 2:
             continue
+        # Build subgraph for shortest path checks
+        sub_nodes = {n for n, _ in node_list}
+        for i_idx in range(len(node_list)):
+            for j_idx in range(i_idx + 1, min(i_idx + 80, len(node_list))):
+                ni, pi = node_list[i_idx]
+                nj, pj = node_list[j_idx]
+                if G.has_edge(ni, nj):
+                    continue
+                d = math.sqrt(sum((a - b) ** 2 for a, b in zip(pi, pj)))
+                if d <= d_max_3d:
+                    # Check graph distance — only fuse if far in graph
+                    try:
+                        gd = nx.shortest_path_length(G, ni, nj)
+                    except nx.NetworkXNoPath:
+                        gd = 999
+                    if gd >= min_graph_hops:
+                        intra_candidates.append((ni, nj, d, 'intra'))
+
+    # Merge and sort all candidates by distance (closest first)
+    candidates = inter_candidates + intra_candidates
+    candidates.sort(key=lambda x: x[2])
+
+    fused_inter = []
+    fused_intra = []
+    for ni, nj, d, kind in candidates[:max_fusions]:
+        if kind == 'inter':
+            # Re-check: skip if already in same component (earlier fusion merged them)
+            if nx.has_path(G, ni, nj):
+                continue
+        # else intra: always add (creates cycle)
         G.add_edge(ni, nj, weight=1.0, conductivity=conductivity_init,
                    anastomosis=True, spatial_fusion=True,
                    length_3d=d, fusion_distance=d)
-        fused.append((ni, nj, d))
+        if kind == 'inter':
+            fused_inter.append((ni, nj, d))
+        else:
+            fused_intra.append((ni, nj, d))
 
     comps_after = nx.number_connected_components(G)
 
     return {
-        'n_fused': len(fused),
+        'n_fused': len(fused_inter) + len(fused_intra),
+        'n_fused_inter': len(fused_inter),
+        'n_fused_intra': len(fused_intra),
         'components_before': comps_before,
         'components_after': comps_after,
-        'fused_pairs': fused,
+        'fused_pairs': [(n1, n2, d) for n1, n2, d in fused_inter + fused_intra],
     }
 
 
@@ -6354,17 +6392,31 @@ def full_lifecycle_simulate(
         'symbiosis_stable': phase4['symbiosis_stable'],
     }
 
+    # ── PHASE 2c: Prune orphan components ────────────────────
+    # Source: Bebber 2007 — metrics computed on connected network only.
+    # Dead hyphal fragments decompose (Boddy 1999); they are noise for
+    # network analysis. Keep root-connected subgraph as "living network".
+    pruned_nodes = mature_graph.number_of_nodes() - active_graph.number_of_nodes()
+    pruned_pct = pruned_nodes / max(mature_graph.number_of_nodes(), 1) * 100
+    results['phase2c_pruning'] = {
+        'total_before': mature_graph.number_of_nodes(),
+        'active_after': active_graph.number_of_nodes(),
+        'pruned_nodes': pruned_nodes,
+        'pruned_pct': round(pruned_pct, 1),
+    }
+
     # ── PHASE 5: v1.0 metrics [briques 0-10] ──────────────────
+    # Metrics on active (root-connected) graph — biologically meaningful.
     try:
-        alpha = meshedness(mature_graph)
+        alpha = meshedness(active_graph)
     except Exception:
         alpha = None
     try:
-        eff = global_efficiency(mature_graph)
+        eff = global_efficiency(active_graph)
     except Exception:
         eff = None
     try:
-        vol_ratio = volume_mst_ratio(mature_graph)
+        vol_ratio = volume_mst_ratio(active_graph)
     except Exception:
         vol_ratio = None
 
@@ -6372,10 +6424,12 @@ def full_lifecycle_simulate(
         'meshedness': alpha,
         'global_efficiency': eff,
         'volume_mst_ratio': vol_ratio,
-        'n_components': nx.number_connected_components(mature_graph),
+        'n_components': nx.number_connected_components(active_graph),
+        'n_components_full': nx.number_connected_components(mature_graph),
     }
 
-    results['final_graph'] = mature_graph
+    results['final_graph'] = active_graph
+    results['full_graph'] = mature_graph
     results['lifecycle_complete'] = True
 
     return results
@@ -6478,6 +6532,26 @@ def test_lifecycle_chain():
     check("Post-proc: 100% edges have weight",
           edges_with_weight == G_final.number_of_edges())
 
+    # === TEST BLOCK 7d: Phase 2c — Pruning orphan components ===
+    check("Phase 2c: pruning stats exist",
+          'phase2c_pruning' in r)
+    check("Phase 2c: active < total (orphans pruned)",
+          r['phase2c_pruning']['active_after'] <=
+          r['phase2c_pruning']['total_before'])
+    check("Phase 2c: final_graph = active (pruned) graph",
+          r['final_graph'].number_of_nodes() ==
+          r['phase2c_pruning']['active_after'])
+    check("Phase 2c: full_graph preserved",
+          r['full_graph'].number_of_nodes() ==
+          r['phase2c_pruning']['total_before'])
+    # Metrics on pruned graph: meshedness should be >= 0
+    check("Phase 5: meshedness >= 0 on active graph",
+          r['phase5_metrics']['meshedness'] is not None and
+          r['phase5_metrics']['meshedness'] >= 0)
+    # Active graph should be connected (1 component)
+    check("Phase 5: active graph = 1 component",
+          r['phase5_metrics']['n_components'] == 1)
+
     # === TEST BLOCK 8: End-to-end properties ===
     check("Lifecycle complete flag",
           r.get('lifecycle_complete'))
@@ -6515,8 +6589,8 @@ def test_lifecycle_chain():
     # === TEST BLOCK 12: All phases ran in order ===
     phases = ['phase0_root', 'phase1_germination', 'joint_1_2',
               'phase2_growth', 'phase2b_spatial_fusion', 'post_processing',
-              'joint_2_3', 'phase3_nutrients', 'phase4_exchange',
-              'phase5_metrics']
+              'phase2c_pruning', 'joint_2_3', 'phase3_nutrients',
+              'phase4_exchange', 'phase5_metrics']
     all_present = all(p in r for p in phases)
     check("All phases present in results", all_present)
 
