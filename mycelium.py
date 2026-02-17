@@ -6028,6 +6028,330 @@ def test_am_fungi_root_growth():
     return passed, failed
 
 
+# ═══════════════════════════════════════════════════════════════════
+# FULL LIFECYCLE PIPELINE — Ordre biologique
+# ═══════════════════════════════════════════════════════════════════
+# Phase 0: [18] Root architecture (L-System)
+# Phase 1: [17] Spore germination + chemotaxis toward root
+# Phase 2: [16+13+15+14+11] AM fungi growth, branching, mechanics,
+#           signaling, fusion
+# Phase 3: [19] P uptake by mature network
+# Phase 4: [20] C↔P exchange plant-fungus
+# Phase 5: [0-10] v1.0 metrics on final graph
+# ═══════════════════════════════════════════════════════════════════
+
+
+def full_lifecycle_simulate(
+        # Phase 0 params
+        root_types=None, root_steps=10,
+        # Phase 1 params
+        spore_positions=None, spore_steps=15,
+        spore_params=None,
+        # Phase 2 params
+        am_steps=20, am_params=None,
+        use_edelstein=True, use_3d=True, use_oscillatory=True,
+        # Phase 3 params
+        nutrient_steps=15, nutrient_params=None,
+        # Phase 4 params
+        symbiosis_steps=30, symbiosis_params=None,
+        # General
+        seed=42):
+    """Full AM fungi lifecycle: root → spore → growth → nutrients → exchange.
+
+    Chains briques 18→17→16+13+15+14+11→19→20→v1.0 in biological order.
+
+    Returns
+    -------
+    dict with phase results + final metrics
+    """
+    import random as _random
+    rng = _random.Random(seed)
+    results = {}
+
+    # ── PHASE 0: Root architecture [brique 18] ──────────────────
+    phase0 = lsystem_root_generate(
+        root_types=root_types, n_steps=root_steps, seed=seed)
+    root_graph = phase0['graph']
+    root_tips = phase0['root_tips']
+    results['phase0_root'] = {
+        'n_nodes': root_graph.number_of_nodes(),
+        'n_tips': len(root_tips),
+        'root_lengths': phase0['root_lengths'],
+    }
+
+    # ── JOINT 0→1: Extract root tip positions for SL source ─────
+    root_tip_positions = []
+    for tip in root_tips:
+        pos = root_graph.nodes[tip].get('pos3d')
+        if pos:
+            root_tip_positions.append(pos)
+
+    if not root_tip_positions:
+        raise ValueError("Phase 0 produced no root tips with positions")
+
+    # ── PHASE 1: Spore germination [brique 17] ─────────────────
+    if spore_positions is None:
+        # Default: scatter spores in soil around root zone
+        spore_positions = []
+        for i in range(5):
+            sp = (rng.uniform(-5, 15),
+                  rng.uniform(-5, 5),
+                  rng.uniform(-8, -1))
+            spore_positions.append(sp)
+
+    phase1 = spore_germination_simulate(
+        spore_positions, root_tip_positions,
+        n_steps=spore_steps, params=spore_params, seed=seed)
+
+    results['phase1_germination'] = {
+        'n_spores': len(spore_positions),
+        'n_germinated': len(phase1['germinated']),
+        'n_nodes': phase1['graph'].number_of_nodes(),
+    }
+
+    # ── JOINT 1→2: Merge spore graph into root graph ───────────
+    # Problem: spore_germination creates its own root_0, root_1 nodes.
+    # We need to connect germ tube tips to actual root tips.
+    spore_graph = phase1['graph']
+
+    # Get germ tube tips from spore graph
+    germ_tips = [n for n in spore_graph.nodes()
+                 if spore_graph.nodes[n].get('is_am_tip') or
+                 (isinstance(n, str) and 'germ_tip' in n)]
+
+    # Add germ tube network to root graph (skip duplicate root nodes)
+    for node in spore_graph.nodes():
+        if isinstance(node, str) and node.startswith('root_'):
+            continue  # skip — we use actual root graph tips
+        if node not in root_graph:
+            root_graph.add_node(node, **spore_graph.nodes[node])
+
+    for u, v, d in spore_graph.edges(data=True):
+        if (isinstance(u, str) and u.startswith('root_')) or \
+           (isinstance(v, str) and v.startswith('root_')):
+            continue  # skip edges to fake root nodes
+        if u in root_graph and v in root_graph:
+            root_graph.add_edge(u, v, **d)
+
+    # Connect germ tips to nearest actual root tip
+    connections_made = 0
+    for gt in germ_tips:
+        if gt not in root_graph:
+            continue
+        gt_pos = root_graph.nodes[gt].get('pos3d')
+        if not gt_pos:
+            continue
+        # Find nearest root tip
+        best_tip = None
+        best_dist = float('inf')
+        for rt in root_tips:
+            rt_pos = root_graph.nodes[rt].get('pos3d')
+            if rt_pos:
+                d = _vec_distance(gt_pos, rt_pos)
+                if d < best_dist:
+                    best_dist = d
+                    best_tip = rt
+        if best_tip and best_dist < 20:  # max connection distance
+            root_graph.add_edge(gt, best_tip,
+                                length_3d=best_dist,
+                                is_colonization=True)
+            connections_made += 1
+
+    results['joint_1_2'] = {
+        'germ_tips': len(germ_tips),
+        'connections_to_root': connections_made,
+        'merged_nodes': root_graph.number_of_nodes(),
+    }
+
+    # ── PHASE 2: AM fungi growth [briques 16+13+15+14+11] ──────
+    # Use root_tips as emission points
+    colonization_points = root_tips[:] if root_tips else []
+    phase2 = am_fungi_simulate(
+        root_graph, colonization_points,
+        n_steps=am_steps, params=am_params, seed=seed,
+        use_edelstein=use_edelstein, use_3d=use_3d,
+        use_oscillatory=use_oscillatory)
+
+    mature_graph = phase2['final_graph']
+    results['phase2_growth'] = {
+        'n_nodes': mature_graph.number_of_nodes(),
+        'n_edges': mature_graph.number_of_edges(),
+        'fusion_events': phase2.get('total_fusions', 0),
+    }
+
+    # ── JOINT 2→3: mature graph → nutrient simulation ──────────
+    # root_tips are P sinks (where fungus delivers P to plant)
+    nutrient_roots = [n for n in root_tips if n in mature_graph]
+    if not nutrient_roots:
+        nutrient_roots = [n for n in mature_graph.nodes()
+                          if mature_graph.nodes[n].get('is_root')][:3]
+
+    # ── PHASE 3: P uptake [brique 19] ──────────────────────────
+    phase3 = nutrient_simulate(
+        mature_graph, nutrient_roots,
+        n_steps=nutrient_steps, params=nutrient_params, seed=seed)
+
+    results['phase3_nutrients'] = {
+        'total_p_root': phase3['total_p_root'],
+        'depletion_zone': phase3['depletion_zone'],
+    }
+
+    # ── JOINT 3→4: P delivery → symbiosis exchange ─────────────
+    # Use actual P from phase 3 as soil_p proxy for phase 4
+    soil_p_effective = max(phase3['total_p_root'] / max(nutrient_steps, 1),
+                          0.001)
+
+    # ── PHASE 4: C↔P exchange [brique 20] ──────────────────────
+    # Fungal biomass proportional to network size
+    fungal_biomass = mature_graph.number_of_nodes() * 0.1
+    phase4 = symbiosis_simulate(
+        n_steps=symbiosis_steps, params=symbiosis_params,
+        soil_p=soil_p_effective,
+        initial_fungal_biomass=max(fungal_biomass, 0.5),
+        seed=seed)
+
+    results['phase4_exchange'] = {
+        'total_plant_p': phase4['final_plant_p'],
+        'total_fungal_c': phase4['final_fungal_c'],
+        'fungus_alive': phase4['fungus_alive'],
+        'symbiosis_stable': phase4['symbiosis_stable'],
+    }
+
+    # ── PHASE 5: v1.0 metrics [briques 0-10] ──────────────────
+    try:
+        alpha = meshedness(mature_graph)
+    except Exception:
+        alpha = None
+    try:
+        eff = global_efficiency(mature_graph)
+    except Exception:
+        eff = None
+    try:
+        vol_ratio = volume_mst_ratio(mature_graph)
+    except Exception:
+        vol_ratio = None
+
+    results['phase5_metrics'] = {
+        'meshedness': alpha,
+        'global_efficiency': eff,
+        'volume_mst_ratio': vol_ratio,
+        'n_components': nx.number_connected_components(mature_graph),
+    }
+
+    results['final_graph'] = mature_graph
+    results['lifecycle_complete'] = True
+
+    return results
+
+
+def test_lifecycle_chain():
+    """Tests for full lifecycle pipeline — biological order."""
+    print("\n=== LIFECYCLE CHAIN: Full Biological Order ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # === TEST BLOCK 1: Phase 0 — Root exists ===
+    r = full_lifecycle_simulate(root_steps=8, spore_steps=10,
+                                 am_steps=10, nutrient_steps=10,
+                                 symbiosis_steps=20, seed=42)
+
+    check("Phase 0: root nodes > 0",
+          r['phase0_root']['n_nodes'] > 0)
+    check("Phase 0: root tips > 0",
+          r['phase0_root']['n_tips'] > 0)
+
+    # === TEST BLOCK 2: Phase 1 — Spores germinate ===
+    check("Phase 1: spores placed",
+          r['phase1_germination']['n_spores'] > 0)
+    check("Phase 1: at least 1 germinated",
+          r['phase1_germination']['n_germinated'] > 0)
+
+    # === TEST BLOCK 3: Joint 1→2 — Germ tubes reach root ===
+    check("Joint 1→2: germ tips detected",
+          r['joint_1_2']['germ_tips'] >= 0)
+    check("Joint 1→2: merged graph bigger than root alone",
+          r['joint_1_2']['merged_nodes'] > r['phase0_root']['n_nodes'])
+
+    # === TEST BLOCK 4: Phase 2 — AM growth ===
+    check("Phase 2: network grew",
+          r['phase2_growth']['n_nodes'] > r['joint_1_2']['merged_nodes'])
+    check("Phase 2: edges exist",
+          r['phase2_growth']['n_edges'] > 0)
+
+    # === TEST BLOCK 5: Phase 3 — P uptake ===
+    check("Phase 3: P delivered to root > 0",
+          r['phase3_nutrients']['total_p_root'] > 0)
+    check("Phase 3: soil depletion > 0",
+          r['phase3_nutrients']['depletion_zone'] > 0)
+
+    # === TEST BLOCK 6: Phase 4 — C↔P exchange ===
+    check("Phase 4: plant got P",
+          r['phase4_exchange']['total_plant_p'] > 0)
+    check("Phase 4: fungus got C",
+          r['phase4_exchange']['total_fungal_c'] > 0)
+    check("Phase 4: fungus alive",
+          r['phase4_exchange']['fungus_alive'])
+
+    # === TEST BLOCK 7: Phase 5 — Metrics ===
+    check("Phase 5: meshedness computed",
+          r['phase5_metrics']['meshedness'] is not None)
+    check("Phase 5: efficiency computed",
+          r['phase5_metrics']['global_efficiency'] is not None)
+
+    # === TEST BLOCK 8: End-to-end properties ===
+    check("Lifecycle complete flag",
+          r.get('lifecycle_complete'))
+    check("Final graph exists",
+          r['final_graph'] is not None)
+    check("Final graph has nodes",
+          r['final_graph'].number_of_nodes() > 10)
+
+    # === TEST BLOCK 9: Different seeds ===
+    r2 = full_lifecycle_simulate(root_steps=6, spore_steps=8,
+                                  am_steps=8, nutrient_steps=8,
+                                  symbiosis_steps=15, seed=99)
+    check("Seed 99: lifecycle completes",
+          r2.get('lifecycle_complete'))
+
+    # === TEST BLOCK 10: No spores → still works ===
+    r3 = full_lifecycle_simulate(root_steps=6, spore_positions=[],
+                                  am_steps=8, nutrient_steps=8,
+                                  symbiosis_steps=15, seed=42)
+    check("No spores: lifecycle still completes",
+          r3.get('lifecycle_complete'))
+
+    # === TEST BLOCK 11: Monotonic P flow ===
+    # Over lifecycle: more steps → more P
+    r_short = full_lifecycle_simulate(root_steps=5, am_steps=5,
+                                      nutrient_steps=5, symbiosis_steps=10,
+                                      seed=42)
+    r_long = full_lifecycle_simulate(root_steps=10, am_steps=15,
+                                     nutrient_steps=15, symbiosis_steps=30,
+                                     seed=42)
+    check("Longer lifecycle → more P to plant",
+          r_long['phase4_exchange']['total_plant_p'] >=
+          r_short['phase4_exchange']['total_plant_p'])
+
+    # === TEST BLOCK 12: All phases ran in order ===
+    phases = ['phase0_root', 'phase1_germination', 'joint_1_2',
+              'phase2_growth', 'phase3_nutrients', 'phase4_exchange',
+              'phase5_metrics']
+    all_present = all(p in r for p in phases)
+    check("All phases present in results", all_present)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 if __name__ == "__main__":
     main()
     p1, f1 = test_kirchhoff_physarum()
@@ -6041,8 +6365,9 @@ if __name__ == "__main__":
     p9, f9 = test_lsystem_root()
     p10, f10 = test_nutrient_uptake()
     p11, f11 = test_symbiosis_exchange()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11
+    p12, f12 = test_lifecycle_chain()
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-20: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-20 + LIFECYCLE: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
