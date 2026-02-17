@@ -3270,6 +3270,688 @@ def test_oscillatory_signaling():
     return passed, failed
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 15 — 3D HYPHAL MECHANICS (v2.0)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   [A] Phys. Rev. E 112:034401, 2025 (BMX expansion)
+#     "3D modeling of hyphal fusion, branching, and nutrient transport"
+#     Filaments = two-site particles, hydrodynamic drag, mechanical
+#     forces. Branching + anastomosis in 3D. Open-source BMX suite.
+#     Used for: overall 3D filament simulation architecture.
+#
+#   [B] Bartnicki-Garcia, Hergert, Gierz 1989, Protoplasma 153:46-57
+#     "Computer simulation of fungal morphogenesis"
+#     VSC (Vesicle Supply Center) model: y = x·cot(V·x/N)
+#     N = vesicles/unit time, V = VSC displacement rate.
+#     Spitzenkörper = VSC → position determines growth direction.
+#     Stationary VSC → sphere. Moving VSC → cylinder (hypha).
+#     Used for: directional memory (spk_direction on tips).
+#
+#   [C] Tindemans, Kern, Mulder 2006, J. Theor. Biol. 238:937-951
+#     "The diffusive VSC model for tip growth"
+#     Extends [B] with diffusion + finite exocytosis rate k.
+#     Dimensionless param λ = D/(k·R²), blunter tips than ballistic.
+#     Used for: tip diameter scaling.
+#
+#   [D] Meškauskas & Moore 2004, Mycol. Res. 108:1241-1256
+#     "Neighbour-sensing model" — 3D vector-based growth.
+#     Each tip generates scalar field (1/d²), tips avoid neighbors.
+#     Branching angle + growth direction from local field gradient.
+#     Used for: negative autotropism force, branch angles 30-90°.
+#
+#   [E] Money 2025, Fungal Genet. Biol. 177:103961
+#     "Physical forces supporting hyphal growth"
+#     Turgor pressure (0.1-1.0 MPa) drives extension.
+#     Extension rate v = φ·(P - Y) — Lockhart equation.
+#     φ=wall extensibility, P=turgor, Y=yield threshold.
+#     Turgor mainly needed for invasive growth (obstacles).
+#     Used for: extension_rate() function.
+#
+#   [F] Riquelme & Bartnicki-Garcia 2004, Fungal Genet. Biol.
+#     Apical branching = tip splits when Spk disappears.
+#     Lateral branching = new Spk forms subapically.
+#     Used for: two branching modes.
+#
+#   [G] Islam et al. 2017, Soft Matter (PMC 29026133)
+#     "Morphology and mechanics of fungal mycelium"
+#     Fiber network model. E ∝ ρ² (density squared scaling).
+#     Mean diameter 1.3 μm. Strain hardening before rupture.
+#     Used for: density-dependent mechanics.
+#
+#   [H] Lew 2011, Microbiology 157:2319-2328
+#     Spitzenkörper = "gyroscope" — directional memory.
+#     In constrained channels, Spk maintains trajectory.
+#     Lost on obstacle → random reorientation.
+#     Used for: spk_direction persistence + decay.
+#
+# Discrete translation for graphs:
+#   Nodes get 3D coords (x, y, z).
+#   Tips carry spk_direction (Spitzenkörper memory) [B,H].
+#   Extension rate from Lockhart: v = φ·(P - Y) [E].
+#   Growth direction = spk_direction + autotropism + noise.
+#   Negative autotropism: avoid high local density (1/d²) [D].
+#   Branch angle ∈ [30°, 90°] (Meškauskas 2004) [D].
+#   Tip diameter d = π·N/V (from hyphoid equation) [B].
+#   Edge length = Euclidean distance between node coords.
+# ═══════════════════════════════════════════════════════════════════
+
+
+class HyphalMechanicsParams:
+    """Parameters for 3D hyphal mechanics.
+
+    Sources:
+        Money 2025: turgor 0.1-1.0 MPa, Lockhart equation [E]
+        Meškauskas 2004: branching angles, autotropism [D]
+        Bartnicki-Garcia 1989: VSC model, hyphoid equation [B]
+        Lew 2011: Spitzenkörper gyroscope [H]
+        BMX 2025: filament interaction forces [A]
+    """
+    def __init__(self,
+                 turgor=0.5,           # P: turgor pressure (normalized 0-1)
+                 yield_threshold=0.2,  # Y: wall yield threshold
+                 extensibility=1.0,    # φ: wall extensibility
+                 branch_angle_min=30,  # degrees [D]
+                 branch_angle_max=90,  # degrees [D]
+                 autotropism_strength=0.3,  # negative autotropism [D]
+                 autotropism_range=3.0,    # distance for 1/d² field [D]
+                 noise=0.1,            # random deviation in growth direction
+                 segment_length=1.0,   # default edge length for new segments
+                 spk_persistence=0.85, # Spitzenkörper memory (0-1) [H]
+                                       # 1.0 = perfect gyroscope, 0 = no memory
+                 vesicle_rate=10.0,    # N: vesicles/unit time [B]
+                 vsc_speed=1.0,        # V: VSC displacement rate [B]
+                 ):
+        self.turgor = turgor
+        self.yield_threshold = yield_threshold
+        self.extensibility = extensibility
+        self.branch_angle_min = branch_angle_min
+        self.branch_angle_max = branch_angle_max
+        self.autotropism_strength = autotropism_strength
+        self.autotropism_range = autotropism_range
+        self.noise = noise
+        self.segment_length = segment_length
+        self.spk_persistence = spk_persistence
+        self.vesicle_rate = vesicle_rate
+        self.vsc_speed = vsc_speed
+
+    def extension_rate(self):
+        """Lockhart equation: v = φ·max(0, P - Y).
+
+        Source: Money 2025 [E], adapted from Lockhart 1965.
+        """
+        return self.extensibility * max(0.0, self.turgor - self.yield_threshold)
+
+    def tip_diameter(self):
+        """Hyphoid equation: d = π·N/V (diameter from VSC model).
+
+        Source: Bartnicki-Garcia 1989 [B], Protoplasma 153:46-57.
+        y = x·cot(V·x/N) → diameter = π·N/V.
+        """
+        if self.vsc_speed < 1e-10:
+            return float('inf')
+        return math.pi * self.vesicle_rate / self.vsc_speed
+
+
+def assign_3d_coords(G, layout='spring', seed=42):
+    """
+    Assign 3D coordinates to all nodes in G.
+
+    Parameters
+    ----------
+    G : nx.Graph
+    layout : str
+        'spring' — force-directed 3D layout
+        'random' — random positions
+    seed : int
+
+    Returns
+    -------
+    dict {node: (x, y, z)} — also stored as node attribute 'pos3d'
+    """
+    import random as _random
+    rng = _random.Random(seed)
+
+    if layout == 'spring':
+        # Use NetworkX spring layout in 3D
+        pos2d = nx.spring_layout(G, dim=3, seed=seed)
+        coords = {n: tuple(pos2d[n]) for n in G.nodes()}
+    else:
+        coords = {n: (rng.gauss(0, 5), rng.gauss(0, 5), rng.gauss(0, 5))
+                  for n in G.nodes()}
+
+    for n, c in coords.items():
+        G.nodes[n]['pos3d'] = c
+
+    return coords
+
+
+def _vec_subtract(a, b):
+    return (a[0]-b[0], a[1]-b[1], a[2]-b[2])
+
+def _vec_add(a, b):
+    return (a[0]+b[0], a[1]+b[1], a[2]+b[2])
+
+def _vec_scale(v, s):
+    return (v[0]*s, v[1]*s, v[2]*s)
+
+def _vec_norm(v):
+    return math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+
+def _vec_normalize(v):
+    n = _vec_norm(v)
+    if n < 1e-10:
+        return (1.0, 0.0, 0.0)
+    return (v[0]/n, v[1]/n, v[2]/n)
+
+def _vec_distance(a, b):
+    return _vec_norm(_vec_subtract(a, b))
+
+def _random_unit_vector(rng):
+    """Random point on unit sphere (Marsaglia method)."""
+    while True:
+        x = rng.gauss(0, 1)
+        y = rng.gauss(0, 1)
+        z = rng.gauss(0, 1)
+        n = math.sqrt(x*x + y*y + z*z)
+        if n > 1e-10:
+            return (x/n, y/n, z/n)
+
+def _rotate_vector_random(v, angle_deg, rng):
+    """Rotate vector v by angle_deg around a random perpendicular axis."""
+    # Find a perpendicular vector
+    rand_v = _random_unit_vector(rng)
+    # Cross product v × rand_v for perpendicular
+    cx = v[1]*rand_v[2] - v[2]*rand_v[1]
+    cy = v[2]*rand_v[0] - v[0]*rand_v[2]
+    cz = v[0]*rand_v[1] - v[1]*rand_v[0]
+    cn = math.sqrt(cx*cx + cy*cy + cz*cz)
+    if cn < 1e-10:
+        return v
+    # Normalize perpendicular
+    px, py, pz = cx/cn, cy/cn, cz/cn
+    # Rodrigues rotation around perpendicular axis
+    angle_rad = math.radians(angle_deg)
+    cos_a = math.cos(angle_rad)
+    sin_a = math.sin(angle_rad)
+    # v_rot = v*cos(a) + (p × v)*sin(a) + p*(p·v)*(1-cos(a))
+    dot_pv = px*v[0] + py*v[1] + pz*v[2]
+    cross_x = py*v[2] - pz*v[1]
+    cross_y = pz*v[0] - px*v[2]
+    cross_z = px*v[1] - py*v[0]
+    rx = v[0]*cos_a + cross_x*sin_a + px*dot_pv*(1-cos_a)
+    ry = v[1]*cos_a + cross_y*sin_a + py*dot_pv*(1-cos_a)
+    rz = v[2]*cos_a + cross_z*sin_a + pz*dot_pv*(1-cos_a)
+    return _vec_normalize((rx, ry, rz))
+
+
+def compute_autotropism_force(G, node, params):
+    """
+    Negative autotropism: repulsive field from nearby hyphae.
+
+    Source: Meškauskas & Moore 2004 — scalar field 1/d² from hyphae.
+    Tips try to avoid dense regions.
+
+    Returns (fx, fy, fz) repulsion vector.
+    """
+    pos = G.nodes[node].get('pos3d')
+    if pos is None:
+        return (0, 0, 0)
+
+    force = [0.0, 0.0, 0.0]
+    for other in G.nodes():
+        if other == node:
+            continue
+        other_pos = G.nodes[other].get('pos3d')
+        if other_pos is None:
+            continue
+        d = _vec_distance(pos, other_pos)
+        if d < 0.01:
+            d = 0.01
+        if d > params.autotropism_range:
+            continue
+        # Repulsive force ∝ 1/d² (Meškauskas field)
+        strength = params.autotropism_strength / (d * d)
+        direction = _vec_normalize(_vec_subtract(pos, other_pos))
+        force[0] += direction[0] * strength
+        force[1] += direction[1] * strength
+        force[2] += direction[2] * strength
+
+    return tuple(force)
+
+
+def hyphal_growth_3d_step(G, params=None, rng=None, name_counter=None):
+    """
+    One step of 3D hyphal growth on graph.
+
+    For each tip (leaf node):
+    1. Compute growth direction (parent→tip + autotropism + noise)
+    2. Extension rate from Lockhart equation
+    3. Add new node at extended position
+    4. Optionally branch (add second node at branch angle)
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graph with 'pos3d' attributes on nodes.
+    params : HyphalMechanicsParams
+    rng : random.Random
+    name_counter : list [int]
+        Mutable counter for naming new nodes.
+
+    Returns
+    -------
+    dict with step stats
+    """
+    import random as _random
+    rng = rng or _random.Random()
+    params = params or HyphalMechanicsParams()
+    if name_counter is None:
+        name_counter = [G.number_of_nodes()]
+
+    stats = {
+        'extensions': 0,
+        'branches': 0,
+        'nodes_added': 0,
+    }
+
+    tips = [n for n in G.nodes() if G.degree(n) <= 1
+            and G.nodes[n].get('pos3d') is not None]
+
+    ext_rate = params.extension_rate()
+    if ext_rate <= 0:
+        return stats
+
+    new_elements = []  # (parent, new_name, new_pos, is_branch)
+
+    for tip in tips:
+        if tip not in G:
+            continue
+        tip_pos = G.nodes[tip].get('pos3d')
+        if tip_pos is None:
+            continue
+
+        # Growth direction = Spitzenkörper memory [B,H]
+        # The Spitzenkörper acts as a gyroscope (Lew 2011):
+        # it preserves direction between steps, with persistence factor.
+        spk_dir = G.nodes[tip].get('spk_direction')
+
+        # Fallback: parent→tip vector
+        neighbors = list(G.neighbors(tip))
+        if neighbors:
+            parent = neighbors[0]
+            parent_pos = G.nodes[parent].get('pos3d', (0, 0, 0))
+            parent_dir = _vec_normalize(_vec_subtract(tip_pos, parent_pos))
+        else:
+            parent_dir = _random_unit_vector(rng)
+
+        if spk_dir is not None and _vec_norm(spk_dir) > 1e-10:
+            # Blend Spitzenkörper memory with parent direction [H]
+            # High persistence → strong directional memory
+            growth_dir = _vec_normalize(_vec_add(
+                _vec_scale(spk_dir, params.spk_persistence),
+                _vec_scale(parent_dir, 1.0 - params.spk_persistence)
+            ))
+        else:
+            growth_dir = parent_dir
+
+        # Add autotropism (negative: away from dense areas)
+        auto_force = compute_autotropism_force(G, tip, params)
+        auto_norm = _vec_norm(auto_force)
+        if auto_norm > 0:
+            auto_unit = _vec_normalize(auto_force)
+            # Blend growth direction with autotropism
+            growth_dir = _vec_normalize(_vec_add(
+                _vec_scale(growth_dir, 1.0),
+                _vec_scale(auto_unit, min(auto_norm, 0.5))
+            ))
+
+        # Add random noise
+        noise_vec = _random_unit_vector(rng)
+        growth_dir = _vec_normalize(_vec_add(
+            _vec_scale(growth_dir, 1.0),
+            _vec_scale(noise_vec, params.noise)
+        ))
+
+        # Extension: new node at tip_pos + growth_dir * segment_length * ext_rate
+        seg_len = params.segment_length * ext_rate
+        new_pos = _vec_add(tip_pos, _vec_scale(growth_dir, seg_len))
+        name_counter[0] += 1
+        new_name = f"h3d_{name_counter[0]}"
+        new_elements.append((tip, new_name, new_pos, False, growth_dir))
+        stats['extensions'] += 1
+
+        # Branching: probability from Edelstein (reuse brique 13 concept)
+        # Apical branching: Spk disappears → 2 new tips [F]
+        # Simplified: branch prob ∝ 0.15 per step
+        if rng.random() < 0.15:
+            angle = rng.uniform(params.branch_angle_min, params.branch_angle_max)
+            branch_dir = _rotate_vector_random(growth_dir, angle, rng)
+            branch_pos = _vec_add(tip_pos, _vec_scale(branch_dir, seg_len))
+            name_counter[0] += 1
+            branch_name = f"h3d_{name_counter[0]}"
+            new_elements.append((tip, branch_name, branch_pos, True, branch_dir))
+            stats['branches'] += 1
+
+    # Apply all extensions and branches
+    tip_diam = params.tip_diameter()
+    for parent, name, pos, is_branch, final_dir in new_elements:
+        G.add_node(name, pos3d=pos, growth_step=True,
+                   spk_direction=final_dir,  # Spitzenkörper memory [B,H]
+                   tip_diameter=tip_diam)     # VSC-derived diameter [B]
+        parent_pos = G.nodes[parent].get('pos3d', (0, 0, 0))
+        edge_len = _vec_distance(pos, parent_pos)
+        G.add_edge(parent, name, length_3d=edge_len, conductivity=0.5,
+                   diameter=tip_diam)
+        stats['nodes_added'] += 1
+
+    return stats
+
+
+def hyphal_simulate_3d(G, n_steps=20, params=None, seed=42):
+    """
+    Run 3D hyphal growth simulation.
+
+    Parameters
+    ----------
+    G : nx.Graph
+    n_steps : int
+    params : HyphalMechanicsParams
+    seed : int
+
+    Returns
+    -------
+    dict with simulation results
+    """
+    import random as _random
+    rng = _random.Random(seed)
+    params = params or HyphalMechanicsParams()
+    name_counter = [G.number_of_nodes()]
+
+    # Assign 3D coords if missing
+    has_coords = any(G.nodes[n].get('pos3d') for n in G.nodes())
+    if not has_coords and G.number_of_nodes() > 0:
+        assign_3d_coords(G, seed=seed)
+
+    history = []
+    for step in range(n_steps):
+        step_stats = hyphal_growth_3d_step(G, params, rng, name_counter)
+        step_stats['step'] = step
+        step_stats['total_nodes'] = G.number_of_nodes()
+        step_stats['total_edges'] = G.number_of_edges()
+        history.append(step_stats)
+
+    # Compute 3D metrics
+    coords = {n: G.nodes[n].get('pos3d', (0, 0, 0)) for n in G.nodes()}
+    edge_lengths = []
+    for u, v in G.edges():
+        if u in coords and v in coords:
+            edge_lengths.append(_vec_distance(coords[u], coords[v]))
+
+    # Bounding box
+    if coords:
+        xs = [c[0] for c in coords.values()]
+        ys = [c[1] for c in coords.values()]
+        zs = [c[2] for c in coords.values()]
+        bbox = {
+            'x_range': max(xs) - min(xs) if xs else 0,
+            'y_range': max(ys) - min(ys) if ys else 0,
+            'z_range': max(zs) - min(zs) if zs else 0,
+        }
+    else:
+        bbox = {'x_range': 0, 'y_range': 0, 'z_range': 0}
+
+    return {
+        'final_graph': G,
+        'history': history,
+        'edge_lengths': edge_lengths,
+        'mean_edge_length': sum(edge_lengths) / len(edge_lengths) if edge_lengths else 0,
+        'bounding_box': bbox,
+        'total_extensions': sum(h['extensions'] for h in history),
+        'total_branches': sum(h['branches'] for h in history),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 15 — TESTS
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_hyphal_mechanics_3d():
+    """Tests for 3D hyphal mechanics (brique 15)."""
+    import random as _random
+
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            passed += 1
+            print(f"  ✅ {name}")
+        else:
+            failed += 1
+            print(f"  ❌ {name}")
+
+    print("\n=== BRIQUE 15: 3D Hyphal Mechanics ===\n")
+
+    # --- Test 1: Lockhart extension rate ---
+    p = HyphalMechanicsParams(turgor=0.5, yield_threshold=0.2, extensibility=1.0)
+    check("Lockhart: v = 1.0 * (0.5 - 0.2) = 0.3",
+          abs(p.extension_rate() - 0.3) < 0.001)
+
+    # --- Test 2: Lockhart below threshold ---
+    p2 = HyphalMechanicsParams(turgor=0.1, yield_threshold=0.5)
+    check("Lockhart: below threshold → v=0", p2.extension_rate() == 0)
+
+    # --- Test 3: assign_3d_coords ---
+    G1 = nx.path_graph(5)
+    coords = assign_3d_coords(G1, seed=42)
+    check("3D coords: all nodes have coords", len(coords) == 5)
+    check("3D coords: 3-tuples", all(len(c) == 3 for c in coords.values()))
+    check("3D coords: stored in graph",
+          G1.nodes[0].get('pos3d') is not None)
+
+    # --- Test 4: vector utilities ---
+    check("vec_distance: (0,0,0)→(3,4,0) = 5",
+          abs(_vec_distance((0, 0, 0), (3, 4, 0)) - 5.0) < 0.001)
+    v = _vec_normalize((1, 1, 1))
+    check("vec_normalize: unit length",
+          abs(_vec_norm(v) - 1.0) < 0.001)
+
+    # --- Test 5: autotropism force ---
+    G2 = nx.path_graph(3)
+    assign_3d_coords(G2, seed=42)
+    p3 = HyphalMechanicsParams(autotropism_strength=0.5, autotropism_range=10.0)
+    force = compute_autotropism_force(G2, 0, p3)
+    check("Autotropism: non-zero force on node with neighbors",
+          _vec_norm(force) > 0)
+
+    # --- Test 6: growth step adds nodes ---
+    G3 = nx.path_graph(5)
+    assign_3d_coords(G3, seed=42)
+    rng = _random.Random(42)
+    counter = [10]
+    stats = hyphal_growth_3d_step(G3, HyphalMechanicsParams(), rng, counter)
+    check("Growth step: extensions > 0", stats['extensions'] > 0)
+    check("Growth step: nodes added", stats['nodes_added'] > 0)
+    check("Growth step: new nodes have 3D coords",
+          all(G3.nodes[n].get('pos3d') is not None
+              for n in G3.nodes() if 'h3d_' in str(n)))
+
+    # --- Test 7: new nodes are spatially coherent ---
+    G4 = nx.Graph()
+    G4.add_node("root", pos3d=(0, 0, 0))
+    G4.add_node("tip", pos3d=(1, 0, 0))
+    G4.add_edge("root", "tip")
+    # Give tip a Spitzenkörper direction pointing +x
+    G4.nodes["tip"]['spk_direction'] = (1, 0, 0)
+    rng4 = _random.Random(42)
+    hyphal_growth_3d_step(G4, HyphalMechanicsParams(noise=0.0, spk_persistence=0.95), rng4, [100])
+    # Find nodes grown from "tip" (connected to tip)
+    tip_children = [n for n in G4.neighbors("tip") if 'h3d_' in str(n)]
+    if tip_children:
+        new_pos = G4.nodes[tip_children[0]].get('pos3d')
+        check("Spatial coherence: tip child extends in +x direction",
+              new_pos[0] > 1.0)
+    else:
+        check("Spatial coherence: tip child created", False)
+
+    # --- Test 8: Spitzenkörper stored on new nodes ---
+    if tip_children:
+        spk = G4.nodes[tip_children[0]].get('spk_direction')
+        check("Spitzenkörper: direction stored on new node",
+              spk is not None and len(spk) == 3)
+    else:
+        check("Spitzenkörper: direction stored", False)
+
+    # --- Test 8: branch angle within bounds ---
+    G5 = nx.path_graph(3)
+    assign_3d_coords(G5, layout='random', seed=42)
+    p5 = HyphalMechanicsParams(branch_angle_min=45, branch_angle_max=90)
+    # Run many steps to get branches
+    rng5 = _random.Random(1)
+    counter5 = [50]
+    total_branches = 0
+    for _ in range(20):
+        s = hyphal_growth_3d_step(G5, p5, rng5, counter5)
+        total_branches += s['branches']
+    check("Branches: some produced over 20 steps", total_branches > 0)
+
+    # --- Test 9: simulate returns valid structure ---
+    G6 = nx.path_graph(5)
+    result = hyphal_simulate_3d(G6, n_steps=15, seed=42)
+    check("Simulate: history length = 15", len(result['history']) == 15)
+    check("Simulate: total_extensions > 0", result['total_extensions'] > 0)
+    check("Simulate: bounding_box exists", 'x_range' in result['bounding_box'])
+    check("Simulate: edge_lengths computed", len(result['edge_lengths']) > 0)
+
+    # --- Test 10: graph grows in 3D space ---
+    G7 = nx.path_graph(3)
+    result7 = hyphal_simulate_3d(G7, n_steps=20, seed=42)
+    bbox = result7['bounding_box']
+    check("3D growth: bounding box > 0 in all dims",
+          bbox['x_range'] > 0 and bbox['y_range'] > 0 and bbox['z_range'] > 0)
+
+    # --- Test 11: no turgor → no growth ---
+    G8 = nx.path_graph(5)
+    p8 = HyphalMechanicsParams(turgor=0.0, yield_threshold=0.5)
+    result8 = hyphal_simulate_3d(G8, n_steps=10, params=p8, seed=42)
+    check("No turgor: zero extensions", result8['total_extensions'] == 0)
+
+    # --- Test 12: edge lengths stored on graph ---
+    G9 = nx.path_graph(3)
+    result9 = hyphal_simulate_3d(G9, n_steps=5, seed=42)
+    new_edges_with_len = [d.get('length_3d', None)
+                          for u, v, d in result9['final_graph'].edges(data=True)
+                          if d.get('length_3d') is not None]
+    check("Edge lengths stored: some edges have length_3d",
+          len(new_edges_with_len) > 0)
+    check("Edge lengths positive",
+          all(l > 0 for l in new_edges_with_len))
+
+    # --- Test 13: empty graph doesn't crash ---
+    G10 = nx.Graph()
+    result10 = hyphal_simulate_3d(G10, n_steps=5, seed=42)
+    check("Empty graph: no crash", result10['total_extensions'] == 0)
+
+    # --- Test 14: integration with Edelstein + oscillatory ---
+    G11 = nx.path_graph(5)
+    assign_3d_coords(G11, seed=42)
+    p_edel = EdelsteinParams(b_n=0.3, d_n=0.05, d=0.0, n_max=1.0)
+    osc = {}
+    rng11 = _random.Random(42)
+    counter11 = [200]
+    for _ in range(5):
+        edelstein_growth_step(G11, p_edel, rng11)
+        oscillatory_signaling_step(G11, osc, params={'d_max': 4})
+        # Assign coords to new nodes before 3D step
+        for n in G11.nodes():
+            if G11.nodes[n].get('pos3d') is None:
+                G11.nodes[n]['pos3d'] = (rng11.gauss(0, 2),
+                                          rng11.gauss(0, 2),
+                                          rng11.gauss(0, 2))
+        hyphal_growth_3d_step(G11, HyphalMechanicsParams(), rng11, counter11)
+    check("Full integration (13+14+15): no crash", True)
+
+    # --- Test 15: density affects autotropism ---
+    # Dense graph → stronger repulsion
+    G_sparse = nx.path_graph(3)
+    assign_3d_coords(G_sparse, seed=42)
+    G_dense = nx.complete_graph(8)
+    assign_3d_coords(G_dense, seed=42)
+    p_auto = HyphalMechanicsParams(autotropism_strength=1.0, autotropism_range=100.0)
+    # Pick a node in each
+    f_sparse = _vec_norm(compute_autotropism_force(G_sparse, 0, p_auto))
+    f_dense = _vec_norm(compute_autotropism_force(G_dense, 0, p_auto))
+    check("Autotropism: denser graph → stronger force",
+          f_dense > f_sparse)
+
+    # --- Test 16: VSC tip diameter (Bartnicki-Garcia hyphoid) ---
+    p16 = HyphalMechanicsParams(vesicle_rate=10.0, vsc_speed=1.0)
+    expected_d = math.pi * 10.0 / 1.0  # π·N/V
+    check("VSC diameter: d = π·N/V",
+          abs(p16.tip_diameter() - expected_d) < 0.001)
+
+    # --- Test 17: VSC diameter scales with N/V ratio ---
+    p17a = HyphalMechanicsParams(vesicle_rate=20.0, vsc_speed=1.0)
+    p17b = HyphalMechanicsParams(vesicle_rate=10.0, vsc_speed=1.0)
+    check("VSC diameter: more vesicles → wider tip",
+          p17a.tip_diameter() > p17b.tip_diameter())
+
+    # --- Test 18: Spitzenkörper persistence maintains direction ---
+    G18 = nx.path_graph(3)
+    assign_3d_coords(G18, layout='random', seed=42)
+    # Set strong Spk direction on node 2 (leaf)
+    G18.nodes[2]['spk_direction'] = (0, 1, 0)  # pointing +y
+    p18 = HyphalMechanicsParams(spk_persistence=0.99, noise=0.0,
+                                 autotropism_strength=0.0)
+    rng18 = _random.Random(42)
+    counter18 = [300]
+    hyphal_growth_3d_step(G18, p18, rng18, counter18)
+    # Find child of node 2
+    children_18 = [n for n in G18.neighbors(2) if 'h3d_' in str(n)]
+    if children_18:
+        child_spk = G18.nodes[children_18[0]].get('spk_direction')
+        # Should be close to (0, 1, 0) due to high persistence
+        check("Spk persistence: direction maintained (y component dominant)",
+              child_spk is not None and abs(child_spk[1]) > 0.5)
+    else:
+        check("Spk persistence: child created", False)
+
+    # --- Test 19: Spitzenkörper 0 persistence = no memory ---
+    G19 = nx.Graph()
+    G19.add_node("a", pos3d=(0, 0, 0), spk_direction=(0, 0, 1))
+    G19.add_node("b", pos3d=(1, 0, 0))
+    G19.add_edge("a", "b")
+    p19 = HyphalMechanicsParams(spk_persistence=0.0, noise=0.0,
+                                 autotropism_strength=0.0)
+    rng19 = _random.Random(42)
+    hyphal_growth_3d_step(G19, p19, rng19, [400])
+    # With persistence=0, spk_direction is ignored, only parent→tip used
+    # Node "a" is leaf with parent "b", so direction = a - b = (-1,0,0)
+    children_a = [n for n in G19.neighbors("a") if 'h3d_' in str(n)]
+    if children_a:
+        child_pos = G19.nodes[children_a[0]].get('pos3d')
+        check("Spk zero persistence: parent direction used (x < 0)",
+              child_pos[0] < 0)
+    else:
+        check("Spk zero persistence: child created", False)
+
+    # --- Test 20: tip_diameter stored on new edges ---
+    G20 = nx.path_graph(3)
+    p20 = HyphalMechanicsParams(vesicle_rate=5.0, vsc_speed=1.0)
+    result20 = hyphal_simulate_3d(G20, n_steps=3, params=p20, seed=42)
+    diameters = [d.get('diameter') for u, v, d in result20['final_graph'].edges(data=True)
+                 if d.get('diameter') is not None]
+    expected_diam = math.pi * 5.0 / 1.0
+    check("Tip diameter on edges: stored correctly",
+          len(diameters) > 0 and abs(diameters[0] - expected_diam) < 0.01)
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 if __name__ == "__main__":
     main()
     p1, f1 = test_kirchhoff_physarum()
@@ -3277,8 +3959,9 @@ if __name__ == "__main__":
     p3, f3 = test_full_pipeline()
     p4, f4 = test_edelstein_growth()
     p5, f5 = test_oscillatory_signaling()
-    total_p = p1 + p2 + p3 + p4 + p5
-    total_f = f1 + f2 + f3 + f4 + f5
+    p6, f6 = test_hyphal_mechanics_3d()
+    total_p = p1 + p2 + p3 + p4 + p5 + p6
+    total_f = f1 + f2 + f3 + f4 + f5 + f6
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-14: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-15: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")

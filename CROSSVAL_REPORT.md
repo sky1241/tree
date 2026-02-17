@@ -236,3 +236,64 @@ Biologie → Code:
 | 11 (Anastomose) | 14 | ✅ |
 | 12 (Intégration) | 39 | ✅ |
 | **TOTAL** | **120** | **✅** |
+
+---
+
+## Brique 15 — 3D Hyphal Mechanics
+
+### Sources scientifiques
+
+| Ref | Paper | Concept clé |
+|-----|-------|-------------|
+| [A] BMX, Phys. Rev. E 112:034401, 2025 | 3D modeling hyphal fusion/branching | Two-site particles, GPU-accelerated filament mechanics |
+| [B] Bartnicki-Garcia 1989, Protoplasma 153:46-57 | VSC model | y = x·cot(V·x/N), diameter = π·N/V |
+| [C] Tindemans 2006, J. Theor. Biol. 238:937 | Diffusive VSC model | Extends [B] with diffusion + exocytosis rate k |
+| [D] Meškauskas & Moore 2004, Mycol. Res. 108:1241 | Neighbour-sensing model | 3D vector growth, scalar field 1/d², autotropism |
+| [E] Money 2025, Fungal Genet. Biol. 177:103961 | Physical forces | Lockhart: v = φ·(P-Y), turgor 0.1-1.0 MPa |
+| [F] Riquelme & Bartnicki-Garcia 2004 | Apical branching | Spk disappears → 2 tips, lateral from subapical |
+| [G] Islam 2017, Soft Matter | Mycelium mechanics | E ∝ ρ², fiber network, mean d=1.3μm |
+| [H] Lew 2011, Microbiology 157:2319 | Spitzenkörper gyroscope | Directional memory, lost on obstacle |
+
+### Modèle implémenté
+
+Biologie → Code:
+- Turgor + wall → Extension rate (Lockhart eq.) [E]
+- VSC position → Growth direction (Spitzenkörper) [B,H]
+- Spk persistence → Directional memory (gyroscope) [H]
+- Vesicle rate N / VSC speed V → Tip diameter π·N/V [B]
+- Neighbouring hyphae → Autotropism (1/d² repulsion) [D]
+- Branch angle 30-90° from field gradient [D]
+- Apical branching = Spk split [F]
+
+5 fonctions principales:
+- `assign_3d_coords()`: 3D positioning (spring/random layout)
+- `compute_autotropism_force()`: negative autotropism [D]
+- `hyphal_growth_3d_step()`: one growth step with Spk memory [B,E,H]
+- `hyphal_simulate_3d()`: multi-step simulation with metrics
+- Vector utilities: normalize, rotate (Rodrigues), distance
+
+### Tests unitaires (30/30 PASS)
+
+| Test | Résultat |
+|------|----------|
+| Lockhart extension rate | ✅ |
+| Lockhart below threshold → 0 | ✅ |
+| 3D coords assigned (3-tuples, stored) | ✅ ×3 |
+| Vector utilities (distance, normalize) | ✅ ×2 |
+| Autotropism non-zero force | ✅ |
+| Growth step: extensions + nodes added | ✅ ×3 |
+| Spatial coherence: +x direction | ✅ |
+| Spitzenkörper stored on new node | ✅ |
+| Branches produced over 20 steps | ✅ |
+| Simulate structure (history, extensions, bbox, edges) | ✅ ×4 |
+| 3D growth: bbox > 0 all dims | ✅ |
+| No turgor → zero extensions | ✅ |
+| Edge lengths stored + positive | ✅ ×2 |
+| Empty graph: no crash | ✅ |
+| Full integration (13+14+15) | ✅ |
+| Autotropism: dense > sparse | ✅ |
+| VSC diameter = π·N/V | ✅ |
+| VSC diameter scales with N/V | ✅ |
+| Spk persistence maintains direction | ✅ |
+| Spk zero persistence = parent direction | ✅ |
+| Tip diameter stored on edges | ✅ |

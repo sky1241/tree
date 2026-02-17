@@ -790,3 +790,51 @@ Tips grandissent (A) → Colonie émerge (B) → Fusions créent réseau (C)
 
 *"L'arbre explore. Le mycelium connecte. La forêt pense."*
 *Winter Tree v2 — Référentiel complet — 15 février 2026, 5h du mat*
+
+---
+
+## BRIQUE 15 — 3D Hyphal Mechanics
+
+### Lockhart Equation [Money 2025]
+```
+v = φ · max(0, P - Y)
+```
+| Symbole | Signification | Valeur typique |
+|---------|--------------|----------------|
+| v | Extension rate | 0-1 (normalized) |
+| φ | Wall extensibility | 1.0 |
+| P | Turgor pressure | 0.1-1.0 MPa |
+| Y | Yield threshold | 0.2 |
+
+### Hyphoid Equation [Bartnicki-Garcia 1989]
+```
+y = x · cot(V·x / N)
+diameter = π · N / V
+```
+| Symbole | Signification |
+|---------|--------------|
+| N | Vesicles released per unit time |
+| V | VSC (Spitzenkörper) displacement rate |
+| x, y | Tip shape coordinates |
+
+### Autotropism Field [Meškauskas 2004]
+```
+F(node) = Σ (strength / d²) · (pos - other_pos) / |pos - other_pos|
+```
+Each hypha generates scalar field 1/d². Tips repelled from dense regions.
+
+### Spitzenkörper Memory [Lew 2011]
+```
+growth_dir = normalize(spk_persistence × spk_direction + (1 - spk_persistence) × parent_direction)
+```
+| Param | Signification |
+|-------|--------------|
+| spk_persistence | 0-1, directional memory (gyroscope) |
+| spk_direction | Stored on each tip node |
+
+### Branching [Riquelme 2004, Meškauskas 2004]
+```
+P(branch) ≈ 0.15 per step
+angle ∈ [30°, 90°]
+branch_dir = rotate(growth_dir, angle, random_axis)  // Rodrigues
+```

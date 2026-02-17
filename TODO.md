@@ -17,16 +17,23 @@
 | 10 | Kirchhoff + Physarum | 16 | Tero 2007, Ito 2011, Tero 2010 |
 | 11 | Anastomose | 14 | Edelstein 1982, Glass 2006 |
 | 12 | Intégration complète | 39 | — |
-| **TOTAL** | | **172** | |
+| **TOTAL v1.0** | | **120** | |
 
-## 🔨 À faire (v2.0 — modèles de croissance)
+## ✅ Complété (v2.0 — modèles de croissance)
+
+| Brique | Nom | Tests | Source | Status |
+|--------|-----|-------|--------|--------|
+| 13 | Edelstein growth (branching + death + densité) | 30 | Edelstein 1982, Schnepf 2008, Du 2019 | ✅ DONE |
+| 14 | Oscillatory signaling (hyphes qui se cherchent) | 22 | Goryachev 2012, Wernet 2023, Fleissner 2009 | ✅ DONE |
+| 15 | 3D hyphal mechanics (croissance filament) | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004, Money 2025, Lew 2011 | ✅ DONE |
+
+## 🔨 À faire
 
 | Brique | Nom | Source | Status |
 |--------|-----|--------|--------|
-| 13 | Edelstein growth (branching + death + densité) | Edelstein 1982 J. Theor. Biol. 98:679, Schnepf & Roose 2008 J. R. Soc. Interface 5:773 | ✅ DONE (30 tests) |
-| 14 | Oscillatory signaling (hyphes qui se cherchent) | Goryachev 2012 BioEssays 34:259, Wernet et al. 2023 eLife 12:e83310, Fleissner et al. 2009 PNAS 106:19387 | ✅ DONE (22 tests) |
-| 15 | 3D hyphal mechanics (croissance filament) | Phys. Rev. E 2025 (bmx suite) | TODO |
-| 16 | AM fungi root growth (croissance depuis racine) | Schnepf & Roose 2006 Proc. R. Soc. B | TODO |
+| 16 | AM fungi root growth (croissance depuis racine) | Schnepf & Roose 2008 J. R. Soc. Interface 5:773 | TODO |
+
+### Compteur total: 202 tests (120 v1.0 + 82 v2.0), 3967 lignes
 
 ### Notes
 
