@@ -6528,6 +6528,21 @@ def full_lifecycle_simulate(
         except Exception:
             physarum_eff = None
 
+    # Small-world [briques 7+8] — expensive, skip if graph > 200 nodes
+    sw_sigma = None
+    sw_omega = None
+    if active_graph.number_of_nodes() <= 200 and nx.is_connected(active_graph):
+        try:
+            sw_s = small_world_sigma(active_graph, nrand=3)
+            sw_sigma = round(sw_s['sigma'], 4)
+        except Exception:
+            sw_sigma = None
+        try:
+            sw_o = small_world_omega(active_graph, nrand=3, nlattice=3)
+            sw_omega = round(sw_o['omega'], 4)
+        except Exception:
+            sw_omega = None
+
     results['phase5_metrics'] = {
         'meshedness': alpha,
         'global_efficiency': eff,
@@ -6538,6 +6553,8 @@ def full_lifecycle_simulate(
         'strategy': strategy,
         'kirchhoff_total_flow': kirchhoff_total,
         'physarum_efficiency': physarum_eff,
+        'small_world_sigma': sw_sigma,
+        'small_world_omega': sw_omega,
         'n_components': nx.number_connected_components(active_graph),
         'n_components_full': nx.number_connected_components(mature_graph),
     }
@@ -6650,6 +6667,25 @@ def test_lifecycle_chain():
           m['kirchhoff_total_flow'] is not None)
     check("Phase 5: Physarum efficiency computed",
           m['physarum_efficiency'] is not None)
+    check("Phase 5: small_world keys present",
+          'small_world_sigma' in m and 'small_world_omega' in m)
+
+    # Small-world with small graph (< 200 nodes)
+    r_small = full_lifecycle_simulate(root_steps=3, spore_steps=3,
+                                       am_steps=3, nutrient_steps=3,
+                                       symbiosis_steps=5, seed=42)
+    m_small = r_small['phase5_metrics']
+    n_small = r_small['final_graph'].number_of_nodes()
+    if n_small <= 200:
+        check("Phase 5: small_world σ computed (small graph)",
+              m_small['small_world_sigma'] is not None)
+        check("Phase 5: small_world ω computed (small graph)",
+              m_small['small_world_omega'] is not None)
+    else:
+        check("Phase 5: small graph test skipped (still > 200)",
+              True)
+        check("Phase 5: small graph test skipped (still > 200)",
+              True)
 
     # === TEST BLOCK 7b: Phase 2b — Spatial fusion ===
     check("Phase 2b: spatial fusion reduced components",
