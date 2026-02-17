@@ -5219,6 +5219,284 @@ def test_nutrient_uptake():
     return passed, failed
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BRIQUE 20 — CARBON ↔ PHOSPHORUS EXCHANGE (v2.0)
+# ═══════════════════════════════════════════════════════════════════
+# Sources:
+#   [A] Kiers et al. 2011, Science 333:880-882
+#     "Reciprocal rewards stabilize cooperation in mycorrhizal symbiosis"
+#     More P delivered → more C rewarded. More C received → more P sent.
+#     Biological market: both partners select best-performing partners.
+#
+#   [B] Chevalier et al. 2025, PNAS
+#     "C-P exchange rate constrains density-speed trade-off"
+#     C investment determines fungal growth rate and network density.
+#     High C → fast growth but sparse. Low C → slow but dense.
+#
+#   [C] Fellbaum et al. 2012, PNAS 109:2666-2671
+#     "Carbon availability triggers fungal N uptake and transport"
+#     AM fungi = obligate biotrophs: 4-17% of host photosynthate.
+#     No C → fungus dies.
+#
+#   [D] Bücking & Shachar-Hill 2005, New Phytol. 165:899-911
+#     "P uptake, transport and transfer stimulated by carbohydrate"
+#     High C availability → increased P transfer to plant.
+#
+# Equations:
+#   Plant C budget:  C_produced = photosynthesis_rate
+#                    C_to_fungus = α · C_produced · f(P_received)
+#   Fungus P budget: P_from_soil = from brique 19
+#                    P_to_plant = β · P_fungus · f(C_received)
+#   Reciprocal rewards [A]:
+#     f(x) = x / (K + x)   (Michaelis-Menten allocation)
+#   Obligate biotroph [C]:
+#     If C_received < C_min → fungus death_rate increases
+# ═══════════════════════════════════════════════════════════════════
+
+
+class SymbiosisParams:
+    """Parameters for C↔P exchange model.
+
+    Sources: Kiers 2011 [A], Fellbaum 2012 [C], Bücking 2005 [D].
+    """
+    def __init__(self,
+                 photosynthesis_rate=1.0,  # C produced per step
+                 c_allocation_max=0.15,    # max fraction of C to fungus (4-17%) [C]
+                 p_allocation_max=0.8,     # max fraction of fungal P to plant
+                 k_c=0.1,                  # K for C reward function [A]
+                 k_p=0.05,                 # K for P reward function [A]
+                 c_min_survival=0.01,      # min C for fungus survival [C]
+                 death_boost_no_c=5.0,     # death rate multiplier if no C
+                 ):
+        self.photosynthesis_rate = photosynthesis_rate
+        self.c_allocation_max = c_allocation_max
+        self.p_allocation_max = p_allocation_max
+        self.k_c = k_c
+        self.k_p = k_p
+        self.c_min_survival = c_min_survival
+        self.death_boost_no_c = death_boost_no_c
+
+    def c_reward(self, p_received):
+        """C allocated to fungus based on P received.
+
+        Reciprocal reward: f(P) = P / (K_p + P) [A]
+        C_to_fungus = α · C_produced · f(P)
+        """
+        f = p_received / (self.k_p + p_received) if p_received > 0 else 0.0
+        return self.c_allocation_max * self.photosynthesis_rate * f
+
+    def p_reward(self, c_received):
+        """P allocated to plant based on C received.
+
+        Reciprocal reward: f(C) = C / (K_c + C) [A]
+        P_to_plant = β · P_fungus · f(C)
+        """
+        f = c_received / (self.k_c + c_received) if c_received > 0 else 0.0
+        return self.p_allocation_max * f
+
+    def fungus_alive(self, c_received):
+        """Check if fungus survives this step.
+
+        Obligate biotroph: needs minimum C [C].
+        """
+        return c_received >= self.c_min_survival
+
+
+def symbiosis_simulate(n_steps=50, params=None, soil_p=0.01,
+                        initial_fungal_biomass=1.0, seed=42):
+    """Simulate C↔P exchange dynamics between plant and fungus.
+
+    Parameters
+    ----------
+    n_steps : int
+    params : SymbiosisParams or None
+    soil_p : float
+        Soil P availability (affects fungal P acquisition).
+    initial_fungal_biomass : float
+    seed : int
+
+    Returns
+    -------
+    dict with:
+        'history': list of step snapshots
+        'final_plant_p': float — total P acquired by plant
+        'final_fungal_c': float — total C received by fungus
+        'fungus_alive': bool — fungus survived?
+        'symbiosis_stable': bool — exchange maintained?
+    """
+    if params is None:
+        params = SymbiosisParams()
+    import random as _random
+    rng = _random.Random(seed)
+
+    plant_p = 0.0       # cumulative P received by plant
+    fungal_c = 0.0      # cumulative C received by fungus
+    fungal_biomass = initial_fungal_biomass
+    fungal_p_pool = 0.0  # P available in fungus for trade
+    alive = True
+    history = []
+
+    for step in range(n_steps):
+        if not alive:
+            history.append({
+                'step': step, 'plant_p': plant_p, 'fungal_c': fungal_c,
+                'fungal_biomass': fungal_biomass, 'alive': False,
+                'c_sent': 0, 'p_sent': 0, 'p_acquired': 0,
+            })
+            continue
+
+        # Phase 1: Fungus acquires P from soil (simplified brique 19)
+        # More biomass → more uptake surface
+        p_acquired = NutrientParams(c_initial=soil_p).uptake_rate(soil_p) * \
+                     fungal_biomass
+        fungal_p_pool += p_acquired
+
+        # Phase 2: Plant sends C based on P received last step [A]
+        c_sent = params.c_reward(fungal_p_pool)
+        fungal_c += c_sent
+
+        # Phase 3: Fungus sends P based on C received [A]
+        p_fraction = params.p_reward(c_sent)
+        p_sent = p_fraction * fungal_p_pool
+        fungal_p_pool -= p_sent
+        plant_p += p_sent
+
+        # Phase 4: Fungus growth/death [B,C]
+        if params.fungus_alive(c_sent):
+            # Growth: proportional to C received
+            growth = 0.1 * c_sent  # simplified
+            fungal_biomass += growth
+        else:
+            # Obligate biotroph death [C]
+            fungal_biomass *= (1.0 - 0.1 * params.death_boost_no_c)
+            if fungal_biomass < 0.01:
+                alive = False
+                fungal_biomass = 0.0
+
+        history.append({
+            'step': step,
+            'plant_p': plant_p,
+            'fungal_c': fungal_c,
+            'fungal_biomass': fungal_biomass,
+            'alive': alive,
+            'c_sent': c_sent,
+            'p_sent': p_sent,
+            'p_acquired': p_acquired,
+        })
+
+    # Check if symbiosis was stable (fungus alive and exchanging)
+    last_steps = history[-5:] if len(history) >= 5 else history
+    stable = alive and all(s.get('c_sent', 0) > 0 and s.get('p_sent', 0) > 0
+                           for s in last_steps)
+
+    return {
+        'history': history,
+        'final_plant_p': plant_p,
+        'final_fungal_c': fungal_c,
+        'final_biomass': fungal_biomass,
+        'fungus_alive': alive,
+        'symbiosis_stable': stable,
+    }
+
+
+def test_symbiosis_exchange():
+    """Tests for brique 20 — C↔P Exchange."""
+    print("\n=== BRIQUE 20: C↔P Symbiosis Exchange ===\n")
+    passed = 0
+    failed = 0
+
+    def check(name, condition):
+        nonlocal passed, failed
+        if condition:
+            print(f"  ✅ {name}")
+            passed += 1
+        else:
+            print(f"  ❌ {name}")
+            failed += 1
+
+    # --- Test 1: C reward function ---
+    p1 = SymbiosisParams()
+    check("C reward: 0 P → 0 C", abs(p1.c_reward(0)) < 0.001)
+    check("C reward: high P → approaches max",
+          p1.c_reward(100) > 0.1)
+    check("C reward: monotonic",
+          p1.c_reward(0.01) <= p1.c_reward(0.1) <= p1.c_reward(1.0))
+
+    # --- Test 2: P reward function ---
+    check("P reward: 0 C → 0 fraction", abs(p1.p_reward(0)) < 0.001)
+    check("P reward: high C → approaches max",
+          p1.p_reward(100) > 0.7)
+
+    # --- Test 3: Obligate biotroph ---
+    check("Alive: enough C", p1.fungus_alive(0.1))
+    check("Dead: no C", not p1.fungus_alive(0.0))
+
+    # --- Test 4: Basic simulation ---
+    r4 = symbiosis_simulate(n_steps=30, soil_p=0.01)
+    check("Sim: history = 30 steps", len(r4['history']) == 30)
+    check("Sim: plant got P", r4['final_plant_p'] > 0)
+    check("Sim: fungus got C", r4['final_fungal_c'] > 0)
+    check("Sim: fungus alive", r4['fungus_alive'])
+
+    # --- Test 5: Reciprocal rewards — more soil P → more exchange ---
+    r5a = symbiosis_simulate(n_steps=30, soil_p=0.001)
+    r5b = symbiosis_simulate(n_steps=30, soil_p=0.1)
+    check("Reciprocal: more soil P → more plant P",
+          r5b['final_plant_p'] >= r5a['final_plant_p'])
+
+    # --- Test 6: No soil P → fungus can't trade, dies ---
+    r6 = symbiosis_simulate(n_steps=50, soil_p=0.0)
+    check("No soil P → fungus dies or no exchange",
+          not r6['symbiosis_stable'])
+
+    # --- Test 7: Very high soil P (fertilization) — plant needs less fungus ---
+    # With excess direct P, plant sends less C
+    r7_low = symbiosis_simulate(n_steps=30, soil_p=0.001)
+    r7_high = symbiosis_simulate(n_steps=30, soil_p=1.0)
+    # Both should work; high soil P means more exchange
+    check("High soil P: more P to plant",
+          r7_high['final_plant_p'] >= r7_low['final_plant_p'])
+
+    # --- Test 8: Fungal biomass grows with C ---
+    r8 = symbiosis_simulate(n_steps=30, soil_p=0.05)
+    biomass_start = r8['history'][0]['fungal_biomass']
+    biomass_end = r8['final_biomass']
+    check("Fungal biomass: grows over time",
+          biomass_end > biomass_start)
+
+    # --- Test 9: C allocation within 4-17% range [C] ---
+    check("C allocation max: 15% (within 4-17%)",
+          0.04 <= SymbiosisParams().c_allocation_max <= 0.17)
+
+    # --- Test 10: Exchange over time increases ---
+    if len(r8['history']) > 10:
+        early_p = r8['history'][5]['p_sent']
+        late_p = r8['history'][-1]['p_sent']
+        check("Exchange grows: late P sent ≥ early",
+              late_p >= early_p)
+    else:
+        check("Exchange grows: skipped", True)
+
+    # --- Test 11: Custom params ---
+    custom = SymbiosisParams(
+        photosynthesis_rate=2.0,
+        c_allocation_max=0.10,
+        k_c=0.05,
+    )
+    r11 = symbiosis_simulate(n_steps=20, params=custom, soil_p=0.05)
+    check("Custom params: sim runs", r11['final_plant_p'] > 0)
+
+    # --- Test 12: Zero photosynthesis → fungus dies ---
+    r12 = symbiosis_simulate(
+        n_steps=30,
+        params=SymbiosisParams(photosynthesis_rate=0.0),
+        soil_p=0.05)
+    check("No photosynthesis → fungus dies", not r12['fungus_alive'])
+
+    print(f"\n  Résultat: {passed}/{passed+failed} tests passés")
+    return passed, failed
+
+
 def test_lsystem_root():
     """Tests for brique 18 — L-System Root Architecture."""
     print("\n=== BRIQUE 18: L-System Root Architecture ===\n")
@@ -5762,8 +6040,9 @@ if __name__ == "__main__":
     p8, f8 = test_spore_germination()
     p9, f9 = test_lsystem_root()
     p10, f10 = test_nutrient_uptake()
-    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10
-    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10
+    p11, f11 = test_symbiosis_exchange()
+    total_p = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11
+    total_f = f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11
     print(f"\n{'='*50}")
-    print(f"  TOTAL BRIQUES 10-19: {total_p}/{total_p+total_f}")
+    print(f"  TOTAL BRIQUES 10-20: {total_p}/{total_p+total_f}")
     print(f"{'='*50}")
