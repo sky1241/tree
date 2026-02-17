@@ -4370,10 +4370,17 @@ def am_fungi_simulate(G, root_nodes, n_steps=20, params=None,
     history = []
     oscillators = {}  # Brique 14: FHN oscillators for tip signaling
     fusion_events = []  # Brique 11: completed fusions
+    # Edelstein 1982: d is a continuous hyphal death rate (1/time),
+    # not a per-step probability. For discrete simulation, probability
+    # of edge death per step = 1 - exp(-d·Δt) ≈ d·Δt for small d.
+    # Hyphae are structural: much more stable than tips (d_n).
+    # Source: Boswell et al. 2003 — "hyphal death rare in healthy colony,
+    # mostly occurs at resource-depleted periphery".
+    # Scale: d_edge = death_rate * 0.05 → ~0.5% edge loss/step (realistic).
     edelstein_params = EdelsteinParams(
         b_n=params.branch_rate,
         d_n=params.death_rate * 0.5,
-        d=params.death_rate,
+        d=params.death_rate * 0.05,  # hyphal edges far more stable than tips
         n_max=min(params.n_max / 100.0, 0.9),  # normalize to fraction
         a1=params.a1,
         a2=params.a2
@@ -6013,15 +6020,19 @@ def test_am_fungi_root_growth():
           presets['A_laevis'].a2 > 0)
 
     # --- Test 19: low δ accumulates near root, high δ at front ---
-    # Low delta → more biomass near root
-    p_low = AMFungiParams(branch_rate=0.5, death_rate=0.05,
+    # Low delta → less death → more surviving structure.
+    # Must use use_edelstein=True to actually test tip/edge death.
+    # Source: Schnepf 2008 — "δ << 1 means biomass near root".
+    p_low = AMFungiParams(branch_rate=0.5, death_rate=0.02,
                            tip_flux_base=2.0)
-    p_high = AMFungiParams(branch_rate=0.5, death_rate=2.5,
+    p_high = AMFungiParams(branch_rate=0.5, death_rate=0.8,
                             tip_flux_base=2.0)
     r_low = am_fungi_simulate(nx.Graph(), ["root"], n_steps=8,
-                               params=p_low, seed=42, use_edelstein=False)
+                               params=p_low, seed=42, use_edelstein=True,
+                               use_3d=False, use_oscillatory=False)
     r_high = am_fungi_simulate(nx.Graph(), ["root"], n_steps=8,
-                                params=p_high, seed=42, use_edelstein=False)
+                                params=p_high, seed=42, use_edelstein=True,
+                                use_3d=False, use_oscillatory=False)
     # Low delta should have more nodes (less death)
     n_low = r_low['final_graph'].number_of_nodes()
     n_high = r_high['final_graph'].number_of_nodes()
