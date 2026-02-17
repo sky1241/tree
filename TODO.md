@@ -25,23 +25,60 @@
 |--------|-----|-------|--------|--------|
 | 13 | Edelstein growth (branching + death + densité) | 30 | Edelstein 1982, Schnepf 2008, Du 2019 | ✅ DONE |
 | 14 | Oscillatory signaling (hyphes qui se cherchent) | 22 | Goryachev 2012, Wernet 2023, Fleissner 2009 | ✅ DONE |
-| 15 | 3D hyphal mechanics (croissance filament) | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004, Money 2025, Lew 2011 | ✅ DONE |
-| 16 | AM fungi root growth (croissance depuis racine) | 42 | Schnepf & Roose 2008, Schnepf 2016, PNAS 2025 | ✅ DONE |
+| 15 | 3D hyphal mechanics (croissance filament) | 30 | BMX 2025, Bartnicki-Garcia 1989, Meškauskas 2004 | ✅ DONE |
+| 16 | AM fungi root growth (croissance depuis racine) | 42 | Schnepf & Roose 2008, Schnepf 2016 | ✅ DONE |
+| 17 | Germination de spores & chemotaxis | 24 | Peleg 2013, Besserer 2006, Chiu 2001 | ✅ DONE |
+| 18 | L-System root architecture | 22 | Leitner 2010, Schnepf 2018 (CRootBox) | ✅ DONE |
+| 19 | Nutrient transport & P uptake | 16 | Schnepf & Roose 2006, Leitner 2010 | ✅ DONE |
+| 20 | C↔P symbiosis exchange | 19 | Kiers 2011, Fellbaum 2012, Chevalier 2025 | ✅ DONE |
+| **TOTAL v2.0** | | **205** | | |
 
-## 🔨 À faire
+### Compteur total: 325 tests (120 v1.0 + 205 v2.0), 6048 lignes
 
-| Brique | Nom | Source | Status |
-|--------|-----|--------|--------|
-| 17 | Nutrient transport & P uptake | Schnepf & Roose 2006, Bücking 2012 | TODO |
+## 🔨 CHANTIER 2 — Audit ordre biologique
 
-### Compteur total: 244 tests (51 briques 0-9 + 193 briques 10-16), 4643 lignes
+### Problème
+Les briques ont été codées dans l'ordre de développement (13→14→15→16→17→18→19→20),
+pas dans l'ordre du cycle de vie réel du champignon. Le pipeline am_fungi_simulate()
+appelle les phases dans un ordre technique, pas biologique.
 
-### Notes
+### Ordre biologique réel (cycle de vie AM fungi)
+
+```
+PHASE 0: SETUP
+  [18] L-System root → la racine existe dans le sol
+  [17] Germination spore → spore détecte strigolactone, germe, tube germinatif
+
+PHASE 1: COLONISATION
+  [16] Root emission → hyphes émis depuis l'interface racine-champignon
+  [13] Edelstein growth → branching, death, densité du réseau
+
+PHASE 2: MATURATION
+  [15] 3D mechanics → orientation, Spitzenkörper, Lockhart elongation
+  [14] Oscillatory signaling → tips se cherchent via FHN
+  [11] Anastomose → fusion des hyphes synchronisés (14→11)
+
+PHASE 3: FONCTION
+  [19] P uptake → le réseau mature absorbe le phosphore du sol
+  [20] C↔P exchange → la plante paie en carbone, reçoit du phosphore
+
+PHASE 4: ANALYSE (v1.0)
+  [0-10] Métriques → meshedness, efficacité, Physarum, robustesse, etc.
+```
+
+### TODO audit
+- [ ] Vérifier que chaque brique reçoit les bonnes données d'entrée de la brique précédente
+- [ ] Vérifier que le format de sortie de chaque brique est compatible avec l'entrée de la suivante
+- [ ] Créer un pipeline full_lifecycle_simulate() qui enchaîne tout dans l'ordre biologique
+- [ ] Identifier les "joints" manquants entre briques
+- [ ] Test d'intégration end-to-end : spore → réseau mature → P delivery
+
+## Notes
 
 v1.0 = moteur d'**analyse** (photo du réseau à un instant t)
 v2.0 = moteur de **croissance** (le réseau pousse dans le temps)
 
-Pipeline intégré `am_fungi_simulate()`:
+Pipeline actuel am_fungi_simulate() (ordre technique):
 - Phase 1: Root emission (brique 16 — Schnepf boundary)
 - Phase 2: Edelstein growth/death (brique 13)
 - Phase 3: 3D mechanics (brique 15 — Lockhart/VSC/Spitzenkörper)
@@ -53,5 +90,4 @@ Chaque brique v2.0 suit le même workflow:
 2. Extraction des équations
 3. Traduction code discret
 4. Tests unitaires
-5. Validation repos réels
-6. Push git
+5. Push git
