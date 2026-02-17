@@ -6273,7 +6273,7 @@ def appressorium_simulate(germ_tips, root_tips, root_graph, params=None, seed=42
 
     # Turgor pressure: Π = c·R·T (van't Hoff, in Pa then → MPa)
     # c in mol/m³ = mol/L × 1000
-    c_mol_m3 = params.glycerol_conc * 1000  # mol/L → mol/m³
+    c_mol_m3 = max(params.glycerol_conc, 0.0) * 1000  # mol/L → mol/m³ (clamp ≥0)
     turgor_pa = c_mol_m3 * params.R * params.T  # Pa
     turgor_mpa = turgor_pa / 1e6  # → MPa
 
