@@ -6382,6 +6382,13 @@ def full_lifecycle_simulate(
         'active_nodes': active_graph.number_of_nodes(),
     }
 
+    # Copy nutrient state to graph nodes (for visualization / downstream)
+    for node in active_graph.nodes():
+        if node in phase3['soil_p']:
+            active_graph.nodes[node]['soil_p'] = phase3['soil_p'][node]
+        if node in phase3['node_p_internal']:
+            active_graph.nodes[node]['internal_p'] = phase3['node_p_internal'][node]
+
     # ── JOINT 3→4: P delivery → symbiosis exchange ─────────────
     # Use actual P from phase 3 as soil_p proxy for phase 4
     soil_p_effective = max(phase3['total_p_root'] / max(nutrient_steps, 1),
@@ -6512,6 +6519,12 @@ def test_lifecycle_chain():
           r['phase3_nutrients']['depletion_zone'] > 0)
     check("Phase 3: active nodes tracked",
           r['phase3_nutrients']['active_nodes'] > 0)
+    # Verify nutrient data copied to graph nodes
+    G_final = r['final_graph']
+    nodes_with_soil_p = sum(1 for n in G_final.nodes()
+                            if 'soil_p' in G_final.nodes[n])
+    check("Phase 3: soil_p on graph nodes",
+          nodes_with_soil_p > 0)
 
     # === TEST BLOCK 6: Phase 4 — C↔P exchange ===
     check("Phase 4: plant got P",
