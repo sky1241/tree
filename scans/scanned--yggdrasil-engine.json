@@ -1,0 +1,290 @@
+{
+  "idea": "yggdrasil-engine",
+  "domain": "scientométrie",
+  "family": "conifere",
+  "family_name": "Conifère",
+  "family_emoji": "🌲",
+  "date": "2026-02-21T19:00:37.243256",
+  "phase": "MATURE",
+  "scanned_from": "/home/claude/yggdrasil-engine",
+  "scale": {
+    "lines": 17865,
+    "factor": 1.56,
+    "category": "grand arbre",
+    "height_px": 509,
+    "data_mb": 0.00087738037109375,
+    "density": 1.0,
+    "trunk_width": 1.0,
+    "data_category": "léger",
+    "label": "🌲 Grand Arbre (17k lignes, 0Mo data)"
+  },
+  "stats": {
+    "total_files": 211,
+    "total_code_lines": 17865,
+    "data_weight_mb": 0.0,
+    "languages": {
+      "Python": 17859,
+      "JavaScript (inline HTML)": 3500
+    },
+    "biggest_file": {
+      "path": "engine/mycelium_full.py",
+      "lines": 7912,
+      "lang": "Python"
+    }
+  },
+  "nodes": [
+    {
+      "id": "M1",
+      "level": "R",
+      "label": "Formules scientométriques",
+      "status": "done",
+      "entry": "engine/scisci.py + holes.py",
+      "depends": [],
+      "desc": "Wang-Barabási, Uzzi z-score, D-index, Q-factor, Physarum",
+      "confidence": 95,
+      "depth": -5
+    },
+    {
+      "id": "M2",
+      "level": "R",
+      "label": "OpenAlex API (250M papers)",
+      "status": "done",
+      "entry": "engine/openalex.py",
+      "depends": [],
+      "desc": "Source de données brutes — La Pluie",
+      "confidence": 90,
+      "depth": -5
+    },
+    {
+      "id": "P1",
+      "level": "R",
+      "label": "Licence MIT",
+      "status": "done",
+      "entry": "LICENSE",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -4
+    },
+    {
+      "id": "R1",
+      "level": "R",
+      "label": "Python deps (networkx, numpy, requests)",
+      "status": "done",
+      "entry": "requirements.txt",
+      "depends": [],
+      "desc": "",
+      "confidence": 85,
+      "depth": -1
+    },
+    {
+      "id": "R2",
+      "level": "R",
+      "label": "SOL.md — sync Sky↔Claude",
+      "status": "done",
+      "entry": "SOL.md",
+      "depends": [],
+      "desc": "Source de vérité entre sessions",
+      "confidence": 100,
+      "depth": -1
+    },
+    {
+      "id": "T1",
+      "level": "T",
+      "label": "Pipeline: Pluie → Racines → Sol → Mycelium",
+      "status": "done",
+      "entry": "engine/mycelium_full.py (7912L)",
+      "depends": [
+        "M1",
+        "M2",
+        "R1"
+      ],
+      "desc": "24 briques, 456 tests, Physarum + BC + meshedness",
+      "confidence": 87,
+      "depth": 1
+    },
+    {
+      "id": "B1",
+      "level": "B",
+      "label": "Symboles & Strates (S0→S6)",
+      "status": "done",
+      "entry": "engine/symbols.py + depth_map.py",
+      "depends": [
+        "T1"
+      ],
+      "desc": "794 originaux + 20,434 minés = 21,228 S0",
+      "confidence": 92,
+      "depth": 2
+    },
+    {
+      "id": "B2",
+      "level": "B",
+      "label": "Escaliers Spectraux",
+      "status": "done",
+      "entry": "engine/escaliers_spectraux.py (576L)",
+      "depends": [
+        "T1",
+        "B1"
+      ],
+      "desc": "150 lianes geo + 69 passe-partout, co-occurrence 296M papers",
+      "confidence": 90,
+      "depth": 2
+    },
+    {
+      "id": "B3",
+      "level": "B",
+      "label": "Cross-analyse Physarum × Works",
+      "status": "done",
+      "entry": "engine/cross_physarum_wc.py (453L)",
+      "depends": [
+        "T1"
+      ],
+      "desc": "806 isolés, 1220 ponts cachés, 1567 vides P4",
+      "confidence": 85,
+      "depth": 2
+    },
+    {
+      "id": "B4",
+      "level": "B",
+      "label": "Mine Concepts OpenAlex",
+      "status": "done",
+      "entry": "engine/mine_concepts.py (815L)",
+      "depends": [
+        "M2"
+      ],
+      "desc": "20,434 concepts minés depuis OpenAlex",
+      "confidence": 88,
+      "depth": 2
+    },
+    {
+      "id": "B5",
+      "level": "B",
+      "label": "Validation 100 tests",
+      "status": "done",
+      "entry": "engine/pipeline_100.py + batch2.py",
+      "depends": [
+        "T1",
+        "B2",
+        "B3"
+      ],
+      "desc": "87/100 validés (82% POUR, 92% CONTRE)",
+      "confidence": 87,
+      "depth": 2
+    },
+    {
+      "id": "b1",
+      "level": "b",
+      "label": "Viz La Pluie v3",
+      "status": "done",
+      "entry": "viz/yggdrasil_rain_v3.html (1.2MB)",
+      "depends": [
+        "B1",
+        "B2"
+      ],
+      "desc": "9 continents, vivant/musée, escaliers toggle",
+      "confidence": 75,
+      "depth": 3
+    },
+    {
+      "id": "b2",
+      "level": "b",
+      "label": "Viz Escaliers 3D",
+      "status": "wip",
+      "entry": "viz/yggdrasil_escaliers_3d.html (60KB)",
+      "depends": [
+        "B2",
+        "B3"
+      ],
+      "desc": "Three.js, routes mycelium en cours d'intégration",
+      "confidence": 60,
+      "depth": 3
+    },
+    {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests verify_32tests",
+      "status": "done",
+      "entry": "engine/verify_32tests.py (520L)",
+      "depends": [
+        "B5"
+      ],
+      "desc": "28/29 validés (97%) sur percées historiques",
+      "confidence": 95,
+      "depth": 5
+    },
+    {
+      "id": "C2",
+      "level": "C",
+      "label": "Tests battery_mycelium",
+      "status": "done",
+      "entry": "engine/battery_mycelium.py (472L)",
+      "depends": [
+        "T1"
+      ],
+      "desc": "456 tests mycelium",
+      "confidence": 90,
+      "depth": 5
+    }
+  ],
+  "build_order": [
+    {
+      "phase": 0,
+      "name": "Mycorhizes — lois physiques",
+      "ids": [
+        "M1"
+      ],
+      "action": "Identifier les lois physiques/math immuables du projet",
+      "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
+    },
+    {
+      "phase": 1,
+      "name": "Poils — contraintes légales",
+      "ids": [
+        "P1"
+      ],
+      "action": "Définir les contraintes de niveau -4",
+      "bio": "Extensions microscopiques de l'épiderme. Cuticule très fine. Filtrent TOUT ce qui entre"
+    },
+    {
+      "phase": 1,
+      "name": "Structurelles — stack technique",
+      "ids": [
+        "R1"
+      ],
+      "action": "Définir les contraintes de niveau -1",
+      "bio": "5-15 racines principales, jusqu'à 30cm diamètre. Spread = 2-4x couronne. 80-90% dans top 60cm"
+    },
+    {
+      "phase": 2,
+      "name": "Tronc — pipeline principal",
+      "ids": [
+        "T1"
+      ],
+      "action": "Construire le pipeline end-to-end minimal",
+      "bio": "Le leader terminal pousse en premier (contrôle apical)"
+    },
+    {
+      "phase": 3,
+      "name": "Branches — modules subordonnés",
+      "ids": [
+        "B1",
+        "B2",
+        "B3",
+        "B4"
+      ],
+      "action": "Ajouter les modules UN PAR UN, toujours subordonnés au tronc",
+      "bio": "Les latérales ne dépassent jamais le leader"
+    },
+    {
+      "phase": 5,
+      "name": "Cime — tests et déploiement",
+      "ids": [
+        "C1",
+        "C2"
+      ],
+      "action": "Implémenter cime — tests et déploiement",
+      "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
+    }
+  ],
+  "next_step": "Vérifier l'arbre scanné et compléter les nœuds manquants"
+}
