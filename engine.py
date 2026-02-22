@@ -4249,6 +4249,13 @@ def serve_tree(json_path=None):
         with open(cube_path, "r", encoding="utf-8") as f:
             cube_tpl = f.read()
 
+    # ── Charger le template skeleton export ──
+    skeleton_tpl = ""
+    skeleton_path = templates_dir / "skeleton_export.html"
+    if skeleton_path.exists():
+        with open(skeleton_path, "r", encoding="utf-8") as f:
+            skeleton_tpl = f.read()
+
     # ── Générer le HTML forêt (avec base64 pour inline) ──
     image_base64_map = {k: base64.b64encode(v).decode("utf-8") for k, v in image_raw.items()}
     forest_html = _generate_forest_html(list(all_trees.values()), image_base64_map)
@@ -4330,6 +4337,11 @@ def serve_tree(json_path=None):
                     self._serve_html(html)
                 else:
                     self._serve_404(fname)
+                return
+
+            # Skeleton export
+            if path == "/skeleton-export" and skeleton_tpl:
+                self._serve_html(skeleton_tpl)
                 return
 
             # Cube 3D (dispo sur /cube si besoin)

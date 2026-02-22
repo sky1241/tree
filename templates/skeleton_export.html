@@ -238,8 +238,8 @@ const _F = {
     emoji: "\uD83C\uDF3F", fullName: "BUISSON",
     trunkTopY: null,
     nodes: [
-      { id:"iC1", lk:"C", label:"Tests / CI", x:380, y:100, pid:null },
-      { id:"iC2", lk:"C", label:"Release / CD", x:540, y:105, pid:null },
+      { id:"iC1", lk:"C", label:"Tests / CI", x:380, y:100, pid:"iF1" },
+      { id:"iC2", lk:"C", label:"Release / CD", x:540, y:105, pid:"iF3" },
       { id:"iF1", lk:"F", label:"API endpoints", x:310, y:175, pid:"ib1" },
       { id:"iF2", lk:"F", label:"UI composants", x:461, y:170, pid:"ib3" },
       { id:"iF3", lk:"F", label:"Exports / CLI", x:610, y:175, pid:"ib4" },
@@ -324,31 +324,31 @@ function buildSkeleton(family, scale) {
   // SOL
   svg += `<line x1="40" y1="${SOL_Y}" x2="882" y2="${SOL_Y}" stroke="#8B6914" stroke-width="2.5" opacity="0.4"/>`;
 
-  // ── BANDES DE NIVEAUX (espac\u00e9es r\u00e9guli\u00e8rement, noeuds centr\u00e9s) ──
+  // ── BANDES DE NIVEAUX (10 niveaux fixes pour TOUTES les familles) ──
   const AERIAL_TOP = 30;
-  const AERIAL_BOT = SOL_Y - 15;
-  const UNDER_TOP = SOL_Y + 20;
+  const AERIAL_BOT = SOL_Y - 40;
+  const UNDER_TOP = SOL_Y + 40;
   const UNDER_BOT = 1090;
 
-  const aerialLks = ["C", "F", "b", "B", "T"].filter(lk => skel.nodes.some(n => n.lk === lk));
-  const underLks = ["R-1", "R-2", "R-3", "R-4", "R-5"].filter(lk => skel.nodes.some(n => n.lk === lk));
+  const allAerialLks = ["C", "F", "b", "B", "T"];
+  const allUnderLks = ["R-1", "R-2", "R-3", "R-4", "R-5"];
 
-  const aerialBandH = aerialLks.length ? (AERIAL_BOT - AERIAL_TOP) / aerialLks.length : 0;
-  const underBandH = underLks.length ? (UNDER_BOT - UNDER_TOP) / underLks.length : 0;
+  const aerialBandH = (AERIAL_BOT - AERIAL_TOP) / allAerialLks.length;
+  const underBandH = (UNDER_BOT - UNDER_TOP) / allUnderLks.length;
 
   const bandInfo = {};
-  aerialLks.forEach((lk, i) => {
+  allAerialLks.forEach((lk, i) => {
     const top = AERIAL_TOP + i * aerialBandH;
     bandInfo[lk] = { lineY: top, centerY: top + aerialBandH / 2 };
   });
-  underLks.forEach((lk, i) => {
+  allUnderLks.forEach((lk, i) => {
     const top = UNDER_TOP + i * underBandH;
     bandInfo[lk] = { lineY: top, centerY: top + underBandH / 2 };
   });
 
   // Adjusted node positions: center nodes vertically in their band, keep X
   const iPos = {};
-  for (const lk of [...aerialLks, ...underLks]) {
+  for (const lk of [...allAerialLks, ...allUnderLks]) {
     const levelNodes = skel.nodes.filter(n => n.lk === lk);
     if (levelNodes.length === 0) continue;
     const origCenterY = levelNodes.reduce((s, n) => s + n.y, 0) / levelNodes.length;
@@ -358,23 +358,22 @@ function buildSkeleton(family, scale) {
     });
   }
 
-  // Draw level lines
-  for (const lk of [...aerialLks, ...underLks]) {
-    const lev = LEVELS[lk];
-    const bi = bandInfo[lk];
-    if (!lev || !bi) continue;
-    svg += `<line x1="40" y1="${Math.round(bi.lineY)}" x2="882" y2="${Math.round(bi.lineY)}" stroke="${lev.color}" stroke-width="0.6" stroke-dasharray="4,6" opacity="0.5"/>`;
-  }
-
   // Trunk (from T node to SOL)
   const trunkNode = skel.nodes.find(n => n.lk === "T");
   const trunkY = trunkNode && iPos[trunkNode.id] ? iPos[trunkNode.id].y : null;
   if (skel.trunkTopY !== null && trunkY) {
     // Trunk goes from top of first aerial band to SOL
-    const topY = bandInfo[aerialLks[0]]?.lineY || AERIAL_TOP;
+    const topY = bandInfo[allAerialLks[0]]?.lineY || AERIAL_TOP;
     svg += `<line x1="${CENTER_X}" y1="${Math.round(topY)}" x2="${CENTER_X}" y2="${SOL_Y}" stroke="rgba(255,255,255,0.5)" stroke-width="${pw['T']}"/>`;
   } else if (skel.trunkTopY !== null) {
     svg += `<line x1="${CENTER_X}" y1="${skel.trunkTopY}" x2="${CENTER_X}" y2="${SOL_Y}" stroke="rgba(255,255,255,0.5)" stroke-width="${pw['T']}"/>`;
+  } else {
+    // Pas de tronc (buisson): uniquement tiges→sol (pas de tige centrale en haut)
+    const bNodes = skel.nodes.filter(n => n.lk === "B");
+    if (bNodes.length) {
+      const bCenterY = bNodes.reduce((s, n) => s + (iPos[n.id]?.y || n.y), 0) / bNodes.length;
+      svg += `<line x1="${CENTER_X}" y1="${Math.round(bCenterY)}" x2="${CENTER_X}" y2="${SOL_Y}" stroke="rgba(255,255,255,0.4)" stroke-width="${pw['B'] * 0.6}"/>`;
+    }
   }
   svg += `<line x1="${CENTER_X}" y1="${SOL_Y}" x2="${CENTER_X}" y2="${Math.round(UNDER_TOP + 5)}" stroke="rgba(255,255,255,0.35)" stroke-width="${(pw['T'] || 2) * 0.85}"/>`;
 
@@ -406,9 +405,15 @@ function buildSkeleton(family, scale) {
     svg += `<text x="${pos.x}" y="${ly}" fill="rgba(255,255,255,0.8)" font-size="8" font-family="JetBrains Mono, monospace" text-anchor="middle" font-weight="400" filter="url(#ts${family})">${n.label}</text>`;
   });
 
-  // Title
-  svg += `<text x="${CENTER_X}" y="40" fill="#c4a035" font-size="18" font-family="JetBrains Mono, monospace" text-anchor="middle" font-weight="600" letter-spacing="4">${skel.fullName} ${skel.emoji}</text>`;
-  svg += `<text x="${CENTER_X}" y="1220" fill="rgba(255,255,255,0.25)" font-size="9" font-family="JetBrains Mono, monospace" text-anchor="middle">WINTER TREE \u2014 Squelette id\u00e9al \u2014 922\u00d71244 \u2014 2026</text>`;
+  // Draw ALL 10 level lines + bottom boundaries — EN DERNIER (par-dessus tout)
+  const lineColor = "rgba(255,255,255,0.35)";
+  for (const lk of [...allAerialLks, ...allUnderLks]) {
+    const bi = bandInfo[lk];
+    if (!bi) continue;
+    svg += `<line x1="40" y1="${Math.round(bi.lineY)}" x2="882" y2="${Math.round(bi.lineY)}" stroke="${lineColor}" stroke-width="0.8" stroke-dasharray="4,6"/>`;
+  }
+  svg += `<line x1="40" y1="${Math.round(AERIAL_BOT)}" x2="882" y2="${Math.round(AERIAL_BOT)}" stroke="${lineColor}" stroke-width="0.8" stroke-dasharray="4,6"/>`;
+  svg += `<line x1="40" y1="${Math.round(UNDER_BOT)}" x2="882" y2="${Math.round(UNDER_BOT)}" stroke="${lineColor}" stroke-width="0.8" stroke-dasharray="4,6"/>`;
 
   svg += `</svg>`;
   return svg;
