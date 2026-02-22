@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Winter Tree — Squelettes Export</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #EDE5DB;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 20px;
+  }
+  h1 { text-align: center; font-size: 14px; letter-spacing: 4px; color: #8B6914; margin-bottom: 20px; }
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+  .card {
+    background: #050805;
+    border: 1px solid rgba(139,105,20,0.2);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .card:hover { border-color: rgba(139,105,20,0.5); }
+  .card h2 {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 8px;
+    color: #c4a035;
+    background: rgba(139,105,20,0.08);
+  }
+  .solo {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: #050805;
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .solo.active { display: flex; }
+  .solo h2 {
+    font-size: 16px;
+    letter-spacing: 4px;
+    color: #c4a035;
+    margin-bottom: 10px;
+  }
+  .solo .hint {
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    margin-top: 10px;
+  }
+  .solo svg { border: 1px solid rgba(139,105,20,0.15); }
+  .back-btn {
+    position: fixed; top: 15px; left: 15px;
+    background: rgba(139,105,20,0.2);
+    color: #c4a035;
+    border: 1px solid rgba(139,105,20,0.3);
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    z-index: 200;
+    display: none;
+    border-radius: 4px;
+  }
+  .back-btn.active { display: block; }
+</style>
+</head>
+<body>
+
+<h1>WINTER TREE — SQUELETTES PARFAITS (922 x 1244)</h1>
+<div class="grid" id="grid"></div>
+<div class="solo" id="solo">
+  <h2 id="soloTitle"></h2>
+  <div id="soloSvg"></div>
+  <div class="hint">Clic droit sur l'image → "Enregistrer l'image sous" pour exporter en SVG</div>
+</div>
+<button class="back-btn" id="backBtn" onclick="closeSolo()">← Retour</button>
+
+<script>
+const IMG_W = 922, IMG_H = 1244, CENTER_X = 461, SOL_Y = 575;
+
+const LEVELS = {
+  "C":   { y: 105, label: "CIME",            color: "#28c862", zone: "aerial" },
+  "F":   { y: 185, label: "FEUILLES",         color: "#32b555", zone: "aerial" },
+  "b":   { y: 270, label: "RAMEAUX",           color: "#38a048", zone: "aerial" },
+  "B":   { y: 385, label: "BRANCHES",          color: "#3d8a3a", zone: "aerial" },
+  "T":   { y: 480, label: "TRONC",             color: "#5a9a35", zone: "aerial" },
+  "R-1": { y: 605, label: "R.STRUCTURELLES",  color: "#9a7453", zone: "under" },
+  "R-2": { y: 700, label: "R.PIVOTANTES",     color: "#8a6344", zone: "under" },
+  "R-3": { y: 790, label: "RADICELLES",       color: "#7a5235", zone: "under" },
+  "R-4": { y: 885, label: "POILS ABSORBANTS", color: "#6b4226", zone: "under" },
+  "R-5": { y: 980, label: "MYCORHIZES",       color: "#5c3317", zone: "under" },
+};
+
+const _F = {
+  conifere: {
+    emoji: "\uD83C\uDF32", fullName: "CONIF\u00C8RE",
+    trunkTopY: 90,
+    nodes: [
+      { id:"iC1", lk:"C", label:"Tests / CI", x:476, y:112, pid:null },
+      { id:"iC2", lk:"C", label:"Release / CD", x:446, y:118, pid:null },
+      { id:"iF1", lk:"F", label:"API endpoints", x:505, y:188, pid:"ib1" },
+      { id:"iF2", lk:"F", label:"UI composants", x:418, y:193, pid:"ib3" },
+      { id:"iF3", lk:"F", label:"Exports / CLI", x:538, y:218, pid:"ib5" },
+      { id:"iB1", lk:"B", label:"Module A", x:490, y:392, pid:null },
+      { id:"iB2", lk:"B", label:"Module B", x:432, y:397, pid:null },
+      { id:"iB3", lk:"B", label:"Module C", x:515, y:450, pid:null },
+      { id:"iB4", lk:"B", label:"Module D", x:408, y:455, pid:null },
+      { id:"ib1", lk:"b", label:"Sub-mod 1", x:520, y:278, pid:"iB1" },
+      { id:"ib2", lk:"b", label:"Sub-mod 2", x:555, y:308, pid:"iB1" },
+      { id:"ib3", lk:"b", label:"Sub-mod 3", x:400, y:283, pid:"iB2" },
+      { id:"ib4", lk:"b", label:"Sub-mod 4", x:368, y:312, pid:"iB2" },
+      { id:"ib5", lk:"b", label:"Sub-mod 5", x:580, y:342, pid:"iB3" },
+      { id:"ib6", lk:"b", label:"Sub-mod 6", x:345, y:348, pid:"iB4" },
+      { id:"iT1", lk:"T", label:"Core pipeline", x:461, y:530, pid:null },
+      { id:"iR11", lk:"R-1", label:"Framework web", x:505, y:612, pid:null },
+      { id:"iR12", lk:"R-1", label:"Framework data", x:418, y:618, pid:null },
+      { id:"iR13", lk:"R-1", label:"Framework test", x:545, y:638, pid:null },
+      { id:"iR21", lk:"R-2", label:"Archi DB", x:548, y:712, pid:"iR11" },
+      { id:"iR22", lk:"R-2", label:"Archi API", x:375, y:720, pid:"iR12" },
+      { id:"iR31", lk:"R-3", label:"Contrainte 1", x:580, y:800, pid:"iR21" },
+      { id:"iR32", lk:"R-3", label:"Contrainte 2", x:345, y:808, pid:"iR22" },
+      { id:"iR33", lk:"R-3", label:"Contrainte 3", x:628, y:815, pid:"iR21" },
+      { id:"iR41", lk:"R-4", label:"Licence", x:612, y:895, pid:"iR31" },
+      { id:"iR42", lk:"R-4", label:"Conformite", x:312, y:902, pid:"iR32" },
+      { id:"iR51", lk:"R-5", label:"Algorithmes", x:645, y:988, pid:"iR41" },
+      { id:"iR52", lk:"R-5", label:"Hardware", x:278, y:995, pid:"iR42" },
+    ],
+    pw: { "T":4.0,"B":2.5,"b":1.5,"C":1.0,"F":1.2,"R-1":2.5,"R-2":1.8,"R-3":1.2,"R-4":0.8,"R-5":0.5 },
+    nr: { "T":33,"B":23,"b":15,"F":12,"C":11,"R-1":23,"R-2":18,"R-3":12,"R-4":8,"R-5":6 },
+  },
+  feuillu: {
+    emoji: "\uD83C\uDF33", fullName: "FEUILLU",
+    trunkTopY: 200,
+    nodes: [
+      { id:"iC1", lk:"C", label:"Tests / CI", x:461, y:100, pid:null },
+      { id:"iC2", lk:"C", label:"Release / CD", x:390, y:120, pid:null },
+      { id:"iC3", lk:"C", label:"Monitoring", x:530, y:120, pid:null },
+      { id:"iF1", lk:"F", label:"API endpoints", x:340, y:190, pid:"ib1" },
+      { id:"iF2", lk:"F", label:"UI composants", x:461, y:180, pid:"ib3" },
+      { id:"iF3", lk:"F", label:"Exports / CLI", x:580, y:190, pid:"ib4" },
+      { id:"iF4", lk:"F", label:"Webhooks", x:280, y:215, pid:"ib2" },
+      { id:"ib1", lk:"b", label:"Sub-mod 1", x:330, y:260, pid:"iB1" },
+      { id:"ib2", lk:"b", label:"Sub-mod 2", x:255, y:285, pid:"iB2" },
+      { id:"ib3", lk:"b", label:"Sub-mod 3", x:461, y:255, pid:"iB3" },
+      { id:"ib4", lk:"b", label:"Sub-mod 4", x:595, y:260, pid:"iB4" },
+      { id:"ib5", lk:"b", label:"Sub-mod 5", x:665, y:285, pid:"iB5" },
+      { id:"ib6", lk:"b", label:"Sub-mod 6", x:385, y:275, pid:"iB1" },
+      { id:"iB1", lk:"B", label:"Module A", x:365, y:385, pid:null },
+      { id:"iB2", lk:"B", label:"Module B", x:275, y:415, pid:"iB1" },
+      { id:"iB3", lk:"B", label:"Module C", x:461, y:375, pid:null },
+      { id:"iB4", lk:"B", label:"Module D", x:555, y:385, pid:null },
+      { id:"iB5", lk:"B", label:"Module E", x:645, y:415, pid:"iB4" },
+      { id:"iT1", lk:"T", label:"Core engine", x:461, y:500, pid:null },
+      { id:"iR11", lk:"R-1", label:"Framework web", x:520, y:618, pid:null },
+      { id:"iR12", lk:"R-1", label:"Framework data", x:400, y:622, pid:null },
+      { id:"iR13", lk:"R-1", label:"Framework test", x:580, y:640, pid:null },
+      { id:"iR21", lk:"R-2", label:"Archi DB", x:560, y:720, pid:"iR11" },
+      { id:"iR22", lk:"R-2", label:"Archi API", x:355, y:728, pid:"iR12" },
+      { id:"iR31", lk:"R-3", label:"Contrainte 1", x:600, y:810, pid:"iR21" },
+      { id:"iR32", lk:"R-3", label:"Contrainte 2", x:320, y:818, pid:"iR22" },
+      { id:"iR33", lk:"R-3", label:"Contrainte 3", x:648, y:825, pid:"iR21" },
+      { id:"iR41", lk:"R-4", label:"Licence", x:635, y:905, pid:"iR31" },
+      { id:"iR42", lk:"R-4", label:"Conformite", x:285, y:912, pid:"iR32" },
+      { id:"iR51", lk:"R-5", label:"Algorithmes", x:668, y:995, pid:"iR41" },
+      { id:"iR52", lk:"R-5", label:"Hardware", x:255, y:1002, pid:"iR42" },
+    ],
+    pw: { "T":4.0,"B":3.5,"b":2.0,"C":1.0,"F":1.2,"R-1":2.5,"R-2":1.8,"R-3":1.2,"R-4":0.8,"R-5":0.5 },
+    nr: { "T":30,"B":26,"b":15,"F":12,"C":10,"R-1":22,"R-2":16,"R-3":12,"R-4":7,"R-5":5 },
+  },
+  baobab: {
+    emoji: "\uD83E\uDEDA", fullName: "BAOBAB",
+    trunkTopY: 170,
+    nodes: [
+      { id:"iC1", lk:"C", label:"Tests / CI", x:461, y:95, pid:null },
+      { id:"iC2", lk:"C", label:"Release / CD", x:440, y:105, pid:null },
+      { id:"iF1", lk:"F", label:"API endpoints", x:500, y:135, pid:"ib1" },
+      { id:"iF2", lk:"F", label:"UI composants", x:420, y:140, pid:"ib2" },
+      { id:"ib1", lk:"b", label:"Sub-mod 1", x:495, y:170, pid:"iB1" },
+      { id:"ib2", lk:"b", label:"Sub-mod 2", x:428, y:175, pid:"iB2" },
+      { id:"ib3", lk:"b", label:"Sub-mod 3", x:530, y:185, pid:"iB3" },
+      { id:"iB1", lk:"B", label:"Module A", x:490, y:215, pid:null },
+      { id:"iB2", lk:"B", label:"Module B", x:432, y:220, pid:null },
+      { id:"iB3", lk:"B", label:"Module C", x:525, y:240, pid:null },
+      { id:"iT1", lk:"T", label:"Core engine", x:461, y:400, pid:null },
+      { id:"iR11", lk:"R-1", label:"Framework web", x:530, y:615, pid:null },
+      { id:"iR12", lk:"R-1", label:"Framework data", x:392, y:620, pid:null },
+      { id:"iR13", lk:"R-1", label:"Framework test", x:568, y:635, pid:null },
+      { id:"iR21", lk:"R-2", label:"Archi DB", x:575, y:710, pid:"iR11" },
+      { id:"iR22", lk:"R-2", label:"Archi API", x:350, y:718, pid:"iR12" },
+      { id:"iR31", lk:"R-3", label:"Contrainte 1", x:615, y:805, pid:"iR21" },
+      { id:"iR32", lk:"R-3", label:"Contrainte 2", x:310, y:812, pid:"iR22" },
+      { id:"iR33", lk:"R-3", label:"Contrainte 3", x:655, y:820, pid:"iR21" },
+      { id:"iR41", lk:"R-4", label:"Licence", x:650, y:900, pid:"iR31" },
+      { id:"iR42", lk:"R-4", label:"Conformite", x:268, y:908, pid:"iR32" },
+      { id:"iR51", lk:"R-5", label:"Algorithmes", x:685, y:992, pid:"iR41" },
+      { id:"iR52", lk:"R-5", label:"Hardware", x:235, y:1000, pid:"iR42" },
+    ],
+    pw: { "T":7.0,"B":1.2,"b":0.8,"C":0.5,"F":0.6,"R-1":2.5,"R-2":1.8,"R-3":1.2,"R-4":0.8,"R-5":0.5 },
+    nr: { "T":45,"B":12,"b":8,"F":6,"C":5,"R-1":20,"R-2":15,"R-3":10,"R-4":6,"R-5":4 },
+  },
+  palmier: {
+    emoji: "\uD83C\uDF34", fullName: "PALMIER",
+    trunkTopY: 90,
+    nodes: [
+      { id:"iC1", lk:"C", label:"Tests / CI", x:461, y:80, pid:null },
+      { id:"iF1", lk:"F", label:"API endpoints", x:350, y:130, pid:null },
+      { id:"iF2", lk:"F", label:"UI composants", x:461, y:120, pid:null },
+      { id:"iF3", lk:"F", label:"Exports / CLI", x:572, y:130, pid:null },
+      { id:"iF4", lk:"F", label:"Webhooks", x:300, y:160, pid:null },
+      { id:"iF5", lk:"F", label:"Events", x:622, y:160, pid:null },
+      { id:"iT1", lk:"T", label:"Stipe unique", x:461, y:420, pid:null },
+      { id:"iR11", lk:"R-1", label:"Framework web", x:520, y:615, pid:null },
+      { id:"iR12", lk:"R-1", label:"Framework data", x:402, y:620, pid:null },
+      { id:"iR21", lk:"R-2", label:"Archi DB", x:555, y:715, pid:"iR11" },
+      { id:"iR22", lk:"R-2", label:"Archi API", x:368, y:722, pid:"iR12" },
+      { id:"iR31", lk:"R-3", label:"Contrainte 1", x:590, y:808, pid:"iR21" },
+      { id:"iR32", lk:"R-3", label:"Contrainte 2", x:335, y:815, pid:"iR22" },
+      { id:"iR41", lk:"R-4", label:"Licence", x:620, y:900, pid:"iR31" },
+      { id:"iR42", lk:"R-4", label:"Conformite", x:305, y:908, pid:"iR32" },
+      { id:"iR51", lk:"R-5", label:"Algorithmes", x:650, y:992, pid:"iR41" },
+      { id:"iR52", lk:"R-5", label:"Hardware", x:275, y:1000, pid:"iR42" },
+    ],
+    pw: { "T":5.0,"B":0,"b":0,"C":0.5,"F":1.5,"R-1":2.0,"R-2":1.5,"R-3":1.0,"R-4":0.6,"R-5":0.4 },
+    nr: { "T":25,"B":0,"b":0,"F":14,"C":8,"R-1":20,"R-2":14,"R-3":10,"R-4":6,"R-5":4 },
+  },
+  buisson: {
+    emoji: "\uD83C\uDF3F", fullName: "BUISSON",
+    trunkTopY: null,
+    nodes: [
+      { id:"iC1", lk:"C", label:"Tests / CI", x:380, y:100, pid:null },
+      { id:"iC2", lk:"C", label:"Release / CD", x:540, y:105, pid:null },
+      { id:"iF1", lk:"F", label:"API endpoints", x:310, y:175, pid:"ib1" },
+      { id:"iF2", lk:"F", label:"UI composants", x:461, y:170, pid:"ib3" },
+      { id:"iF3", lk:"F", label:"Exports / CLI", x:610, y:175, pid:"ib4" },
+      { id:"ib1", lk:"b", label:"Sub-mod 1", x:300, y:250, pid:"iB1" },
+      { id:"ib2", lk:"b", label:"Sub-mod 2", x:390, y:255, pid:"iB2" },
+      { id:"ib3", lk:"b", label:"Sub-mod 3", x:461, y:245, pid:"iB3" },
+      { id:"ib4", lk:"b", label:"Sub-mod 4", x:530, y:250, pid:"iB4" },
+      { id:"ib5", lk:"b", label:"Sub-mod 5", x:620, y:255, pid:"iB5" },
+      { id:"iB1", lk:"B", label:"Tige A", x:310, y:390, pid:null },
+      { id:"iB2", lk:"B", label:"Tige B", x:395, y:385, pid:null },
+      { id:"iB3", lk:"B", label:"Tige C", x:461, y:380, pid:null },
+      { id:"iB4", lk:"B", label:"Tige D", x:527, y:385, pid:null },
+      { id:"iB5", lk:"B", label:"Tige E", x:612, y:390, pid:null },
+      { id:"iR11", lk:"R-1", label:"Dep principale", x:461, y:618, pid:null },
+      { id:"iR12", lk:"R-1", label:"Framework test", x:560, y:632, pid:null },
+      { id:"iR21", lk:"R-2", label:"Archi DB", x:540, y:718, pid:"iR11" },
+      { id:"iR22", lk:"R-2", label:"Archi API", x:382, y:725, pid:"iR11" },
+      { id:"iR31", lk:"R-3", label:"Contrainte 1", x:575, y:808, pid:"iR21" },
+      { id:"iR32", lk:"R-3", label:"Contrainte 2", x:348, y:815, pid:"iR22" },
+      { id:"iR41", lk:"R-4", label:"Licence", x:608, y:900, pid:"iR31" },
+      { id:"iR42", lk:"R-4", label:"Conformite", x:315, y:908, pid:"iR32" },
+      { id:"iR51", lk:"R-5", label:"Algorithmes", x:640, y:992, pid:"iR41" },
+      { id:"iR52", lk:"R-5", label:"Hardware", x:282, y:1000, pid:"iR42" },
+    ],
+    pw: { "T":0,"B":2.0,"b":1.2,"C":0.8,"F":1.0,"R-1":2.5,"R-2":1.8,"R-3":1.0,"R-4":0.6,"R-5":0.4 },
+    nr: { "T":0,"B":20,"b":12,"F":10,"C":8,"R-1":20,"R-2":14,"R-3":10,"R-4":6,"R-5":4 },
+  },
+  liane: {
+    emoji: "\uD83C\uDF31", fullName: "LIANE",
+    trunkTopY: 90,
+    nodes: [
+      { id:"iC1", lk:"C", label:"Tests / CI", x:461, y:100, pid:null },
+      { id:"iC2", lk:"C", label:"Release / CD", x:430, y:115, pid:null },
+      { id:"iF1", lk:"F", label:"API endpoints", x:400, y:185, pid:"ib1" },
+      { id:"iF2", lk:"F", label:"UI composants", x:520, y:190, pid:"ib2" },
+      { id:"iF3", lk:"F", label:"Exports / CLI", x:360, y:215, pid:"ib3" },
+      { id:"ib1", lk:"b", label:"Vrille 1", x:415, y:275, pid:"iB1" },
+      { id:"ib2", lk:"b", label:"Vrille 2", x:505, y:280, pid:"iB2" },
+      { id:"ib3", lk:"b", label:"Vrille 3", x:380, y:310, pid:"iB1" },
+      { id:"iB1", lk:"B", label:"Fork A", x:430, y:395, pid:null },
+      { id:"iB2", lk:"B", label:"Fork B", x:490, y:400, pid:null },
+      { id:"iT1", lk:"T", label:"Tige principale", x:461, y:510, pid:null },
+      { id:"iR11", lk:"R-1", label:"Framework web", x:500, y:625, pid:null },
+      { id:"iR12", lk:"R-1", label:"Framework data", x:422, y:630, pid:null },
+      { id:"iR21", lk:"R-2", label:"Archi DB", x:530, y:725, pid:"iR11" },
+      { id:"iR22", lk:"R-2", label:"Archi API", x:395, y:732, pid:"iR12" },
+      { id:"iR31", lk:"R-3", label:"Contrainte 1", x:560, y:815, pid:"iR21" },
+      { id:"iR32", lk:"R-3", label:"Contrainte 2", x:365, y:822, pid:"iR22" },
+      { id:"iR41", lk:"R-4", label:"Licence", x:590, y:908, pid:"iR31" },
+      { id:"iR42", lk:"R-4", label:"Conformite", x:335, y:915, pid:"iR32" },
+      { id:"iR51", lk:"R-5", label:"Algorithmes", x:620, y:998, pid:"iR41" },
+      { id:"iR52", lk:"R-5", label:"Hardware", x:305, y:1005, pid:"iR42" },
+    ],
+    pw: { "T":1.5,"B":1.2,"b":1.0,"C":0.6,"F":0.8,"R-1":1.5,"R-2":1.2,"R-3":0.8,"R-4":0.5,"R-5":0.3 },
+    nr: { "T":15,"B":12,"b":10,"F":8,"C":6,"R-1":12,"R-2":10,"R-3":8,"R-4":5,"R-5":4 },
+  },
+};
+
+function buildSkeleton(family, scale) {
+  const skel = _F[family];
+  const pw = skel.pw;
+  const nr = skel.nr;
+  const s = scale || 1;
+  const w = IMG_W * s, h = IMG_H * s;
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${IMG_W} ${IMG_H}" style="background:#050805;">`;
+
+  // Defs
+  svg += `<defs>
+    <filter id="g${family}" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    </filter>
+    <filter id="ts${family}" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#000" flood-opacity="0.9"/>
+    </filter>
+  </defs>`;
+
+  // Axe central
+  svg += `<line x1="${CENTER_X}" y1="60" x2="${CENTER_X}" y2="1160" stroke="rgba(139,105,20,0.15)" stroke-width="1" stroke-dasharray="6,4"/>`;
+
+  // SOL
+  svg += `<line x1="40" y1="${SOL_Y}" x2="882" y2="${SOL_Y}" stroke="#8B6914" stroke-width="2.5" opacity="0.4"/>`;
+
+  // ── BANDES DE NIVEAUX (espac\u00e9es r\u00e9guli\u00e8rement, noeuds centr\u00e9s) ──
+  const AERIAL_TOP = 30;
+  const AERIAL_BOT = SOL_Y - 15;
+  const UNDER_TOP = SOL_Y + 20;
+  const UNDER_BOT = 1090;
+
+  const aerialLks = ["C", "F", "b", "B", "T"].filter(lk => skel.nodes.some(n => n.lk === lk));
+  const underLks = ["R-1", "R-2", "R-3", "R-4", "R-5"].filter(lk => skel.nodes.some(n => n.lk === lk));
+
+  const aerialBandH = aerialLks.length ? (AERIAL_BOT - AERIAL_TOP) / aerialLks.length : 0;
+  const underBandH = underLks.length ? (UNDER_BOT - UNDER_TOP) / underLks.length : 0;
+
+  const bandInfo = {};
+  aerialLks.forEach((lk, i) => {
+    const top = AERIAL_TOP + i * aerialBandH;
+    bandInfo[lk] = { lineY: top, centerY: top + aerialBandH / 2 };
+  });
+  underLks.forEach((lk, i) => {
+    const top = UNDER_TOP + i * underBandH;
+    bandInfo[lk] = { lineY: top, centerY: top + underBandH / 2 };
+  });
+
+  // Adjusted node positions: center nodes vertically in their band, keep X
+  const iPos = {};
+  for (const lk of [...aerialLks, ...underLks]) {
+    const levelNodes = skel.nodes.filter(n => n.lk === lk);
+    if (levelNodes.length === 0) continue;
+    const origCenterY = levelNodes.reduce((s, n) => s + n.y, 0) / levelNodes.length;
+    const dy = bandInfo[lk].centerY - origCenterY;
+    levelNodes.forEach(n => {
+      iPos[n.id] = { x: n.x, y: Math.round(n.y + dy) };
+    });
+  }
+
+  // Draw level lines
+  for (const lk of [...aerialLks, ...underLks]) {
+    const lev = LEVELS[lk];
+    const bi = bandInfo[lk];
+    if (!lev || !bi) continue;
+    svg += `<line x1="40" y1="${Math.round(bi.lineY)}" x2="882" y2="${Math.round(bi.lineY)}" stroke="${lev.color}" stroke-width="0.6" stroke-dasharray="4,6" opacity="0.5"/>`;
+  }
+
+  // Trunk (from T node to SOL)
+  const trunkNode = skel.nodes.find(n => n.lk === "T");
+  const trunkY = trunkNode && iPos[trunkNode.id] ? iPos[trunkNode.id].y : null;
+  if (skel.trunkTopY !== null && trunkY) {
+    // Trunk goes from top of first aerial band to SOL
+    const topY = bandInfo[aerialLks[0]]?.lineY || AERIAL_TOP;
+    svg += `<line x1="${CENTER_X}" y1="${Math.round(topY)}" x2="${CENTER_X}" y2="${SOL_Y}" stroke="rgba(255,255,255,0.5)" stroke-width="${pw['T']}"/>`;
+  } else if (skel.trunkTopY !== null) {
+    svg += `<line x1="${CENTER_X}" y1="${skel.trunkTopY}" x2="${CENTER_X}" y2="${SOL_Y}" stroke="rgba(255,255,255,0.5)" stroke-width="${pw['T']}"/>`;
+  }
+  svg += `<line x1="${CENTER_X}" y1="${SOL_Y}" x2="${CENTER_X}" y2="${Math.round(UNDER_TOP + 5)}" stroke="rgba(255,255,255,0.35)" stroke-width="${(pw['T'] || 2) * 0.85}"/>`;
+
+  // Connections (using adjusted positions)
+  skel.nodes.forEach(n => {
+    const pos = iPos[n.id];
+    if (!pos || n.lk === "T") return;
+    let pp;
+    if (n.pid && iPos[n.pid]) { pp = iPos[n.pid]; }
+    else if (n.lk === "R-1") { pp = { x: CENTER_X, y: SOL_Y + 15 }; }
+    else { pp = { x: CENTER_X, y: pos.y - 15 }; }
+    const cx = pp.x + (pos.x - pp.x) * 0.55;
+    const cy = pp.y + (pos.y - pp.y) * 0.3;
+    const sw = pw[n.lk] || 1.0;
+    svg += `<path d="M${pp.x},${pp.y} Q${cx},${cy} ${pos.x},${pos.y}" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="${sw}"/>`;
+  });
+
+  // Nodes (using adjusted positions)
+  skel.nodes.forEach(n => {
+    const pos = iPos[n.id];
+    if (!pos) return;
+    const r = nr[n.lk] || 5;
+    const lev = LEVELS[n.lk];
+    const above = lev?.zone === "aerial";
+    const ly = above ? pos.y - r - 5 : pos.y + r + 13;
+
+    svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" filter="url(#g${family})"/>`;
+    svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${Math.max(1.5, r * 0.25)}" fill="#fff"/>`;
+    svg += `<text x="${pos.x}" y="${ly}" fill="rgba(255,255,255,0.8)" font-size="8" font-family="JetBrains Mono, monospace" text-anchor="middle" font-weight="400" filter="url(#ts${family})">${n.label}</text>`;
+  });
+
+  // Title
+  svg += `<text x="${CENTER_X}" y="40" fill="#c4a035" font-size="18" font-family="JetBrains Mono, monospace" text-anchor="middle" font-weight="600" letter-spacing="4">${skel.fullName} ${skel.emoji}</text>`;
+  svg += `<text x="${CENTER_X}" y="1220" fill="rgba(255,255,255,0.25)" font-size="9" font-family="JetBrains Mono, monospace" text-anchor="middle">WINTER TREE \u2014 Squelette id\u00e9al \u2014 922\u00d71244 \u2014 2026</text>`;
+
+  svg += `</svg>`;
+  return svg;
+}
+
+// Build grid
+const grid = document.getElementById("grid");
+const families = ["conifere", "feuillu", "baobab", "palmier", "buisson", "liane"];
+
+families.forEach(f => {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `<h2>${_F[f].emoji} ${_F[f].fullName}</h2>${buildSkeleton(f, 0.35)}`;
+  card.onclick = () => openSolo(f);
+  grid.appendChild(card);
+});
+
+function openSolo(f) {
+  document.getElementById("soloTitle").textContent = `${_F[f].emoji} ${_F[f].fullName}`;
+  document.getElementById("soloSvg").innerHTML = buildSkeleton(f, 0.85);
+  document.getElementById("solo").classList.add("active");
+  document.getElementById("backBtn").classList.add("active");
+}
+function closeSolo() {
+  document.getElementById("solo").classList.remove("active");
+  document.getElementById("backBtn").classList.remove("active");
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSolo(); });
+</script>
+</body>
+</html>
