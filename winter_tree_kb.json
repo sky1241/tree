@@ -565,5 +565,29 @@
       "rs_ratio": "Progresse de ~0 à normal",
       "detail": "Racines aériennes d'abord, puis terrestres. Le figuier étrangleur développe un système complet seulement au sol."
     }
+  },
+  "rules": {
+    "auto_update": {
+      "description": "Le winter-tree.json de chaque projet est la source de verite. Il DOIT etre mis a jour automatiquement apres chaque modification significative.",
+      "triggers": [
+        "Fichier cree, deplace ou supprime -> mettre a jour nodes[].entry",
+        "Fonctionnalite terminee -> passer nodes[].status de todo/wip a done",
+        "Travail en cours -> passer nodes[].status a wip",
+        "Resultat de test/validation -> ajuster nodes[].confidence",
+        "Nouveau module ou feature -> ajouter un node",
+        "Stats changent (lignes de code, fichiers, data) -> mettre a jour stats{}",
+        "Etape franchie -> mettre a jour next_step et build_order[].action"
+      ],
+      "fields_to_update": [
+        "nodes[].status (todo|wip|done)",
+        "nodes[].entry (chemin relatif)",
+        "nodes[].confidence (0-100)",
+        "nodes[].desc (description courte)",
+        "stats.total_files, stats.total_code_lines, stats.data_weight_mb",
+        "phase (GRAINE|GERMINATION|CROISSANCE|CANOPEE)",
+        "next_step"
+      ],
+      "when": "A chaque commit ou changement significatif dans le projet. Le winter-tree est le journal de bord vivant."
+    }
   }
 }
