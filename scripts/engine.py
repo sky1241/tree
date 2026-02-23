@@ -4256,6 +4256,13 @@ def serve_tree(json_path=None):
         with open(skeleton_path, "r", encoding="utf-8") as f:
             skeleton_tpl = f.read()
 
+    # ── Charger le template planche overlay ──
+    planche_overlay_tpl = ""
+    overlay_path = templates_dir / "planche_overlay.html"
+    if overlay_path.exists():
+        with open(overlay_path, "r", encoding="utf-8") as f:
+            planche_overlay_tpl = f.read()
+
     # ── Générer le HTML forêt (avec base64 pour inline) ──
     image_base64_map = {k: base64.b64encode(v).decode("utf-8") for k, v in image_raw.items()}
     forest_html = _generate_forest_html(list(all_trees.values()), image_base64_map)
@@ -4285,6 +4292,22 @@ def serve_tree(json_path=None):
     class TreeHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             path = urllib.parse.unquote(self.path)
+
+            # Static template files (images)
+            if path.startswith("/tpl/"):
+                fname = path[5:]
+                tpl_file = templates_dir / fname
+                if tpl_file.exists() and tpl_file.suffix in (".png", ".jpg", ".jpeg", ".webp"):
+                    ct = "image/png" if tpl_file.suffix == ".png" else "image/jpeg"
+                    data = tpl_file.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-type", ct)
+                    self.send_header("Content-Length", len(data))
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    self._serve_404(fname)
+                return
 
             # Images: /assets/filename.png
             if path.startswith("/assets/"):
@@ -4342,6 +4365,11 @@ def serve_tree(json_path=None):
             # Skeleton export
             if path == "/skeleton-export" and skeleton_tpl:
                 self._serve_html(skeleton_tpl)
+                return
+
+            # Planche overlay
+            if path == "/planche-overlay" and planche_overlay_tpl:
+                self._serve_html(planche_overlay_tpl)
                 return
 
             # Cube 3D (dispo sur /cube si besoin)
