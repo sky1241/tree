@@ -13,7 +13,7 @@ TGT_W, TGT_H = 1024, 1536
 FAMILY_SOL_Y = {
     "conifere": 890,
     "feuillu":  720,
-    "baobab":   930,
+    "baobab":   895,
     "palmier":  885,
     "buisson":  730,
     "liane":    815,
