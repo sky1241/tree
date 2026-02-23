@@ -11,12 +11,12 @@ TGT_W, TGT_H = 1024, 1536
 
 # Real ground level per family (measured from ChatGPT images)
 FAMILY_SOL_Y = {
-    "conifere": 850,
-    "feuillu":  735,
-    "baobab":   800,
-    "palmier":  795,
-    "buisson":  715,
-    "liane":    755,
+    "conifere": 890,
+    "feuillu":  720,
+    "baobab":   860,
+    "palmier":  885,
+    "buisson":  730,
+    "liane":    815,
 }
 
 # Positions baobab 1024x1536 — NOW using dynamic remap per family
