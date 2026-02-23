@@ -253,10 +253,57 @@ def quadratic_bezier(p0, p1, p2, steps=50):
     return pts
 
 
+def draw_glow_ring(draw, cx, cy, r, color, alpha_outer=60, alpha_mid=100, ring_w=4):
+    """Focus ring UX: outline 2px solid + box-shadow 0 0 0 4px rgba(color, 0.3)
+    Ref: infernal-wheel/ux_resources/DESIGN_TREE.md — Focus appearance 2.4.13"""
+    # Outer glow (box-shadow equivalent)
+    for i in range(ring_w, 0, -1):
+        a = int(alpha_outer * (1 - i / ring_w))
+        rr = r + ring_w + i
+        draw.ellipse([(cx-rr, cy-rr), (cx+rr, cy+rr)],
+                     fill=None, outline=(*color, a), width=1)
+    # Mid ring (outline 2px solid)
+    rr = r + 2
+    draw.ellipse([(cx-rr, cy-rr), (cx+rr, cy+rr)],
+                 fill=None, outline=(*color, alpha_mid), width=2)
+
+
+def draw_label_card(draw, text, cx, cy, r, font, color):
+    """Label en mini-card avec elevation.
+    Ref: DESIGN_TREE — Cards: border-radius 8px, box-shadow 0 1px 3px rgba(0,0,0,0.1)
+    Dark mode elevation 4dp = #272727"""
+    tw = draw.textlength(text, font=font) if hasattr(draw, 'textlength') else len(text) * 7
+    pad_h, pad_v = 6, 3
+    tx = cx - tw / 2
+    ty = cy - r - 20
+    box = [(tx - pad_h, ty - pad_v), (tx + tw + pad_h, ty + 14 + pad_v)]
+
+    # Card background: elevation 4dp #272727
+    draw.rounded_rectangle(box, radius=4, fill=(39, 39, 39, 200),
+                           outline=(*color, 80), width=1)
+    # Text: contrast >= 4.5:1 sur dark bg
+    draw.text((tx, ty), text, fill=(*color, 240), font=font)
+
+
 def gen_skeleton(family_name, fam):
-    """Genere le squelette sur fond noir."""
-    img = Image.new("RGBA", (TGT_W, TGT_H), (5, 8, 5, 255))
+    """Genere le squelette sur fond noir.
+    UX rules from infernal-wheel/ux_resources/DESIGN_TREE.md:
+    - Dark mode bg: #121212 (elevation 0dp)
+    - Contrast UI >= 3:1
+    - Focus ring: outline 2px + glow 4px
+    - Nodes min 12px radius (visibility)
+    - Labels: elevation cards avec border-radius"""
+    # BG: Dark mode elevation 0dp = #121212
+    img = Image.new("RGBA", (TGT_W, TGT_H), (18, 18, 18, 255))
     draw = ImageDraw.Draw(img)
+
+    # Font
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 11)
+        font_band = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 9)
+    except:
+        font = ImageFont.load_default()
+        font_band = font
 
     # Scale nodes
     nodes = []
@@ -266,71 +313,108 @@ def gen_skeleton(family_name, fam):
     iPos = {n["id"]: (n["x"], n["y"]) for n in nodes}
     pw = fam["pw"]
 
-    # Ligne de sol
-    draw.line([(0, SOL_Y), (TGT_W, SOL_Y)], fill=(180, 140, 20, 180), width=2)
-
-    # Axe central
-    draw.line([(CENTER_X, 0), (CENTER_X, TGT_H)], fill=(180, 140, 20, 60), width=1)
-
-    # Bandes horizontales
+    # Bandes horizontales — elevation 1dp = #1E1E1E, subtle
     all_lks = AERIAL_LKS + UNDER_LKS
+    BAND_LABELS = {
+        "C": "CIME", "F": "FEUILLES", "b": "RAMEAUX", "B": "BRANCHES", "T": "TRONC",
+        "R-1": "R.STRUCT", "R-2": "R.PIVOT", "R-3": "RADICELLES",
+        "R-4": "POILS ABS.", "R-5": "MYCORHIZES",
+    }
     for lk in all_lks:
         by = BAND_Y[lk]
-        draw.line([(0, by), (TGT_W, by)], fill=(255, 255, 255, 30), width=1)
+        col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (100, 100, 100))
+        # Band line: contrast 3:1 vs #121212 → need at least #5a5a5a
+        draw.line([(0, by), (TGT_W, by)], fill=(*col, 35), width=1)
+        # Band label right-aligned
+        label = BAND_LABELS.get(lk, lk)
+        draw.text((TGT_W - 8 - len(label) * 6, by + 2), label,
+                  fill=(*col, 70), font=font_band, anchor="rt" if hasattr(draw, 'textlength') else None)
+
+    # Ligne de sol — gold ambre, high visibility
+    for i in range(6):
+        a = 180 - i * 25
+        draw.line([(0, SOL_Y + i - 3), (TGT_W, SOL_Y + i - 3)],
+                  fill=(200, 160, 30, max(a, 20)), width=1)
+
+    # Axe central — subtle
+    draw.line([(CENTER_X, 0), (CENTER_X, TGT_H)], fill=(200, 160, 30, 30), width=1)
 
     # Tronc
     trunkTopY = fam.get("trunkTopY")
     if trunkTopY is not None:
         trunkW = pw.get("T", 0)
         if trunkW > 0:
-            tw = int(trunkW * 2.5)
+            tw = int(trunkW * 3)
+            # Tronc avec glow
+            for i in range(3, 0, -1):
+                draw.line(
+                    [(CENTER_X, sy(trunkTopY)), (CENTER_X, SOL_Y)],
+                    fill=(255, 255, 255, 20 * i), width=tw + i * 4
+                )
             draw.line(
                 [(CENTER_X, sy(trunkTopY)), (CENTER_X, SOL_Y)],
-                fill=(255, 255, 255, 120), width=tw
+                fill=(255, 255, 255, 160), width=tw
             )
 
-    # Connexions: branches vers tronc ou sol
+    # Connexions: courbes bezier avec gradient opacity
     for n in nodes:
-        nid = n["id"]
         nx, ny = n["x"], n["y"]
         lk = n["lk"]
         pid = n.get("pid")
+        col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (200, 200, 200))
 
-        # Connexion vers parent
         if pid and pid in iPos:
             px, py = iPos[pid]
-            # Courbe bezier
             midx = (nx + px) / 2
             midy = (ny + py) / 2
             cp = (midx + (CENTER_X - midx) * 0.3, midy)
-            pts = quadratic_bezier((nx, ny), cp, (px, py), steps=40)
-            w = max(1, int(pw.get(lk, 1) * 1.2))
+            pts = quadratic_bezier((nx, ny), cp, (px, py), steps=50)
+            w = max(2, int(pw.get(lk, 1) * 1.5))
             for i in range(len(pts)-1):
-                draw.line([pts[i], pts[i+1]], fill=(255, 255, 255, 80), width=w)
+                t = i / len(pts)
+                a = int(60 + 80 * (1 - abs(t - 0.5) * 2))
+                draw.line([pts[i], pts[i+1]], fill=(*col, a), width=w)
         else:
-            # Branches/tiges vers le centre (sol ou tronc)
             if lk in ("B", "T") or (lk.startswith("R") and not pid):
                 target_y = SOL_Y
                 target_x = CENTER_X
                 cp = ((nx + target_x) / 2, (ny + target_y) / 2)
-                pts = quadratic_bezier((nx, ny), cp, (target_x, target_y), steps=40)
-                w = max(1, int(pw.get(lk, 1) * 1.5))
+                pts = quadratic_bezier((nx, ny), cp, (target_x, target_y), steps=50)
+                w = max(2, int(pw.get(lk, 1) * 1.8))
                 for i in range(len(pts)-1):
-                    draw.line([pts[i], pts[i+1]], fill=(255, 255, 255, 60), width=w)
+                    t = i / len(pts)
+                    a = int(40 + 60 * (1 - t))
+                    draw.line([pts[i], pts[i+1]], fill=(*col, a), width=w)
 
-    # Noeuds
+    # Noeuds — min 8px radius, glow ring, label card
     for n in nodes:
         nx, ny = n["x"], n["y"]
         lk = n["lk"]
-        r = max(4, int(pw.get(lk, 1) * 5))
-        col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (255, 255, 255))
-        draw.ellipse([(nx-r, ny-r), (nx+r, ny+r)], fill=(255, 255, 255, 220))
+        col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (200, 200, 200))
+        r = max(8, int(pw.get(lk, 1) * 5))
+
+        # Glow ring (UX focus pattern)
+        draw_glow_ring(draw, nx, ny, r, col, alpha_outer=50, alpha_mid=120, ring_w=6)
+
+        # Node fill: solid center with slight gradient feel
+        draw.ellipse([(nx-r, ny-r), (nx+r, ny+r)],
+                     fill=(*col, 220),
+                     outline=(255, 255, 255, 180), width=2)
+
+        # Inner highlight dot (premium feel)
+        hr = max(2, r // 3)
+        draw.ellipse([(nx-hr-1, ny-hr-2), (nx+hr-1, ny+hr-2)],
+                     fill=(255, 255, 255, 100))
+
+        # Label card
+        draw_label_card(draw, n["label"], nx, ny, r, font, col)
 
     return img, nodes
 
 
 def gen_overlay(family_name, fam, nodes):
-    """Plaque le squelette semi-transparent sur l'image ChatGPT."""
+    """Plaque le squelette UX sur l'image ChatGPT.
+    UX rules: glow rings, label cards elevation, contrast 3:1+"""
     raw_path = os.path.join(TEMPLATES, RAW_IMAGES.get(family_name, ""))
     if not os.path.exists(raw_path):
         print(f"    !! Image raw manquante: {raw_path}")
@@ -346,63 +430,68 @@ def gen_overlay(family_name, fam, nodes):
     pw = fam["pw"]
     iPos = {n["id"]: (n["x"], n["y"]) for n in nodes}
 
-    # Bandes
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 11)
+    except:
+        font = ImageFont.load_default()
+
+    # Bandes subtiles
     all_lks = AERIAL_LKS + UNDER_LKS
     for lk in all_lks:
         by = BAND_Y[lk]
-        draw.line([(0, by), (TGT_W, by)], fill=(255, 180, 50, 40), width=1)
+        draw.line([(0, by), (TGT_W, by)], fill=(255, 180, 50, 30), width=1)
 
-    # Ligne de sol
-    draw.line([(0, SOL_Y), (TGT_W, SOL_Y)], fill=(200, 160, 30, 100), width=2)
+    # Sol — gradient glow
+    for i in range(6):
+        a = 120 - i * 18
+        draw.line([(0, SOL_Y + i - 3), (TGT_W, SOL_Y + i - 3)],
+                  fill=(200, 160, 30, max(a, 15)), width=1)
 
     # Axe central
-    draw.line([(CENTER_X, 0), (CENTER_X, TGT_H)], fill=(200, 160, 30, 40), width=1)
+    draw.line([(CENTER_X, 0), (CENTER_X, TGT_H)], fill=(200, 160, 30, 25), width=1)
 
-    # Connexions
+    # Connexions avec couleur par niveau
     for n in nodes:
         pid = n.get("pid")
+        lk = n["lk"]
+        col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (200, 200, 200))
         if pid and pid in iPos:
             nx, ny = n["x"], n["y"]
             px, py = iPos[pid]
             midx = (nx + px) / 2
             midy = (ny + py) / 2
             cp = (midx + (CENTER_X - midx) * 0.3, midy)
-            pts = quadratic_bezier((nx, ny), cp, (px, py), steps=40)
-            w = max(1, int(pw.get(n["lk"], 1) * 1.0))
+            pts = quadratic_bezier((nx, ny), cp, (px, py), steps=50)
+            w = max(2, int(pw.get(lk, 1) * 1.2))
             for i in range(len(pts)-1):
-                draw.line([pts[i], pts[i+1]], fill=(255, 255, 255, 50), width=w)
+                t = i / len(pts)
+                a = int(40 + 50 * (1 - abs(t - 0.5) * 2))
+                draw.line([pts[i], pts[i+1]], fill=(*col, a), width=w)
 
-    # Noeuds + labels
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 11)
-    except:
-        font = ImageFont.load_default()
-
+    # Noeuds — glow ring + label card
     for n in nodes:
         nx, ny = n["x"], n["y"]
         lk = n["lk"]
-        r = max(3, int(pw.get(lk, 1) * 4))
+        col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (200, 200, 200))
+        r = max(6, int(pw.get(lk, 1) * 4))
 
-        # Noeud ambre
+        # Glow ring
+        draw_glow_ring(draw, nx, ny, r, col, alpha_outer=40, alpha_mid=100, ring_w=5)
+
+        # Node
         draw.ellipse(
             [(nx-r, ny-r), (nx+r, ny+r)],
-            fill=(220, 170, 40, 180),
-            outline=(255, 200, 50, 220),
-            width=1
+            fill=(*col, 200),
+            outline=(255, 255, 255, 160), width=2
         )
 
-        # Label
-        label = n["label"]
-        tw = draw.textlength(label, font=font) if hasattr(draw, 'textlength') else len(label) * 7
-        tx = nx - tw / 2
-        ty = ny - r - 14
+        # Inner highlight
+        hr = max(2, r // 3)
+        draw.ellipse([(nx-hr-1, ny-hr-2), (nx+hr-1, ny+hr-2)],
+                     fill=(255, 255, 255, 80))
 
-        # Fond label
-        draw.rectangle(
-            [(tx - 2, ty - 1), (tx + tw + 2, ty + 13)],
-            fill=(0, 0, 0, 140)
-        )
-        draw.text((tx, ty), label, fill=(220, 200, 160, 220), font=font)
+        # Label card
+        draw_label_card(draw, n["label"], nx, ny, r, font, col)
 
     # Compositer
     result = Image.alpha_composite(bg, overlay)
