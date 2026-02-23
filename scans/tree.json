@@ -1,33 +1,36 @@
 {
   "idea": "[scanned] tree",
   "domain": "audio",
-  "family": "baobab",
-  "family_name": "Baobab",
-  "family_emoji": "🌳",
-  "date": "2026-02-15T18:14:37.324602",
+  "family": "buisson",
+  "family_name": "Buisson",
+  "family_emoji": "🌿",
+  "date": "2026-02-23T19:12:59.431047",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/tree",
   "scale": {
-    "lines": 4157,
-    "factor": 1.08,
+    "lines": 9682,
+    "factor": 1.29,
     "category": "arbre",
-    "height_px": 413,
-    "data_mb": 0.20958709716796875,
-    "density": 1.01,
-    "trunk_width": 1.01,
-    "data_category": "léger",
-    "label": "🌳 Arbre (4k lignes, 0Mo data)"
+    "height_px": 448,
+    "data_mb": 36.80253601074219,
+    "density": 1.39,
+    "trunk_width": 1.39,
+    "data_category": "normal",
+    "label": "🌳 Arbre (9k lignes, 36Mo data)"
   },
   "stats": {
-    "total_files": 32,
-    "total_code_lines": 4157,
-    "data_weight_mb": 0.2,
+    "total_files": 81,
+    "total_code_lines": 9682,
+    "data_weight_mb": 36.8,
     "languages": {
-      "Python": 4157
+      "Python": 6074,
+      "HTML": 3323,
+      "PowerShell": 279,
+      "Shell": 6
     },
     "biggest_file": {
-      "path": "engine.py",
-      "lines": 4157,
+      "path": "scripts/engine.py",
+      "lines": 4640,
       "lang": "Python"
     }
   },
@@ -46,7 +49,18 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Python (4157 lignes)",
+      "label": "Langage principal : Python (6074 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "M2",
+      "level": "R",
+      "label": "Langage secondaire : HTML (3323 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -57,9 +71,39 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : engine.py (~4157L, Python)",
+      "label": "Core : scripts/engine.py (~4640L, Python)",
       "status": "done",
-      "entry": "engine.py",
+      "entry": "scripts/engine.py",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B1",
+      "level": "B",
+      "label": "scripts/ (3f, ~5643L, Python)",
+      "status": "done",
+      "entry": "scripts/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B2",
+      "level": "B",
+      "label": "v3/ (1f, ~272L, PowerShell)",
+      "status": "done",
+      "entry": "v3/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B3",
+      "level": "B",
+      "label": "hooks/ (2f, ~12L, PowerShell, Shell)",
+      "status": "done",
+      "entry": "hooks/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -80,7 +124,8 @@
       "phase": 0,
       "name": "Mycorhizes — lois physiques",
       "ids": [
-        "M1"
+        "M1",
+        "M2"
       ],
       "action": "Identifier les lois physiques/math immuables du projet",
       "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
@@ -96,12 +141,14 @@
     },
     {
       "phase": 2,
-      "name": "Tronc — core engine MASSIF",
+      "name": "Tiges — lancer en parallèle",
       "ids": [
-        "T1"
+        "B1",
+        "B2",
+        "B3"
       ],
-      "action": "Construire et CONSOLIDER le core avant toute extension",
-      "bio": "Le baobab met toute son énergie dans le tronc d'abord"
+      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
+      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
     },
     {
       "phase": 5,
@@ -113,5 +160,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

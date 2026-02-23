@@ -1,35 +1,37 @@
 {
   "idea": "[scanned] yggdrasil-engine",
   "domain": "audio",
-  "family": "conifere",
-  "family_name": "Feuillu",
-  "family_emoji": "🍁",
-  "date": "2026-02-19T18:14:08.976463",
+  "family": "buisson",
+  "family_name": "Buisson",
+  "family_emoji": "🌿",
+  "date": "2026-02-23T19:12:53.046562",
   "phase": "MATURE",
-  "scanned_from": "C:\\Users\\ludov\\tree\\yggdrasil-engine",
+  "scanned_from": "https://github.com/sky1241/yggdrasil-engine",
   "scale": {
-    "lines": 2255,
-    "factor": 1.01,
-    "category": "arbre",
-    "height_px": 401,
-    "data_mb": 0.0008840560913085938,
-    "density": 1.0,
-    "trunk_width": 1.0,
+    "lines": 91093,
+    "factor": 2.08,
+    "category": "géant",
+    "height_px": 613,
+    "data_mb": 1.7897262573242188,
+    "density": 1.05,
+    "trunk_width": 1.05,
     "data_category": "léger",
-    "label": "🌳 Arbre (2k lignes, 0Mo data)"
+    "label": "🏔️ Géant (91k lignes, 1Mo data)"
   },
   "stats": {
-    "total_files": 28,
-    "total_code_lines": 2255,
-    "data_weight_mb": 0.0,
+    "total_files": 261,
+    "total_code_lines": 91093,
+    "data_weight_mb": 1.8,
     "languages": {
-      "Python": 2249,
-      "JavaScript": 6
+      "HTML": 67177,
+      "Python": 23898,
+      "PowerShell": 10,
+      "Shell": 8
     },
     "biggest_file": {
-      "path": "engine\\verify_32tests.py",
-      "lines": 519,
-      "lang": "Python"
+      "path": "viz/three.min.js",
+      "lines": 15086,
+      "lang": "JavaScript"
     }
   },
   "nodes": [
@@ -78,7 +80,18 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Python (2249 lignes)",
+      "label": "Langage principal : HTML (67177 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "M2",
+      "level": "R",
+      "label": "Langage secondaire : Python (23898 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -89,9 +102,9 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : engine\\verify_32tests.py (519 lignes, Python)",
+      "label": "Core : viz/three.min.js (~15086L, JavaScript)",
       "status": "done",
-      "entry": "engine\\verify_32tests.py",
+      "entry": "viz/three.min.js",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -99,7 +112,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "engine/ (7 fichiers, 1811L, Python)",
+      "label": "engine/ (38f, ~20673L, Python)",
       "status": "done",
       "entry": "engine/",
       "depends": [],
@@ -107,19 +120,59 @@
       "confidence": 80
     },
     {
-      "id": "B2",
-      "level": "B",
-      "label": "tests/ (2 fichiers, 320L, Python)",
+      "id": "b1",
+      "level": "b",
+      "label": "engine/pipeline/ (7f, ~10554L)",
       "status": "done",
-      "entry": "tests/",
+      "entry": "engine/pipeline/",
       "depends": [],
       "desc": "",
       "confidence": 80
     },
     {
-      "id": "B3",
+      "id": "b2",
+      "level": "b",
+      "label": "engine/mining/ (4f, ~2334L)",
+      "status": "done",
+      "entry": "engine/mining/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b3",
+      "level": "b",
+      "label": "engine/analysis/ (8f, ~2296L)",
+      "status": "done",
+      "entry": "engine/analysis/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b4",
+      "level": "b",
+      "label": "engine/vizgen/ (5f, ~2133L)",
+      "status": "done",
+      "entry": "engine/vizgen/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b5",
+      "level": "b",
+      "label": "engine/topology/ (7f, ~2022L)",
+      "status": "done",
+      "entry": "engine/topology/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B2",
       "level": "B",
-      "label": "viz/ (1 fichiers, 6L, JavaScript)",
+      "label": "viz/ (1f, ~15086L, JavaScript)",
       "status": "done",
       "entry": "viz/",
       "depends": [],
@@ -127,11 +180,31 @@
       "confidence": 80
     },
     {
+      "id": "B3",
+      "level": "B",
+      "label": "tests/ (4f, ~1934L, Python)",
+      "status": "done",
+      "entry": "tests/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
       "id": "B4",
       "level": "B",
-      "label": "server.py (118L, Python)",
+      "label": "blind_test/ (6f, ~1094L, Python)",
       "status": "done",
-      "entry": "server.py",
+      "entry": "blind_test/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B5",
+      "level": "B",
+      "label": "hooks/ (2f, ~18L, PowerShell, Shell)",
+      "status": "done",
+      "entry": "hooks/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -142,7 +215,8 @@
       "phase": 0,
       "name": "Mycorhizes — lois physiques",
       "ids": [
-        "M1"
+        "M1",
+        "M2"
       ],
       "action": "Identifier les lois physiques/math immuables du projet",
       "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
@@ -167,24 +241,29 @@
     },
     {
       "phase": 2,
-      "name": "Tronc — core minimal",
-      "ids": [
-        "T1"
-      ],
-      "action": "Core minimal — il va perdre la dominance face aux branches",
-      "bio": "Le tronc du feuillu se perd parmi les branches (forme décurrente)"
-    },
-    {
-      "phase": 3,
-      "name": "Branches — modules en parallèle",
+      "name": "Tiges — lancer en parallèle",
       "ids": [
         "B1",
         "B2",
         "B3",
-        "B4"
+        "B4",
+        "B5"
       ],
-      "action": "Modules en parallèle — SURVEILLER la co-dominance",
-      "bio": "⚠️ Si une branche dépasse le tronc = risque de rupture"
+      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
+      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+    },
+    {
+      "phase": 4,
+      "name": "Rameaux — sous-features",
+      "ids": [
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5"
+      ],
+      "action": "Implémenter rameaux — sous-features",
+      "bio": "Subdivisions des branches, <4 ans. Les plus flexibles, se plient au vent, premiers à casser"
     },
     {
       "phase": 5,
@@ -197,5 +276,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné et compléter les nœuds manquants"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

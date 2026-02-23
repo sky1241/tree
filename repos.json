@@ -1,0 +1,87 @@
+{
+  "_comment": "REGISTRE CENTRAL — Tous les repos de Sky. Mettre le chemin local Windows.",
+  "_usage": "python scripts/sync_all.py  →  re-scanne tout et met à jour scans/",
+  "repos": [
+    {
+      "name": "yggdrasil-engine",
+      "github": "sky1241/yggdrasil-engine",
+      "local_path": "C:\\Users\\Sky\\path\\to\\yggdrasil-engine",
+      "active": true
+    },
+    {
+      "name": "shazam-piano",
+      "github": "sky1241/shazam-piano",
+      "local_path": "C:\\Users\\Sky\\path\\to\\shazam-piano",
+      "active": true
+    },
+    {
+      "name": "infernal-wheel",
+      "github": "sky1241/infernal-wheel",
+      "local_path": "C:\\Users\\Sky\\path\\to\\infernal-wheel",
+      "active": true
+    },
+    {
+      "name": "3d-printer",
+      "github": "sky1241/3d-printer",
+      "local_path": "C:\\Users\\Sky\\path\\to\\3d-printer",
+      "active": true
+    },
+    {
+      "name": "HSBC-algo-genetic",
+      "github": "sky1241/HSBC-algo-genetic",
+      "local_path": "C:\\Users\\Sky\\path\\to\\HSBC-algo-genetic",
+      "active": true
+    },
+    {
+      "name": "p-egal-np-on-s-amuse-",
+      "github": "sky1241/p-egal-np-on-s-amuse-",
+      "local_path": "C:\\Users\\Sky\\path\\to\\p-egal-np-on-s-amuse-",
+      "active": true
+    },
+    {
+      "name": "fck-translation-",
+      "github": "sky1241/fck-translation-",
+      "local_path": "C:\\Users\\Sky\\path\\to\\fck-translation-",
+      "active": true
+    },
+    {
+      "name": "jeu-pour-les-gamin",
+      "github": "sky1241/jeu-pour-les-gamin",
+      "local_path": "C:\\Users\\Sky\\path\\to\\jeu-pour-les-gamin",
+      "active": true
+    },
+    {
+      "name": "-cole-de-danse",
+      "github": "sky1241/-cole-de-danse",
+      "local_path": "C:\\Users\\Sky\\path\\to\\-cole-de-danse",
+      "active": true
+    },
+    {
+      "name": "tree",
+      "github": "sky1241/tree",
+      "local_path": "C:\\Users\\Sky\\path\\to\\tree",
+      "active": true
+    },
+    {
+      "name": "CtrlYSV",
+      "github": "sky1241/CtrlYSV",
+      "local_path": "C:\\Users\\Sky\\path\\to\\CtrlYSV",
+      "active": false,
+      "_note": "Repo vide (0 lignes)"
+    },
+    {
+      "name": "FASV2",
+      "github": "sky1241/FASV2",
+      "local_path": "C:\\Users\\Sky\\path\\to\\FASV2",
+      "active": false,
+      "_note": "Repo vide (0 lignes)"
+    },
+    {
+      "name": "mon-projet-flutter",
+      "github": "sky1241/mon-projet-flutter",
+      "local_path": "C:\\Users\\Sky\\path\\to\\mon-projet-flutter",
+      "active": false,
+      "_note": "Repo vide (0 lignes)"
+    }
+  ]
+}

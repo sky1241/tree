@@ -4,40 +4,60 @@
   "family": "baobab",
   "family_name": "Baobab",
   "family_emoji": "🌳",
-  "date": "2026-02-15T18:14:40.007685",
+  "date": "2026-02-23T19:12:54.834714",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/3d-printer",
   "scale": {
-    "lines": 32666,
-    "factor": 1.67,
+    "lines": 34713,
+    "factor": 1.69,
     "category": "grand arbre",
-    "height_px": 528,
-    "data_mb": 0.4443206787109375,
+    "height_px": 530,
+    "data_mb": 0.40139007568359375,
     "density": 1.01,
     "trunk_width": 1.01,
     "data_category": "léger",
-    "label": "🌲 Grand Arbre (32k lignes, 0Mo data)"
+    "label": "🌲 Grand Arbre (34k lignes, 0Mo data)"
   },
   "stats": {
-    "total_files": 63,
-    "total_code_lines": 32666,
+    "total_files": 66,
+    "total_code_lines": 34713,
     "data_weight_mb": 0.4,
     "languages": {
-      "Python": 28609,
+      "Python": 30656,
       "HTML": 3768,
       "JavaScript": 289
     },
     "biggest_file": {
-      "path": "automata_unified_v4.py",
+      "path": "engine/automata_unified_v4.py",
       "lines": 22959,
       "lang": "Python"
     }
   },
   "nodes": [
     {
+      "id": "C1",
+      "level": "C",
+      "label": "Tests (dossier test/)",
+      "status": "done",
+      "entry": "test/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "C2",
+      "level": "C",
+      "label": "Tests (dossier tests/)",
+      "status": "done",
+      "entry": "tests/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Python (28609 lignes)",
+      "label": "Langage principal : Python (30656 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -59,22 +79,42 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : automata_unified_v4.py (~22959L, Python)",
+      "label": "Core : engine/automata_unified_v4.py (~22959L, Python)",
       "status": "done",
-      "entry": "automata_unified_v4.py",
+      "entry": "engine/automata_unified_v4.py",
       "depends": [],
       "desc": "",
       "confidence": 80
     },
     {
-      "id": "C1",
-      "level": "C",
-      "label": "Tests/CI — ABSENT",
-      "status": "todo",
-      "entry": "~",
+      "id": "B1",
+      "level": "B",
+      "label": "engine/ (8f, ~29122L, Python)",
+      "status": "done",
+      "entry": "engine/",
       "depends": [],
       "desc": "",
-      "confidence": 0
+      "confidence": 80
+    },
+    {
+      "id": "B2",
+      "level": "B",
+      "label": "tests/ (4f, ~1193L, Python, JavaScript)",
+      "status": "done",
+      "entry": "tests/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B3",
+      "level": "B",
+      "label": "web/ (1f, ~625L, Python)",
+      "status": "done",
+      "entry": "web/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
     },
     {
       "id": "P1",
@@ -118,14 +158,27 @@
       "bio": "Le baobab met toute son énergie dans le tronc d'abord"
     },
     {
+      "phase": 3,
+      "name": "Branches — petites extensions",
+      "ids": [
+        "B1",
+        "B2",
+        "B3"
+      ],
+      "action": "Extensions petites — ne pas rivaliser avec le tronc",
+      "bio": "Les branches du baobab sont fines comparées au tronc massif"
+    },
+    {
       "phase": 5,
       "name": "Cime — tests et déploiement",
       "ids": [
-        "C1"
+        "C1",
+        "C2"
       ],
       "action": "Implémenter cime — tests et déploiement",
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

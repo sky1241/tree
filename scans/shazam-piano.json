@@ -4,7 +4,7 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-15T18:14:40.619775",
+  "date": "2026-02-23T19:12:53.725625",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/shazam-piano",
   "scale": {
@@ -12,7 +12,7 @@
     "factor": 1.7,
     "category": "grand arbre",
     "height_px": 532,
-    "data_mb": 60.78844451904297,
+    "data_mb": 60.79137420654297,
     "density": 1.47,
     "trunk_width": 1.47,
     "data_category": "normal",
@@ -199,7 +199,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "app/ (127f, ~30946L, C++, C/C++ header)",
+      "label": "app/ (127f, ~30946L, Swift, PowerShell)",
       "status": "done",
       "entry": "app/",
       "depends": [],
@@ -269,7 +269,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "scripts/ (10f, ~1118L, PowerShell, Shell)",
+      "label": "scripts/ (12f, ~1150L, PowerShell, Shell)",
       "status": "done",
       "entry": "scripts/",
       "depends": [],
@@ -389,5 +389,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

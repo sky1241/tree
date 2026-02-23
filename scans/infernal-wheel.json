@@ -4,36 +4,39 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-15T18:14:37.869487",
+  "date": "2026-02-23T19:12:54.302340",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/infernal-wheel",
   "scale": {
-    "lines": 22512,
+    "lines": 21935,
     "factor": 1.59,
     "category": "grand arbre",
-    "height_px": 515,
-    "data_mb": 1.4000244140625,
-    "density": 1.04,
-    "trunk_width": 1.04,
+    "height_px": 514,
+    "data_mb": 1.7120742797851562,
+    "density": 1.05,
+    "trunk_width": 1.05,
     "data_category": "léger",
-    "label": "🌲 Grand Arbre (22k lignes, 1Mo data)"
+    "label": "🌲 Grand Arbre (21k lignes, 1Mo data)"
   },
   "stats": {
-    "total_files": 184,
-    "total_code_lines": 22512,
-    "data_weight_mb": 1.4,
+    "total_files": 251,
+    "total_code_lines": 21935,
+    "data_weight_mb": 1.7,
     "languages": {
-      "PowerShell": 10953,
-      "HTML": 6026,
+      "PowerShell": 10948,
       "Dart": 4765,
+      "Python": 1971,
+      "Kotlin": 1955,
+      "Swift": 1240,
       "C++": 483,
+      "Monkey C": 263,
       "CMake": 262,
-      "C": 18,
-      "Batchfile": 5
+      "HTML": 30,
+      "C": 18
     },
     "biggest_file": {
       "path": "hellwell/dashboard/Dashboard.Page.ps1",
-      "lines": 4506,
+      "lines": 4444,
       "lang": "PowerShell"
     }
   },
@@ -61,9 +64,20 @@
       "depth": -1
     },
     {
+      "id": "R3",
+      "level": "R",
+      "label": "Swift/iOS",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -1
+    },
+    {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : PowerShell (10953 lignes)",
+      "label": "Langage principal : PowerShell (10948 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -73,17 +87,6 @@
     },
     {
       "id": "M2",
-      "level": "R",
-      "label": "Langage secondaire : HTML (6026 lignes)",
-      "status": "done",
-      "entry": "~",
-      "depends": [],
-      "desc": "",
-      "confidence": 80,
-      "depth": -5
-    },
-    {
-      "id": "M3",
       "level": "R",
       "label": "Langage secondaire : Dart (4765 lignes)",
       "status": "done",
@@ -96,7 +99,7 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : hellwell/dashboard/Dashboard.Page.ps1 (~4506L, PowerShell)",
+      "label": "Core : hellwell/dashboard/Dashboard.Page.ps1 (~4444L, PowerShell)",
       "status": "done",
       "entry": "hellwell/dashboard/Dashboard.Page.ps1",
       "depends": [],
@@ -106,7 +109,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "hellwell/ (8f, ~10634L, PowerShell)",
+      "label": "hellwell/ (8f, ~10628L, PowerShell)",
       "status": "done",
       "entry": "hellwell/",
       "depends": [],
@@ -116,7 +119,7 @@
     {
       "id": "b1",
       "level": "b",
-      "label": "hellwell/dashboard/ (2f, ~6007L)",
+      "label": "hellwell/dashboard/ (2f, ~5952L)",
       "status": "done",
       "entry": "hellwell/dashboard/",
       "depends": [],
@@ -126,7 +129,7 @@
     {
       "id": "b2",
       "level": "b",
-      "label": "hellwell/engine/ (1f, ~361L)",
+      "label": "hellwell/engine/ (1f, ~373L)",
       "status": "done",
       "entry": "hellwell/engine/",
       "depends": [],
@@ -136,7 +139,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "infernal-app/ (43f, ~5234L, C/C++ header, C++)",
+      "label": "infernal-app/ (43f, ~5234L, C++, C/C++ header)",
       "status": "done",
       "entry": "infernal-app/",
       "depends": [],
@@ -176,6 +179,36 @@
     {
       "id": "B3",
       "level": "B",
+      "label": "trilateration/ (22f, ~5160L, Kotlin, Python)",
+      "status": "done",
+      "entry": "trilateration/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b6",
+      "level": "b",
+      "label": "trilateration/wear-os-app/ (9f, ~1953L)",
+      "status": "done",
+      "entry": "trilateration/wear-os-app/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b7",
+      "level": "b",
+      "label": "trilateration/apple-watch-app/ (7f, ~1237L)",
+      "status": "done",
+      "entry": "trilateration/apple-watch-app/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B4",
+      "level": "B",
       "label": "infernal-migration/ (1f, ~142L, PowerShell)",
       "status": "done",
       "entry": "infernal-migration/",
@@ -211,8 +244,7 @@
       "name": "Mycorhizes — lois physiques",
       "ids": [
         "M1",
-        "M2",
-        "M3"
+        "M2"
       ],
       "action": "Identifier les lois physiques/math immuables du projet",
       "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
@@ -231,7 +263,8 @@
       "name": "Structurelles — stack technique",
       "ids": [
         "R1",
-        "R2"
+        "R2",
+        "R3"
       ],
       "action": "Définir les contraintes de niveau -1",
       "bio": "5-15 racines principales, jusqu'à 30cm diamètre. Spread = 2-4x couronne. 80-90% dans top 60cm"
@@ -242,7 +275,8 @@
       "ids": [
         "B1",
         "B2",
-        "B3"
+        "B3",
+        "B4"
       ],
       "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
       "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
@@ -255,7 +289,9 @@
         "b2",
         "b3",
         "b4",
-        "b5"
+        "b5",
+        "b6",
+        "b7"
       ],
       "action": "Implémenter rameaux — sous-features",
       "bio": "Subdivisions des branches, <4 ans. Les plus flexibles, se plient au vent, premiers à casser"
@@ -270,5 +306,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

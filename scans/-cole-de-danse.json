@@ -4,7 +4,7 @@
   "family": "palmier",
   "family_name": "Palmier",
   "family_emoji": "🌴",
-  "date": "2026-02-15T18:14:41.047697",
+  "date": "2026-02-23T19:12:58.859066",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/-cole-de-danse",
   "scale": {
@@ -94,5 +94,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

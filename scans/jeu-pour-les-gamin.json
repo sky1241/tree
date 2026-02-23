@@ -1,51 +1,58 @@
 {
-  "idea": "[scanned] fck-translation-",
+  "idea": "[scanned] jeu-pour-les-gamin",
   "domain": "mobile_app",
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-23T19:12:57.419171",
-  "phase": "CROISSANCE",
-  "scanned_from": "https://github.com/sky1241/fck-translation-",
+  "date": "2026-02-23T19:12:58.381319",
+  "phase": "MATURE",
+  "scanned_from": "https://github.com/sky1241/jeu-pour-les-gamin",
   "scale": {
-    "lines": 6615,
-    "factor": 1.17,
-    "category": "arbre",
-    "height_px": 428,
-    "data_mb": 85.2583999633789,
-    "density": 1.55,
-    "trunk_width": 1.55,
-    "data_category": "normal",
-    "label": "🌳 Arbre (6k lignes, 85Mo data)"
+    "lines": 126781,
+    "factor": 2.15,
+    "category": "géant",
+    "height_px": 625,
+    "data_mb": 268.61095428466797,
+    "density": 1.66,
+    "trunk_width": 1.66,
+    "data_category": "dense",
+    "label": "🏔️ Géant (126k lignes, 268Mo data)"
   },
   "stats": {
-    "total_files": 284,
-    "total_code_lines": 6615,
-    "data_weight_mb": 85.3,
+    "total_files": 6286,
+    "total_code_lines": 126781,
+    "data_weight_mb": 268.6,
     "languages": {
-      "Dart": 4134,
-      "PowerShell": 1093,
-      "C++": 629,
-      "CMake": 497,
-      "HTML": 110,
-      "Swift": 66,
-      "Kotlin": 50,
-      "C": 35,
-      "Objective-C": 1
+      "C++": 110005,
+      "Scheme": 5181,
+      "Java": 5180,
+      "Squirrel": 2127,
+      "CMake": 1537,
+      "C#": 1237,
+      "Shell": 396,
+      "Python": 364,
+      "C": 285,
+      "Perl": 187,
+      "Nix": 122,
+      "GLSL": 88,
+      "AppleScript": 39,
+      "Ruby": 23,
+      "Makefile": 7,
+      "Batchfile": 3
     },
     "biggest_file": {
-      "path": "lib/features/chat/presentation/chat_controller.dart",
-      "lines": 514,
-      "lang": "Dart"
+      "path": "src/object/player.cpp",
+      "lines": 2341,
+      "lang": "C++"
     }
   },
   "nodes": [
     {
       "id": "R1",
       "level": "R",
-      "label": "Flutter/Dart",
+      "label": "Java/Kotlin Gradle",
       "status": "done",
-      "entry": "pubspec.yaml",
+      "entry": "build.gradle",
       "depends": [],
       "desc": "",
       "confidence": 80,
@@ -65,13 +72,24 @@
     {
       "id": "R3",
       "level": "R",
-      "label": "Swift/iOS",
+      "label": "Make build system",
       "status": "done",
-      "entry": "~",
+      "entry": "Makefile",
       "depends": [],
       "desc": "",
       "confidence": 80,
       "depth": -1
+    },
+    {
+      "id": "P1",
+      "level": "R",
+      "label": "Licence projet",
+      "status": "done",
+      "entry": "LICENSE",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -4
     },
     {
       "id": "C1",
@@ -86,9 +104,9 @@
     {
       "id": "C2",
       "level": "C",
-      "label": "GitHub Actions CI",
+      "label": "Tests (dossier tests/)",
       "status": "done",
-      "entry": ".github/workflows/",
+      "entry": "tests/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -96,18 +114,7 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Dart (4134 lignes)",
-      "status": "done",
-      "entry": "~",
-      "depends": [],
-      "desc": "",
-      "confidence": 80,
-      "depth": -5
-    },
-    {
-      "id": "M2",
-      "level": "R",
-      "label": "Langage secondaire : PowerShell (1093 lignes)",
+      "label": "Langage principal : C++ (110005 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -118,9 +125,9 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : lib/features/chat/presentation/chat_controller.dart (~514L, Dart)",
+      "label": "Core : src/object/player.cpp (~2341L, C++)",
       "status": "done",
-      "entry": "lib/features/chat/presentation/chat_controller.dart",
+      "entry": "src/object/player.cpp",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -128,9 +135,9 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "lib/ (46f, ~4499L, Dart)",
+      "label": "src/ (477f, ~75404L, C++, C/C++ header)",
       "status": "done",
-      "entry": "lib/",
+      "entry": "src/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -138,9 +145,9 @@
     {
       "id": "b1",
       "level": "b",
-      "label": "lib/features/ (29f, ~3385L)",
+      "label": "src/object/ (95f, ~17015L)",
       "status": "done",
-      "entry": "lib/features/",
+      "entry": "src/object/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -148,29 +155,9 @@
     {
       "id": "b2",
       "level": "b",
-      "label": "lib/core/ (15f, ~1013L)",
+      "label": "src/supertux/ (105f, ~16549L)",
       "status": "done",
-      "entry": "lib/core/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B2",
-      "level": "B",
-      "label": "tools/ (8f, ~544L, PowerShell, Dart)",
-      "status": "done",
-      "entry": "tools/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B3",
-      "level": "B",
-      "label": "windows/ (9f, ~485L, C++, C/C++ header)",
-      "status": "done",
-      "entry": "windows/",
+      "entry": "src/supertux/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -178,9 +165,9 @@
     {
       "id": "b3",
       "level": "b",
-      "label": "windows/runner/ (8f, ~478L)",
+      "label": "src/badguy/ (66f, ~11591L)",
       "status": "done",
-      "entry": "windows/runner/",
+      "entry": "src/badguy/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -188,39 +175,9 @@
     {
       "id": "b4",
       "level": "b",
-      "label": "windows/flutter/ (1f, ~7L)",
+      "label": "src/editor/ (25f, ~7188L)",
       "status": "done",
-      "entry": "windows/flutter/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B4",
-      "level": "B",
-      "label": "scripts/ (6f, ~468L, PowerShell)",
-      "status": "done",
-      "entry": "scripts/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B5",
-      "level": "B",
-      "label": "test/ (3f, ~123L, Dart)",
-      "status": "done",
-      "entry": "test/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B6",
-      "level": "B",
-      "label": "android/ (2f, ~49L, Kotlin)",
-      "status": "done",
-      "entry": "android/",
+      "entry": "src/editor/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -228,19 +185,19 @@
     {
       "id": "b5",
       "level": "b",
-      "label": "android/app/ (2f, ~49L)",
+      "label": "src/video/ (41f, ~5300L)",
       "status": "done",
-      "entry": "android/app/",
+      "entry": "src/video/",
       "depends": [],
       "desc": "",
       "confidence": 80
     },
     {
-      "id": "B7",
+      "id": "B2",
       "level": "B",
-      "label": "macos/ (4f, ~47L, Swift)",
+      "label": "mk/ (14f, ~5444L, Shell, Java)",
       "status": "done",
-      "entry": "macos/",
+      "entry": "mk/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -248,9 +205,9 @@
     {
       "id": "b6",
       "level": "b",
-      "label": "macos/Flutter/ (1f, ~24L)",
+      "label": "mk/android/ (11f, ~5187L)",
       "status": "done",
-      "entry": "macos/Flutter/",
+      "entry": "mk/android/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -258,9 +215,9 @@
     {
       "id": "b7",
       "level": "b",
-      "label": "macos/Runner/ (2f, ~16L)",
+      "label": "mk/emscripten/ (2f, ~254L)",
       "status": "done",
-      "entry": "macos/Runner/",
+      "entry": "mk/emscripten/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -268,29 +225,19 @@
     {
       "id": "b8",
       "level": "b",
-      "label": "macos/RunnerTests/ (1f, ~7L)",
+      "label": "mk/cppcheck/ (1f, ~3L)",
       "status": "done",
-      "entry": "macos/RunnerTests/",
+      "entry": "mk/cppcheck/",
       "depends": [],
       "desc": "",
       "confidence": 80
     },
     {
-      "id": "B8",
+      "id": "B3",
       "level": "B",
-      "label": "demo/ (3f, ~42L, PowerShell)",
+      "label": "tools/ (25f, ~2691L, Shell, Ruby)",
       "status": "done",
-      "entry": "demo/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B9",
-      "level": "B",
-      "label": "docs/ (1f, ~32L, PowerShell)",
-      "status": "done",
-      "entry": "docs/",
+      "entry": "tools/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -298,19 +245,9 @@
     {
       "id": "b9",
       "level": "b",
-      "label": "docs/PLAYBOOK/ (1f, ~32L)",
+      "label": "tools/tilemanager/ (6f, ~1234L)",
       "status": "done",
-      "entry": "docs/PLAYBOOK/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B10",
-      "level": "B",
-      "label": "ios/ (3f, ~17L, Swift, C/C++ header)",
-      "status": "done",
-      "entry": "ios/",
+      "entry": "tools/tilemanager/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -318,9 +255,9 @@
     {
       "id": "b10",
       "level": "b",
-      "label": "ios/Runner/ (2f, ~10L)",
+      "label": "tools/scripting_docs_gen/ (4f, ~825L)",
       "status": "done",
-      "entry": "ios/Runner/",
+      "entry": "tools/scripting_docs_gen/",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -328,23 +265,102 @@
     {
       "id": "b11",
       "level": "b",
-      "label": "ios/RunnerTests/ (1f, ~7L)",
+      "label": "tools/darwin/ (1f, ~6L)",
       "status": "done",
-      "entry": "ios/RunnerTests/",
+      "entry": "tools/darwin/",
       "depends": [],
       "desc": "",
       "confidence": 80
     },
     {
-      "id": "P1",
-      "level": "R",
-      "label": "Licence/Legal — ABSENT",
-      "status": "todo",
-      "entry": "~",
+      "id": "B4",
+      "level": "B",
+      "label": "external/ (9f, ~2036L, C++, C)",
+      "status": "done",
+      "entry": "external/",
       "depends": [],
       "desc": "",
-      "confidence": 0,
-      "depth": -4
+      "confidence": 80
+    },
+    {
+      "id": "b12",
+      "level": "b",
+      "label": "external/obstack/ (2f, ~800L)",
+      "status": "done",
+      "entry": "external/obstack/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b13",
+      "level": "b",
+      "label": "external/partio_zip/ (1f, ~634L)",
+      "status": "done",
+      "entry": "external/partio_zip/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b14",
+      "level": "b",
+      "label": "external/findlocale/ (3f, ~437L)",
+      "status": "done",
+      "entry": "external/findlocale/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b15",
+      "level": "b",
+      "label": "external/SDL_SavePNG/ (3f, ~165L)",
+      "status": "done",
+      "entry": "external/SDL_SavePNG/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B5",
+      "level": "B",
+      "label": "tests/ (17f, ~816L, C++)",
+      "status": "done",
+      "entry": "tests/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b16",
+      "level": "b",
+      "label": "tests/unit/ (17f, ~816L)",
+      "status": "done",
+      "entry": "tests/unit/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B6",
+      "level": "B",
+      "label": "data/ (2f, ~22L, Shell)",
+      "status": "done",
+      "entry": "data/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b17",
+      "level": "b",
+      "label": "data/sounds/ (2f, ~22L)",
+      "status": "done",
+      "entry": "data/sounds/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
     }
   ],
   "build_order": [
@@ -352,8 +368,7 @@
       "phase": 0,
       "name": "Mycorhizes — lois physiques",
       "ids": [
-        "M1",
-        "M2"
+        "M1"
       ],
       "action": "Identifier les lois physiques/math immuables du projet",
       "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
@@ -387,11 +402,7 @@
         "B3",
         "B4",
         "B5",
-        "B6",
-        "B7",
-        "B8",
-        "B9",
-        "B10"
+        "B6"
       ],
       "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
       "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
@@ -410,7 +421,13 @@
         "b8",
         "b9",
         "b10",
-        "b11"
+        "b11",
+        "b12",
+        "b13",
+        "b14",
+        "b15",
+        "b16",
+        "b17"
       ],
       "action": "Implémenter rameaux — sous-features",
       "bio": "Subdivisions des branches, <4 ans. Les plus flexibles, se plient au vent, premiers à casser"

@@ -1,31 +1,31 @@
 {
   "idea": "[scanned] HSBC-algo-genetic",
   "domain": "trading",
-  "family": "conifere",
-  "family_name": "Conifère",
-  "family_emoji": "🌲",
-  "date": "2026-02-15T18:14:39.095725",
+  "family": "buisson",
+  "family_name": "Buisson",
+  "family_emoji": "🌿",
+  "date": "2026-02-23T19:12:56.189249",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/HSBC-algo-genetic",
   "scale": {
-    "lines": 310238,
+    "lines": 310511,
     "factor": 2.54,
     "category": "titan",
     "height_px": 706,
-    "data_mb": 363.1048126220703,
+    "data_mb": 363.10221099853516,
     "density": 1.69,
     "trunk_width": 1.69,
     "data_category": "dense",
     "label": "⛰️ Titan (310k lignes, 363Mo data)"
   },
   "stats": {
-    "total_files": 9957,
-    "total_code_lines": 310238,
+    "total_files": 9960,
+    "total_code_lines": 310511,
     "data_weight_mb": 363.1,
     "languages": {
       "HTML": 271552,
       "Python": 36861,
-      "PowerShell": 1798,
+      "PowerShell": 2071,
       "Batchfile": 27
     },
     "biggest_file": {
@@ -365,5 +365,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }
