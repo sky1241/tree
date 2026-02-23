@@ -26,7 +26,7 @@ SOL_Y = sy(575)  # default, overridden per family below
 FAMILY_SOL_Y = {
     "conifere": 890,
     "feuillu":  720,
-    "baobab":   860,
+    "baobab":   930,
     "palmier":  885,
     "buisson":  730,
     "liane":    815,
