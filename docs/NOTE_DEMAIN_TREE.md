@@ -28,3 +28,32 @@ Toi tu sais ce que tu veux. C'est pas encore formulable en mots. Mais c'est dans
 - Le cube P=NP contient le tout, borné par Turing
 
 Le squelette parfait c'est ce qui unifie tout ça.
+
+---
+
+## 🔴 PRIORITÉ — Revoir complètement le workflow d'installation (2026-02-23)
+
+### Le problème
+
+Le setup actuel c'est de la merde. Ça demande 15 allers-retours pour que l'utilisateur configure tree sur sa machine. Pour un outil "fait pour les gens qui savent pas coder", c'est inadmissible.
+
+### Ce qui pue
+
+1. **Trop de scripts séparés** — detect_repos.py, install_all_hooks.py, sync_all.py, setup.py... l'utilisateur sait pas quoi lancer
+2. **Le token GitHub** — il faut le mettre manuellement dans un fichier texte. C'est nul
+3. **Les repos dans Temp** — git clone met les trucs dans Temp, Windows les supprime
+4. **Pas de one-click** — l'objectif c'est: tu clones tree, tu lances UN truc, c'est fini
+5. **Les chemins Windows** — backslashes, unicode escapes dans les docstrings, l'enfer
+
+### Ce qu'il faut
+
+- **UN fichier, UNE commande**: `python setup.py` et c'est terminé, pour toujours
+- **Zéro question posée** — le script détecte tout, installe tout, configure tout
+- **Autorun** — idéalement le setup se relance tout seul quand t'ouvres un terminal (profil PS auto)
+- **UI web** — le serve_tree() devrait être le point d'entrée, pas le terminal
+- **Le tree doit vivre dans un endroit permanent**, pas dans Temp
+
+### Vision long terme
+
+tree = une app standalone. Tu la lances, elle te montre ta forêt, tu cliques sur un arbre pour voir le détail. Pas de terminal, pas de git, pas de Python à installer. Juste un .exe ou une app web.
+
