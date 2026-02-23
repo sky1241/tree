@@ -1,27 +1,27 @@
-# Positions band-centered, scalees 1024x1536
+# Positions buisson scalees 1024x1536
 # CENTER_X=512, SOL_Y=710
-iC1     Tests / CI            x= 422  y=  96
-iC2     Release / CD          x= 600  y= 102
-iF1     API endpoints         x= 344  y= 226
-iF2     UI composants         x= 512  y= 220
-iF3     Exports / CLI         x= 677  y= 226
-ib1     Sub-mod 1             x= 333  y= 348
-ib2     Sub-mod 2             x= 433  y= 353
-ib3     Sub-mod 3             x= 512  y= 341
-ib4     Sub-mod 4             x= 589  y= 348
-ib5     Sub-mod 5             x= 689  y= 353
-iB1     Tige A                x= 344  y= 479
-iB2     Tige B                x= 439  y= 472
-iB3     Tige C                x= 512  y= 467
-iB4     Tige D                x= 585  y= 472
-iB5     Tige E                x= 680  y= 479
-iR11    Dep principale        x= 512  y= 810
-iR12    Framework test        x= 622  y= 827
-iR21    Archi DB              x= 600  y= 931
-iR22    Archi API             x= 424  y= 940
-iR31    Contrainte 1          x= 639  y=1048
-iR32    Contrainte 2          x= 386  y=1057
-iR41    Licence               x= 675  y=1166
-iR42    Conformite            x= 350  y=1175
-iR51    Algorithmes           x= 711  y=1282
-iR52    Hardware              x= 313  y=1292
+iC1      Tests / CI             x= 422  y= 123
+iC2      Release / CD           x= 600  y= 130
+iF1      API endpoints          x= 344  y= 216
+iF2      UI composants          x= 512  y= 210
+iF3      Exports / CLI          x= 677  y= 216
+ib1      Sub-mod 1              x= 333  y= 309
+ib2      Sub-mod 2              x= 433  y= 315
+ib3      Sub-mod 3              x= 512  y= 303
+ib4      Sub-mod 4              x= 589  y= 309
+ib5      Sub-mod 5              x= 689  y= 315
+iB1      Tige A                 x= 344  y= 482
+iB2      Tige B                 x= 439  y= 475
+iB3      Tige C                 x= 512  y= 469
+iB4      Tige D                 x= 585  y= 475
+iB5      Tige E                 x= 680  y= 482
+iR11     Dep principale         x= 512  y= 763
+iR12     Framework test         x= 622  y= 780
+iR21     Archi DB               x= 600  y= 887
+iR22     Archi API              x= 424  y= 895
+iR31     Contrainte 1           x= 639  y= 998
+iR32     Contrainte 2           x= 386  y=1006
+iR41     Licence                x= 675  y=1111
+iR42     Conformite             x= 350  y=1121
+iR51     Algorithmes            x= 711  y=1225
+iR52     Hardware               x= 313  y=1235
