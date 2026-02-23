@@ -5,13 +5,13 @@
     {
       "name": "yggdrasil-engine",
       "github": "sky1241/yggdrasil-engine",
-      "local_path": "C:\\Users\\Sky\\path\\to\\yggdrasil-engine",
+      "local_path": "C:\\Users\\ludov\\Desktop\\ygg\\yggdrasil-engine",
       "active": true
     },
     {
       "name": "shazam-piano",
       "github": "sky1241/shazam-piano",
-      "local_path": "C:\\Users\\Sky\\path\\to\\shazam-piano",
+      "local_path": "C:\\Users\\ludov\\shazam-piano",
       "active": true
     },
     {
@@ -23,25 +23,25 @@
     {
       "name": "3d-printer",
       "github": "sky1241/3d-printer",
-      "local_path": "C:\\Users\\Sky\\path\\to\\3d-printer",
+      "local_path": "C:\\Users\\ludov\\3d-printer",
       "active": true
     },
     {
       "name": "HSBC-algo-genetic",
       "github": "sky1241/HSBC-algo-genetic",
-      "local_path": "C:\\Users\\Sky\\path\\to\\HSBC-algo-genetic",
+      "local_path": "C:\\Users\\ludov\\HSBC-algo-genetic",
       "active": true
     },
     {
       "name": "p-egal-np-on-s-amuse-",
       "github": "sky1241/p-egal-np-on-s-amuse-",
-      "local_path": "C:\\Users\\Sky\\path\\to\\p-egal-np-on-s-amuse-",
+      "local_path": "C:\\Users\\ludov\\AppData\\Local\\Temp\\p-egal-np-on-s-amuse-",
       "active": true
     },
     {
       "name": "fck-translation-",
       "github": "sky1241/fck-translation-",
-      "local_path": "C:\\Users\\Sky\\path\\to\\fck-translation-",
+      "local_path": "C:\\Users\\ludov\\fck-translation-",
       "active": true
     },
     {
@@ -59,7 +59,7 @@
     {
       "name": "tree",
       "github": "sky1241/tree",
-      "local_path": "C:\\Users\\Sky\\path\\to\\tree",
+      "local_path": "",
       "active": true
     },
     {
