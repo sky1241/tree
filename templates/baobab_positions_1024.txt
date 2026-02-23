@@ -1,25 +1,25 @@
 # Positions baobab scalees 1024x1536
-# CENTER_X=512, SOL_Y=710
-iC1      Tests / CI             x= 512  y= 117
-iC2      Release / CD           x= 489  y= 130
-iF1      API endpoints          x= 555  y= 167
-iF2      UI composants          x= 466  y= 173
-ib1      Sub-mod 1              x= 550  y= 210
-ib2      Sub-mod 2              x= 475  y= 216
-ib3      Sub-mod 3              x= 589  y= 228
-iB1      Module A               x= 544  y= 265
-iB2      Module B               x= 480  y= 272
-iB3      Module C               x= 583  y= 296
-iT1      Core engine            x= 512  y= 494
-iR11     Framework web          x= 589  y= 759
-iR12     Framework data         x= 435  y= 766
-iR13     Framework test         x= 631  y= 784
-iR21     Archi DB               x= 639  y= 877
-iR22     Archi API              x= 389  y= 887
-iR31     Contrainte 1           x= 683  y= 994
-iR32     Contrainte 2           x= 344  y=1003
-iR33     Contrainte 3           x= 727  y=1012
-iR41     Licence                x= 722  y=1111
-iR42     Conformite             x= 298  y=1121
-iR51     Algorithmes            x= 761  y=1225
-iR52     Hardware               x= 261  y=1235
+# CENTER_X=512, SOL_Y=800
+iC1      Tests / CI             x= 512  y=  74
+iC2      Release / CD           x= 489  y=  90
+iF1      API endpoints          x= 555  y= 138
+iF2      UI composants          x= 466  y= 146
+ib1      Sub-mod 1              x= 550  y= 194
+ib2      Sub-mod 2              x= 475  y= 202
+ib3      Sub-mod 3              x= 589  y= 218
+iB1      Module A               x= 544  y= 266
+iB2      Module B               x= 480  y= 274
+iB3      Module C               x= 583  y= 306
+iT1      Core engine            x= 512  y= 563
+iR11     Framework web          x= 589  y= 839
+iR12     Framework data         x= 435  y= 847
+iR13     Framework test         x= 631  y= 869
+iR21     Archi DB               x= 639  y= 979
+iR22     Archi API              x= 389  y= 991
+iR31     Contrainte 1           x= 683  y=1119
+iR32     Contrainte 2           x= 344  y=1129
+iR33     Contrainte 3           x= 727  y=1141
+iR41     Licence                x= 722  y=1259
+iR42     Conformite             x= 298  y=1271
+iR51     Algorithmes            x= 761  y=1394
+iR52     Hardware               x= 261  y=1406

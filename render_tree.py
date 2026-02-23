@@ -9,20 +9,57 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES = os.path.join(ROOT, "templates")
 TGT_W, TGT_H = 1024, 1536
 
-# Positions baobab 1024x1536 (from gen_all_skeletons.py, scaled)
-# Map level -> list of positions available
-BAOBAB_SLOTS = {
-    "C":   [{"x": 512, "y": 117}, {"x": 489, "y": 130}],
-    "F":   [{"x": 556, "y": 167}, {"x": 467, "y": 173}],
-    "b":   [{"x": 550, "y": 210}, {"x": 475, "y": 216}, {"x": 589, "y": 228}],
-    "B":   [{"x": 544, "y": 266}, {"x": 480, "y": 272}, {"x": 583, "y": 296}],
-    "T":   [{"x": 512, "y": 494}],
-    "R-1": [{"x": 589, "y": 759}, {"x": 436, "y": 766}, {"x": 631, "y": 784}],
-    "R-2": [{"x": 639, "y": 877}, {"x": 389, "y": 886}],
-    "R-3": [{"x": 683, "y": 994}, {"x": 344, "y": 1003}, {"x": 728, "y": 1013}],
-    "R-4": [{"x": 722, "y": 1111}, {"x": 298, "y": 1121}],
-    "R-5": [{"x": 761, "y": 1225}, {"x": 261, "y": 1235}],
+# Real ground level per family (measured from ChatGPT images)
+FAMILY_SOL_Y = {
+    "conifere": 850,
+    "feuillu":  735,
+    "baobab":   800,
+    "palmier":  795,
+    "buisson":  715,
+    "liane":    755,
 }
+
+# Positions baobab 1024x1536 — NOW using dynamic remap per family
+# Generic slot templates (relative: 0.0=top, 1.0=ground for aerial; 0.0=ground, 1.0=bottom for roots)
+AERIAL_SLOTS = {
+    "C":   [{"rx": 0.50, "ry": 0.05}, {"rx": 0.47, "ry": 0.08}],
+    "F":   [{"rx": 0.55, "ry": 0.18}, {"rx": 0.42, "ry": 0.20}],
+    "b":   [{"rx": 0.54, "ry": 0.32}, {"rx": 0.44, "ry": 0.34}, {"rx": 0.60, "ry": 0.36}],
+    "B":   [{"rx": 0.53, "ry": 0.50}, {"rx": 0.43, "ry": 0.52}, {"rx": 0.62, "ry": 0.56}],
+    "T":   [{"rx": 0.50, "ry": 0.80}],
+}
+
+ROOT_SLOTS = {
+    "R-1": [{"rx": 0.58, "ry": 0.10}, {"rx": 0.40, "ry": 0.12}, {"rx": 0.63, "ry": 0.15}],
+    "R-2": [{"rx": 0.62, "ry": 0.28}, {"rx": 0.36, "ry": 0.30}],
+    "R-3": [{"rx": 0.67, "ry": 0.45}, {"rx": 0.30, "ry": 0.48}, {"rx": 0.72, "ry": 0.50}],
+    "R-4": [{"rx": 0.72, "ry": 0.65}, {"rx": 0.25, "ry": 0.68}],
+    "R-5": [{"rx": 0.76, "ry": 0.82}, {"rx": 0.22, "ry": 0.85}],
+}
+
+
+def get_slot_px(family, level, index):
+    """Convert relative slot to absolute pixel position."""
+    sol_y = FAMILY_SOL_Y.get(family, 750)
+    air_top = 90
+    air_bot = sol_y - 30
+    und_top = sol_y + 30
+    und_bot = TGT_H - 80
+
+    if level in AERIAL_SLOTS:
+        slots = AERIAL_SLOTS[level]
+        slot = slots[index % len(slots)]
+        x = int(slot["rx"] * TGT_W)
+        y = int(air_top + slot["ry"] * (air_bot - air_top))
+        return x, y
+    elif level in ROOT_SLOTS:
+        slots = ROOT_SLOTS[level]
+        slot = slots[index % len(slots)]
+        x = int(slot["rx"] * TGT_W)
+        y = int(und_top + slot["ry"] * (und_bot - und_top))
+        return x, y
+    else:
+        return TGT_W // 2, sol_y
 
 # Map scan levels to skeleton levels
 LEVEL_MAP = {
@@ -103,7 +140,7 @@ def render(scan_path, output_path=None):
         font = font_sm = font_title = ImageFont.load_default()
 
     # Assign positions to nodes
-    slot_usage = {k: 0 for k in BAOBAB_SLOTS}
+    slot_usage = {}
     placed = []
 
     for node in nodes:
@@ -116,15 +153,21 @@ def render(scan_path, output_path=None):
             if dl:
                 skel_level = dl
 
-        if skel_level not in BAOBAB_SLOTS:
+        if skel_level not in AERIAL_SLOTS and skel_level not in ROOT_SLOTS:
             skel_level = "B"  # fallback
 
-        slots = BAOBAB_SLOTS[skel_level]
-        idx = slot_usage[skel_level] % len(slots)
-        slot_usage[skel_level] += 1
+        idx = slot_usage.get(skel_level, 0)
+        slot_usage[skel_level] = idx + 1
 
-        pos = slots[idx]
-        placed.append({**node, "px": pos["x"], "py": pos["y"], "skel_level": skel_level})
+        px, py = get_slot_px(family, skel_level, idx)
+        placed.append({**node, "px": px, "py": py, "skel_level": skel_level})
+
+    # Ground line at real SOL_Y
+    sol_y = FAMILY_SOL_Y.get(family, 750)
+    for i in range(6):
+        a = 150 - i * 22
+        draw.line([(0, sol_y + i - 3), (TGT_W, sol_y + i - 3)],
+                  fill=(200, 160, 30, max(a, 15)), width=1)
 
     # Draw nodes
     for n in placed:

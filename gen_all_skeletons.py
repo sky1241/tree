@@ -19,7 +19,18 @@ def sx(x): return round(x * SX)
 def sy(y): return round(y * SY)
 
 CENTER_X = sx(461)
-SOL_Y = sy(575)
+SOL_Y = sy(575)  # default, overridden per family below
+
+# ═══ REAL fam_sol per family (measured from ChatGPT images) ═══
+# Each image has ground at different Y. Calibrated visually.
+FAMILY_SOL_Y = {
+    "conifere": 850,
+    "feuillu":  735,
+    "baobab":   800,
+    "palmier":  795,
+    "buisson":  715,
+    "liane":    755,
+}
 
 # Bandes
 AERIAL_LKS = ["C", "F", "b", "B", "T"]
@@ -27,14 +38,8 @@ UNDER_LKS = ["R-1", "R-2", "R-3", "R-4", "R-5"]
 AERIAL_TOP, AERIAL_BOT = sy(30), sy(535)
 UNDER_TOP, UNDER_BOT = sy(615), sy(1090)
 
-aH = (AERIAL_BOT - AERIAL_TOP) / len(AERIAL_LKS)
-uH = (UNDER_BOT - UNDER_TOP) / len(UNDER_LKS)
-
-BAND_Y = {}
-for i, lk in enumerate(AERIAL_LKS):
-    BAND_Y[lk] = sy(30) + i * aH
-for i, lk in enumerate(UNDER_LKS):
-    BAND_Y[lk] = sy(615) + i * uH
+# Bandes calculated dynamically per family in gen_skeleton()
+# (moved from global to function-level)
 
 # Couleurs par niveau
 COLORS = {
@@ -253,6 +258,57 @@ def quadratic_bezier(p0, p1, p2, steps=50):
     return pts
 
 
+def remap_nodes(fam_nodes, family_sol_y):
+    """Remap node positions from 922x1244 skeleton to 1024x1536 with correct fam_sol.
+    Old skeleton: aerial y=80-535, sol=575, underground y=605-1020.
+    New: aerial 50..(sol_y-20), underground (sol_y+25)..(TGT_H-100)."""
+    OLD_SOL = 575
+    OLD_AIR_TOP, OLD_AIR_BOT = 80, 535
+    OLD_UND_TOP, OLD_UND_BOT = 605, 1020
+
+    new_air_top = 50
+    new_air_bot = family_sol_y - 20
+    new_und_top = family_sol_y + 25
+    new_und_bot = TGT_H - 100
+
+    nodes = []
+    for n in fam_nodes:
+        ox, oy = n["x"], n["y"]
+        nx = sx(ox)
+
+        if oy <= OLD_SOL:
+            # Aerial: remap proportionally
+            t = (oy - OLD_AIR_TOP) / max(1, OLD_AIR_BOT - OLD_AIR_TOP)
+            t = max(0, min(1, t))
+            ny = int(new_air_top + t * (new_air_bot - new_air_top))
+        else:
+            # Underground: remap proportionally
+            t = (oy - OLD_UND_TOP) / max(1, OLD_UND_BOT - OLD_UND_TOP)
+            t = max(0, min(1, t))
+            ny = int(new_und_top + t * (new_und_bot - new_und_top))
+
+        nodes.append({**n, "x": nx, "y": ny})
+    return nodes
+
+
+def calc_band_y(family_sol_y):
+    """Calculate band Y positions for a given fam_sol."""
+    air_top = 50
+    air_bot = family_sol_y - 20
+    und_top = family_sol_y + 25
+    und_bot = TGT_H - 100
+
+    aH = (air_bot - air_top) / len(AERIAL_LKS)
+    uH = (und_bot - und_top) / len(UNDER_LKS)
+
+    band_y = {}
+    for i, lk in enumerate(AERIAL_LKS):
+        band_y[lk] = int(air_top + i * aH)
+    for i, lk in enumerate(UNDER_LKS):
+        band_y[lk] = int(und_top + i * uH)
+    return band_y
+
+
 def draw_glow_ring(draw, cx, cy, r, color, alpha_outer=60, alpha_mid=100, ring_w=4):
     """Focus ring UX: outline 2px solid + box-shadow 0 0 0 4px rgba(color, 0.3)
     Ref: infernal-wheel/ux_resources/DESIGN_TREE.md — Focus appearance 2.4.13"""
@@ -305,10 +361,12 @@ def gen_skeleton(family_name, fam):
         font = ImageFont.load_default()
         font_band = font
 
-    # Scale nodes
-    nodes = []
-    for n in fam["nodes"]:
-        nodes.append({**n, "x": sx(n["x"]), "y": sy(n["y"])})
+    # Per-family fam_sol
+    fam_sol = FAMILY_SOL_Y.get(family_name, 710)
+    band_y = calc_band_y(fam_sol)
+
+    # Scale + remap nodes to real ground level
+    nodes = remap_nodes(fam["nodes"], fam_sol)
 
     iPos = {n["id"]: (n["x"], n["y"]) for n in nodes}
     pw = fam["pw"]
@@ -321,7 +379,7 @@ def gen_skeleton(family_name, fam):
         "R-4": "POILS ABS.", "R-5": "MYCORHIZES",
     }
     for lk in all_lks:
-        by = BAND_Y[lk]
+        by = band_y[lk]
         col = COLORS.get(lk.split("-")[0] if "-" in lk else lk, (100, 100, 100))
         # Band line: contrast 3:1 vs #121212 → need at least #5a5a5a
         draw.line([(0, by), (TGT_W, by)], fill=(*col, 35), width=1)
@@ -333,7 +391,7 @@ def gen_skeleton(family_name, fam):
     # Ligne de sol — gold ambre, high visibility
     for i in range(6):
         a = 180 - i * 25
-        draw.line([(0, SOL_Y + i - 3), (TGT_W, SOL_Y + i - 3)],
+        draw.line([(0, fam_sol + i - 3), (TGT_W, fam_sol + i - 3)],
                   fill=(200, 160, 30, max(a, 20)), width=1)
 
     # Axe central — subtle
@@ -345,14 +403,17 @@ def gen_skeleton(family_name, fam):
         trunkW = pw.get("T", 0)
         if trunkW > 0:
             tw = int(trunkW * 3)
+            # Remap trunk top to new coordinate space
+            t = (trunkTopY - 80) / max(1, 535 - 80)
+            trunk_top_px = int(50 + t * (fam_sol - 70))
             # Tronc avec glow
             for i in range(3, 0, -1):
                 draw.line(
-                    [(CENTER_X, sy(trunkTopY)), (CENTER_X, SOL_Y)],
+                    [(CENTER_X, trunk_top_px), (CENTER_X, fam_sol)],
                     fill=(255, 255, 255, 20 * i), width=tw + i * 4
                 )
             draw.line(
-                [(CENTER_X, sy(trunkTopY)), (CENTER_X, SOL_Y)],
+                [(CENTER_X, trunk_top_px), (CENTER_X, fam_sol)],
                 fill=(255, 255, 255, 160), width=tw
             )
 
@@ -376,7 +437,7 @@ def gen_skeleton(family_name, fam):
                 draw.line([pts[i], pts[i+1]], fill=(*col, a), width=w)
         else:
             if lk in ("B", "T") or (lk.startswith("R") and not pid):
-                target_y = SOL_Y
+                target_y = fam_sol
                 target_x = CENTER_X
                 cp = ((nx + target_x) / 2, (ny + target_y) / 2)
                 pts = quadratic_bezier((nx, ny), cp, (target_x, target_y), steps=50)
@@ -430,6 +491,10 @@ def gen_overlay(family_name, fam, nodes):
     pw = fam["pw"]
     iPos = {n["id"]: (n["x"], n["y"]) for n in nodes}
 
+    # Per-family ground level
+    fam_sol = FAMILY_SOL_Y.get(family_name, 710)
+    band_y = calc_band_y(fam_sol)
+
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 11)
     except:
@@ -438,13 +503,13 @@ def gen_overlay(family_name, fam, nodes):
     # Bandes subtiles
     all_lks = AERIAL_LKS + UNDER_LKS
     for lk in all_lks:
-        by = BAND_Y[lk]
+        by = band_y[lk]
         draw.line([(0, by), (TGT_W, by)], fill=(255, 180, 50, 30), width=1)
 
     # Sol — gradient glow
     for i in range(6):
         a = 120 - i * 18
-        draw.line([(0, SOL_Y + i - 3), (TGT_W, SOL_Y + i - 3)],
+        draw.line([(0, fam_sol + i - 3), (TGT_W, fam_sol + i - 3)],
                   fill=(200, 160, 30, max(a, 15)), width=1)
 
     # Axe central
@@ -498,10 +563,10 @@ def gen_overlay(family_name, fam, nodes):
     return result
 
 
-def gen_positions_file(family_name, nodes):
+def gen_positions_file(family_name, nodes, fam_sol=710):
     """Genere le fichier de positions (comme buisson_positions_1024.txt)."""
     lines = [f"# Positions {family_name} scalees 1024x1536"]
-    lines.append(f"# CENTER_X={CENTER_X}, SOL_Y={SOL_Y}")
+    lines.append(f"# CENTER_X={CENTER_X}, SOL_Y={fam_sol}")
     for n in nodes:
         lines.append(f"{n['id']:<8s} {n['label']:<22s} x={n['x']:>4d}  y={n['y']:>4d}")
     return "\n".join(lines)
@@ -521,7 +586,8 @@ def main():
         print(f"    skeleton: {skel_path}")
 
         # 2. Positions
-        pos_text = gen_positions_file(fname, scaled_nodes)
+        fam_sol = FAMILY_SOL_Y.get(fname, 710)
+        pos_text = gen_positions_file(fname, scaled_nodes, fam_sol)
         pos_path = os.path.join(TEMPLATES, f"{fname}_positions_1024.txt")
         with open(pos_path, "w", encoding="utf-8") as f:
             f.write(pos_text)
