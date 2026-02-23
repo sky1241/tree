@@ -1,6 +1,6 @@
 {
   "version": "1.1",
-  "date": "2026-02-14T12:39:56.441393",
+  "date": "2026-02-23",
   "source": "Winter Tree Engine",
   "references": {
     "lindenmayer_1968": {
@@ -589,5 +589,28 @@
       ],
       "when": "A chaque commit ou changement significatif dans le projet. Le winter-tree est le journal de bord vivant."
     }
+  },
+  "auto_update": {
+    "mechanism": "git pre-commit hook (hooks/pre-commit)",
+    "install": "powershell hooks/install.ps1 (Windows) | bash hooks/install.sh (Linux/Mac)",
+    "description": "Le hook se declenche automatiquement a chaque git commit. Il met a jour les stats (lignes, fichiers, phase) dans le winter-tree.json de chaque projet.",
+    "what_it_updates": [
+      "stats.total_code_lines",
+      "stats.total_files",
+      "stats.data_weight_mb",
+      "stats.commits",
+      "stats.biggest_file",
+      "scale.lines",
+      "phase (GRAINE|GERMINATION|CROISSANCE|CANOPEE)",
+      "date"
+    ],
+    "what_claude_must_still_do": [
+      "nodes[].status (todo|wip|done) — semantic, not automatable",
+      "nodes[].confidence — depends on test results",
+      "nodes[].desc — context-dependent",
+      "next_step — strategic decision",
+      "build_order[].action — depends on progress"
+    ],
+    "note": "Les stats sont automatiques (hook). Les contenus semantiques restent manuels (Claude ou Sky)."
   }
 }
