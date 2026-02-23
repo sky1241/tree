@@ -12,7 +12,7 @@
       "y": 957,
       "lk": "R-1",
       "label": "Nouveau nœud",
-      "pid": "b19"
+      "pid": null
     },
     {
       "id": "R-12",
@@ -28,7 +28,7 @@
       "y": 997,
       "lk": "R-1",
       "label": "Nouveau nœud",
-      "pid": "R-12"
+      "pid": null
     },
     {
       "id": "R-24",
@@ -36,7 +36,7 @@
       "y": 1056,
       "lk": "R-2",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "R-11"
     },
     {
       "id": "R-25",
@@ -44,7 +44,7 @@
       "y": 1062,
       "lk": "R-2",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "R-13"
     },
     {
       "id": "R-36",
@@ -68,7 +68,7 @@
       "y": 1206,
       "lk": "R-4",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "R-36"
     },
     {
       "id": "R-49",
@@ -76,7 +76,7 @@
       "y": 1208,
       "lk": "R-4",
       "label": "Nouveau nœud",
-      "pid": "R-25"
+      "pid": "R-37"
     },
     {
       "id": "R-510",
@@ -84,7 +84,7 @@
       "y": 1347,
       "lk": "R-5",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "R-48"
     },
     {
       "id": "R-511",
@@ -92,7 +92,7 @@
       "y": 1333,
       "lk": "R-5",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "R-49"
     },
     {
       "id": "C12",
@@ -100,7 +100,7 @@
       "y": 743,
       "lk": "C",
       "label": "Nouveau nœud",
-      "pid": "R-48"
+      "pid": "F15"
     },
     {
       "id": "F13",
@@ -108,7 +108,7 @@
       "y": 484,
       "lk": "F",
       "label": "Nouveau nœud",
-      "pid": "C12"
+      "pid": "b17"
     },
     {
       "id": "F14",
@@ -116,7 +116,7 @@
       "y": 484,
       "lk": "F",
       "label": "Nouveau nœud",
-      "pid": "C12"
+      "pid": "b18"
     },
     {
       "id": "F15",
@@ -124,7 +124,7 @@
       "y": 563,
       "lk": "F",
       "label": "Nouveau nœud",
-      "pid": "B21"
+      "pid": "b19"
     },
     {
       "id": "b17",
@@ -132,7 +132,7 @@
       "y": 370,
       "lk": "b",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "B20"
     },
     {
       "id": "b18",
@@ -140,7 +140,7 @@
       "y": 359,
       "lk": "b",
       "label": "Nouveau nœud",
-      "pid": "F14"
+      "pid": "B21"
     },
     {
       "id": "b19",
@@ -148,7 +148,7 @@
       "y": 404,
       "lk": "b",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "B21"
     },
     {
       "id": "B20",
@@ -156,7 +156,7 @@
       "y": 257,
       "lk": "B",
       "label": "Nouveau nœud",
-      "pid": "b17"
+      "pid": "T22"
     },
     {
       "id": "B21",
@@ -164,7 +164,7 @@
       "y": 254,
       "lk": "B",
       "label": "Nouveau nœud",
-      "pid": null
+      "pid": "T23"
     },
     {
       "id": "T22",
@@ -185,44 +185,84 @@
   ],
   "connections": [
     {
-      "from": "C12",
-      "to": "F13"
-    },
-    {
-      "from": "b17",
+      "from": "T22",
       "to": "B20"
     },
     {
-      "from": "F14",
+      "from": "B20",
+      "to": "b17"
+    },
+    {
+      "from": "b17",
+      "to": "F13"
+    },
+    {
+      "from": "F13",
+      "to": "C12"
+    },
+    {
+      "from": "T23",
+      "to": "B21"
+    },
+    {
+      "from": "B21",
       "to": "b18"
     },
     {
       "from": "B21",
-      "to": "F15"
+      "to": "b19"
+    },
+    {
+      "from": "b18",
+      "to": "F14"
     },
     {
       "from": "b19",
-      "to": "R-11"
+      "to": "F15"
+    },
+    {
+      "from": "F14",
+      "to": "C12"
+    },
+    {
+      "from": "F15",
+      "to": "C12"
+    },
+    {
+      "from": "R-11",
+      "to": "R-24"
     },
     {
       "from": "R-24",
       "to": "R-36"
     },
     {
+      "from": "R-36",
+      "to": "R-48"
+    },
+    {
       "from": "R-48",
-      "to": "C12"
+      "to": "R-510"
     },
     {
       "from": "R-12",
-      "to": "R-13"
+      "to": "R-25"
+    },
+    {
+      "from": "R-13",
+      "to": "R-25"
     },
     {
       "from": "R-25",
       "to": "R-37"
     },
     {
-      "from": "R-25",
+      "from": "R-37",
       "to": "R-49"
+    },
+    {
+      "from": "R-49",
+      "to": "R-511"
     }
   ]
 }
