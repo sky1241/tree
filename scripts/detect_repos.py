@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
-"""
-DETECT REPOS — Trouve automatiquement tous les repos git de Sky sur le PC.
-============================================================================
-
-Usage (depuis le repo tree):
-  python scripts/detect_repos.py
-
-Scanne les dossiers courants pour trouver les repos git qui correspondent
-aux noms dans repos.json, et met à jour les chemins automatiquement.
-
-Cherche dans:
-  - C:\Users\ludov\
-  - C:\Users\ludov\OneDrive\Bureau\
-  - C:\Users\ludov\Documents\
-  - C:\Users\ludov\Desktop\
-  - D:\ (si existe)
-  - Le dossier parent du repo tree
-"""
+# DETECT REPOS - Trouve automatiquement tous les repos git sur le PC.
+# Usage: python scripts/detect_repos.py
+# Scanne le disque pour trouver les repos sky1241 et remplit repos.json.
 
 import json
 import os
@@ -98,25 +83,30 @@ def main():
     repo_names = {r["name"] for r in data["repos"]}
 
     # Déterminer les dossiers à scanner
-    home = Path.home()  # C:\Users\ludov
-    tree_parent = ROOT.parent  # Le dossier qui contient tree/
+    home = Path.home()
+    tree_parent = ROOT.parent
 
     search_dirs = [
-        tree_parent,                        # Probablement là où sont les autres repos
-        home,                               # Home directory
-        home / "OneDrive" / "Bureau",       # Bureau OneDrive
-        home / "Desktop",                   # Bureau standard
-        home / "Documents",                 # Documents
-        home / "repos",                     # Dossier repos classique
-        home / "projects",                  # Dossier projets
-        home / "dev",                       # Dossier dev
-        home / "git",                       # Dossier git
+        tree_parent,
+        home,
+        home / "Desktop",
+        home / "Bureau",
+        home / "Documents",
+        home / "OneDrive",
+        home / "OneDrive" / "Bureau",
+        home / "OneDrive" / "Desktop",
+        home / "repos",
+        home / "projects",
+        home / "dev",
+        home / "git",
+        home / "AppData" / "Local" / "Temp",
     ]
 
-    # Aussi D:\ si existe
-    d_drive = Path("D:/")
-    if d_drive.exists():
-        search_dirs.append(d_drive)
+    # Aussi D:\ et E:\ si existent
+    for drive in ["D:/", "E:/"]:
+        d = Path(drive)
+        if d.exists():
+            search_dirs.append(d)
 
     # Supprimer les doublons et les chemins inexistants
     search_dirs = list(dict.fromkeys(str(d) for d in search_dirs if Path(d).exists()))
