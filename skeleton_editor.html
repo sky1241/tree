@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌳 Winter Tree — Skeleton Editor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Outfit:wght@300;400;600;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0c;
+    --surface: #141418;
+    --surface2: #1c1c22;
+    --border: #2a2a33;
+    --amber: #d4a520;
+    --amber-dim: rgba(212, 165, 32, 0.3);
+    --green: #28c862;
+    --red: #e04040;
+    --white: #e8e4dc;
+    --muted: #8a8678;
+    --font: 'JetBrains Mono', monospace;
+    --display: 'Outfit', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 13px;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  header h1 span { color: var(--amber); }
+  .header-actions { display: flex; gap: 8px; }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--white);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { border-color: var(--amber); color: var(--amber); }
+  .btn.active { background: var(--amber); color: var(--bg); border-color: var(--amber); }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: var(--red); color: white; }
+  .btn.export { border-color: var(--green); color: var(--green); }
+  .btn.export:hover { background: var(--green); color: var(--bg); }
+
+  /* ─── MAIN LAYOUT ─── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ─── LEFT PANEL ─── */
+  .panel {
+    width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .panel-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-section h3 {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Tool buttons grid */
+  .tools-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .tool-btn {
+    font-family: var(--font);
+    font-size: 11px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { border-color: var(--amber-dim); color: var(--white); }
+  .tool-btn.active { border-color: var(--amber); color: var(--amber); background: rgba(212,165,32,0.08); }
+
+  /* Level selector */
+  .level-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  .level-btn {
+    font-family: var(--font);
+    font-size: 10px;
+    padding: 5px 2px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .level-btn:hover { border-color: var(--amber); }
+  .level-btn.active { border-color: var(--amber); color: var(--bg); font-weight: 700; }
+
+  .level-btn[data-zone="aerial"] { color: #28c862; }
+  .level-btn[data-zone="aerial"].active { background: #28c862; }
+  .level-btn[data-zone="under"] { color: #9a7453; }
+  .level-btn[data-zone="under"].active { background: #9a7453; }
+
+  /* Node list */
+  .node-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+  .node-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .node-item:hover { border-color: var(--amber-dim); }
+  .node-item.selected { border-color: var(--amber); }
+  .node-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .node-coords { color: var(--muted); font-size: 10px; }
+  .node-del { color: var(--red); cursor: pointer; opacity: 0.5; font-size: 14px; font-weight: bold; }
+  .node-del:hover { opacity: 1; }
+
+  /* Input */
+  .input-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+  .input-row input {
+    flex: 1;
+    font-family: var(--font);
+    font-size: 11px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--white);
+    outline: none;
+  }
+  .input-row input:focus { border-color: var(--amber); }
+
+  /* ─── CANVAS AREA ─── */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    position: relative;
+    background: #070709;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    cursor: crosshair;
+    box-shadow: 0 0 60px rgba(0,0,0,0.8);
+  }
+  .canvas-wrap img {
+    display: block;
+    max-height: calc(100vh - 60px);
+    width: auto;
+  }
+
+  /* Canvas overlays */
+  .canvas-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+  }
+  .canvas-overlay svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Interactive node on canvas */
+  .canvas-node {
+    position: absolute;
+    pointer-events: all;
+    cursor: grab;
+    transform: translate(-50%, -50%);
+  }
+  .canvas-node:active { cursor: grabbing; }
+  .canvas-node .ring {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 12px rgba(255,255,255,0.1);
+    transition: box-shadow 0.2s;
+  }
+  .canvas-node:hover .ring { box-shadow: 0 0 20px rgba(212,165,32,0.4); }
+  .canvas-node.selected .ring { box-shadow: 0 0 24px rgba(212,165,32,0.6); border-width: 3px; }
+  .canvas-node .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .canvas-node .tag {
+    position: absolute;
+    top: -22px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20,20,24,0.9);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-family: var(--font);
+    white-space: nowrap;
+    color: var(--white);
+    pointer-events: none;
+  }
+
+  /* SOL line */
+  .sol-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 3px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .sol-line::before {
+    content: 'SOL';
+    position: absolute;
+    right: 8px;
+    top: -16px;
+    font-family: var(--font);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--amber);
+    letter-spacing: 1px;
+  }
+
+  /* Cursor info */
+  .cursor-info {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    z-index: 100;
+    pointer-events: none;
+  }
+  .cursor-info span { color: var(--amber); font-weight: 600; }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  /* Dropzone */
+  .dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 60px;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .dropzone:hover { border-color: var(--amber); color: var(--white); }
+  .dropzone .icon { font-size: 48px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌳 Winter Tree — <span>Skeleton Editor</span></h1>
+  <div class="header-actions">
+    <button class="btn" onclick="loadImage()">📂 Charger Image</button>
+    <button class="btn" onclick="importJSON()">📥 Importer JSON</button>
+    <button class="btn export" onclick="exportJSON()">📤 Exporter JSON</button>
+    <button class="btn export" onclick="exportPositions()">📄 Export .txt</button>
+    <button class="btn danger" onclick="clearAll()">🗑 Reset</button>
+    <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImage(event)">
+    <input type="file" id="jsonInput" accept=".json" style="display:none" onchange="handleJSON(event)">
+  </div>
+</header>
+
+<div class="main">
+  <!-- LEFT PANEL -->
+  <div class="panel">
+
+    <div class="panel-section">
+      <h3>🔧 Outil actif</h3>
+      <div class="tools-grid">
+        <button class="tool-btn active" data-tool="place" onclick="setTool('place')">⊕ Placer nœud</button>
+        <button class="tool-btn" data-tool="sol" onclick="setTool('sol')">━ Tracer SOL</button>
+        <button class="tool-btn" data-tool="connect" onclick="setTool('connect')">⟋ Connecter</button>
+        <button class="tool-btn" data-tool="move" onclick="setTool('move')">✥ Déplacer</button>
+        <button class="tool-btn" data-tool="delete" onclick="setTool('delete')">✕ Supprimer</button>
+        <button class="tool-btn" data-tool="select" onclick="setTool('select')">◎ Sélectionner</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>🏷️ Niveau du nœud</h3>
+      <div class="level-grid">
+        <button class="level-btn active" data-level="C" data-zone="aerial" onclick="setLevel('C')">C</button>
+        <button class="level-btn" data-level="F" data-zone="aerial" onclick="setLevel('F')">F</button>
+        <button class="level-btn" data-level="b" data-zone="aerial" onclick="setLevel('b')">b</button>
+        <button class="level-btn" data-level="B" data-zone="aerial" onclick="setLevel('B')">B</button>
+        <button class="level-btn" data-level="T" data-zone="aerial" onclick="setLevel('T')">T</button>
+        <button class="level-btn" data-level="R-1" data-zone="under" onclick="setLevel('R-1')">R1</button>
+        <button class="level-btn" data-level="R-2" data-zone="under" onclick="setLevel('R-2')">R2</button>
+        <button class="level-btn" data-level="R-3" data-zone="under" onclick="setLevel('R-3')">R3</button>
+        <button class="level-btn" data-level="R-4" data-zone="under" onclick="setLevel('R-4')">R4</button>
+        <button class="level-btn" data-level="R-5" data-zone="under" onclick="setLevel('R-5')">R5</button>
+      </div>
+      <div class="input-row">
+        <input type="text" id="nodeLabel" placeholder="Label du nœud..." value="Nouveau nœud">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>📋 Nœuds (<span id="nodeCount">0</span>)</h3>
+      <div class="node-list" id="nodeList"></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>🔗 Connexions (<span id="connCount">0</span>)</h3>
+      <div class="node-list" id="connList"></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>📐 Sol</h3>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:var(--amber)">SOL_Y =</span>
+        <input type="number" id="solInput" style="width:70px;font-family:var(--font);font-size:12px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--amber);text-align:center;" value="0" onchange="setSolFromInput()">
+        <span style="color:var(--muted);font-size:10px">px</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="dropzone" id="dropzone" onclick="loadImage()">
+      <div class="icon">🌳</div>
+      <div>Glisser une image ici ou <span style="color:var(--amber)">cliquer</span></div>
+      <div style="font-size:11px">PNG des templates (1024×1536)</div>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap" style="display:none">
+      <img id="treeImage" draggable="false">
+      <div class="sol-line" id="solLine" style="display:none;background:linear-gradient(90deg,transparent,var(--amber),var(--amber),transparent);"></div>
+      <svg class="canvas-overlay" id="svgOverlay"></svg>
+      <div id="nodesContainer"></div>
+    </div>
+  </div>
+</div>
+
+<div class="cursor-info" id="cursorInfo">
+  Charger une image pour commencer
+</div>
+
+<div class="status-bar">
+  <div id="statusLeft">Prêt</div>
+  <div id="statusRight">Winter Tree Skeleton Editor v1.0</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let state = {
+  tool: 'place',
+  level: 'C',
+  nodes: [],
+  connections: [],
+  solY: null,
+  imgW: 1024,
+  imgH: 1536,
+  selectedNode: null,
+  connectFrom: null,
+  dragging: null,
+  dragOffset: { x: 0, y: 0 },
+  nextId: 1,
+  familyName: 'unknown',
+};
+
+const LEVEL_COLORS = {
+  'C':   '#28c862', 'F':   '#32b555', 'b':   '#389f48',
+  'B':   '#3d8a3a', 'T':   '#5a9a35',
+  'R-1': '#9a7453', 'R-2': '#8a6344', 'R-3': '#7a5235',
+  'R-4': '#6b4226', 'R-5': '#5c3317',
+};
+const LEVEL_NAMES = {
+  'C': 'Cime', 'F': 'Feuilles', 'b': 'Rameaux', 'B': 'Branches', 'T': 'Tronc',
+  'R-1': 'R.Struct', 'R-2': 'R.Pivot', 'R-3': 'Radicelles', 'R-4': 'Poils abs.', 'R-5': 'Mycorhizes',
+};
+
+// ═══════════════════════════════════════════════════
+// TOOLS
+// ═══════════════════════════════════════════════════
+function setTool(t) {
+  state.tool = t;
+  state.connectFrom = null;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  updateCursor();
+  updateStatus();
+}
+
+function setLevel(l) {
+  state.level = l;
+  document.querySelectorAll('.level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === l));
+}
+
+function updateCursor() {
+  const wrap = document.getElementById('canvasWrap');
+  const cursors = { place: 'crosshair', sol: 'row-resize', connect: 'pointer', move: 'grab', delete: 'not-allowed', select: 'default' };
+  wrap.style.cursor = cursors[state.tool] || 'default';
+}
+
+// ═══════════════════════════════════════════════════
+// IMAGE LOADING
+// ═══════════════════════════════════════════════════
+function loadImage() { document.getElementById('imageInput').click(); }
+
+function handleImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  // Detect family from filename
+  const fname = file.name.toLowerCase();
+  ['conifere','feuillu','baobab','palmier','buisson','liane'].forEach(f => {
+    if (fname.includes(f)) state.familyName = f;
+  });
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = document.getElementById('treeImage');
+    img.onload = () => {
+      state.imgW = img.naturalWidth;
+      state.imgH = img.naturalHeight;
+      document.getElementById('dropzone').style.display = 'none';
+      document.getElementById('canvasWrap').style.display = 'block';
+      updateStatus();
+      render();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag & drop
+document.addEventListener('DOMContentLoaded', () => {
+  const area = document.getElementById('canvasArea');
+  area.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
+  area.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const input = document.getElementById('imageInput');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      handleImage({ target: input });
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// CANVAS CLICK
+// ═══════════════════════════════════════════════════
+document.getElementById('canvasWrap').addEventListener('mousedown', (e) => {
+  if (e.target.closest('.canvas-node')) return; // handled by node
+  const rect = document.getElementById('treeImage').getBoundingClientRect();
+  const scaleX = state.imgW / rect.width;
+  const scaleY = state.imgH / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+
+  if (state.tool === 'place') {
+    const label = document.getElementById('nodeLabel').value || `Node ${state.nextId}`;
+    addNode(x, y, state.level, label);
+  } else if (state.tool === 'sol') {
+    state.solY = y;
+    document.getElementById('solInput').value = y;
+    render();
+  } else if (state.tool === 'select') {
+    state.selectedNode = null;
+    render();
+  }
+});
+
+// Mouse move for cursor info
+document.getElementById('canvasWrap').addEventListener('mousemove', (e) => {
+  const rect = document.getElementById('treeImage').getBoundingClientRect();
+  const scaleX = state.imgW / rect.width;
+  const scaleY = state.imgH / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+
+  const zone = state.solY ? (y < state.solY ? '🌿 Aérien' : '🪨 Souterrain') : '';
+  document.getElementById('cursorInfo').innerHTML =
+    `x=<span>${x}</span> y=<span>${y}</span> ${zone} — Outil: <span>${state.tool.toUpperCase()}</span>`;
+
+  // Drag
+  if (state.dragging !== null) {
+    const n = state.nodes[state.dragging];
+    n.x = x;
+    n.y = y;
+    render();
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  state.dragging = null;
+});
+
+// ═══════════════════════════════════════════════════
+// NODE MANAGEMENT
+// ═══════════════════════════════════════════════════
+function addNode(x, y, level, label) {
+  const id = `${level}${state.nextId}`;
+  state.nodes.push({ id, x, y, lk: level, label, pid: null });
+  state.nextId++;
+  state.selectedNode = state.nodes.length - 1;
+  render();
+}
+
+function deleteNode(idx) {
+  const node = state.nodes[idx];
+  state.connections = state.connections.filter(c => c.from !== node.id && c.to !== node.id);
+  state.nodes.splice(idx, 1);
+  if (state.selectedNode === idx) state.selectedNode = null;
+  render();
+}
+
+function selectNode(idx) {
+  if (state.tool === 'delete') {
+    deleteNode(idx);
+    return;
+  }
+  if (state.tool === 'connect') {
+    if (state.connectFrom === null) {
+      state.connectFrom = idx;
+      state.selectedNode = idx;
+      updateStatus(`Connexion: depuis ${state.nodes[idx].label} → cliquer destination`);
+    } else {
+      if (state.connectFrom !== idx) {
+        const from = state.nodes[state.connectFrom];
+        const to = state.nodes[idx];
+        const exists = state.connections.some(c => c.from === from.id && c.to === to.id);
+        if (!exists) {
+          state.connections.push({ from: from.id, to: to.id });
+          to.pid = from.id;
+        }
+      }
+      state.connectFrom = null;
+      state.selectedNode = null;
+    }
+    render();
+    return;
+  }
+  state.selectedNode = idx;
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════
+function render() {
+  renderSol();
+  renderConnections();
+  renderNodes();
+  renderNodeList();
+  renderConnList();
+  document.getElementById('nodeCount').textContent = state.nodes.length;
+  document.getElementById('connCount').textContent = state.connections.length;
+}
+
+function renderSol() {
+  const line = document.getElementById('solLine');
+  if (state.solY === null) { line.style.display = 'none'; return; }
+  const img = document.getElementById('treeImage');
+  const rect = img.getBoundingClientRect();
+  const scale = rect.height / state.imgH;
+  line.style.display = 'block';
+  line.style.top = (state.solY * scale) + 'px';
+}
+
+function renderConnections() {
+  const svg = document.getElementById('svgOverlay');
+  const img = document.getElementById('treeImage');
+  const rect = img.getBoundingClientRect();
+  const sx = rect.width / state.imgW;
+  const sy = rect.height / state.imgH;
+
+  let html = '';
+  const nodeMap = {};
+  state.nodes.forEach(n => nodeMap[n.id] = n);
+
+  state.connections.forEach(c => {
+    const from = nodeMap[c.from];
+    const to = nodeMap[c.to];
+    if (!from || !to) return;
+    const x1 = from.x * sx, y1 = from.y * sy;
+    const x2 = to.x * sx, y2 = to.y * sy;
+    // Quadratic bezier
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const cx = mx + (rect.width/2 - mx) * 0.2;
+    const cy = my;
+    const col = LEVEL_COLORS[from.lk] || '#888';
+    html += `<path d="M${x1},${y1} Q${cx},${cy} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="2" stroke-opacity="0.6"/>`;
+  });
+  svg.innerHTML = html;
+}
+
+function renderNodes() {
+  const container = document.getElementById('nodesContainer');
+  const img = document.getElementById('treeImage');
+  const rect = img.getBoundingClientRect();
+  const sx = rect.width / state.imgW;
+  const sy = rect.height / state.imgH;
+
+  let html = '';
+  state.nodes.forEach((n, i) => {
+    const col = LEVEL_COLORS[n.lk] || '#888';
+    const sel = i === state.selectedNode ? 'selected' : '';
+    const px = n.x * sx;
+    const py = n.y * sy;
+    html += `
+      <div class="canvas-node ${sel}" style="left:${px}px;top:${py}px"
+           onmousedown="startDrag(event,${i})" onclick="selectNode(${i})">
+        <div class="ring" style="border-color:${col}">
+          <div class="dot" style="background:${col}"></div>
+        </div>
+        <div class="tag">${n.label}</div>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderNodeList() {
+  const list = document.getElementById('nodeList');
+  let html = '';
+  state.nodes.forEach((n, i) => {
+    const col = LEVEL_COLORS[n.lk] || '#888';
+    const sel = i === state.selectedNode ? 'selected' : '';
+    html += `
+      <div class="node-item ${sel}" onclick="selectNode(${i})">
+        <div class="node-dot" style="background:${col}"></div>
+        <div class="node-label">[${n.lk}] ${n.label}</div>
+        <div class="node-coords">${n.x},${n.y}</div>
+        <div class="node-del" onclick="event.stopPropagation();deleteNode(${i})">×</div>
+      </div>`;
+  });
+  list.innerHTML = html || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:12px">Aucun nœud</div>';
+}
+
+function renderConnList() {
+  const list = document.getElementById('connList');
+  const nodeMap = {};
+  state.nodes.forEach(n => nodeMap[n.id] = n);
+  let html = '';
+  state.connections.forEach((c, i) => {
+    const from = nodeMap[c.from];
+    const to = nodeMap[c.to];
+    html += `
+      <div class="node-item">
+        <div class="node-label">${from?.label || '?'} → ${to?.label || '?'}</div>
+        <div class="node-del" onclick="state.connections.splice(${i},1);render()">×</div>
+      </div>`;
+  });
+  list.innerHTML = html || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:12px">Aucune</div>';
+}
+
+// ═══════════════════════════════════════════════════
+// DRAG
+// ═══════════════════════════════════════════════════
+function startDrag(e, idx) {
+  if (state.tool === 'move') {
+    e.preventDefault();
+    e.stopPropagation();
+    state.dragging = idx;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// SOL from input
+// ═══════════════════════════════════════════════════
+function setSolFromInput() {
+  const v = parseInt(document.getElementById('solInput').value);
+  if (!isNaN(v) && v > 0) {
+    state.solY = v;
+    render();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// IMPORT / EXPORT
+// ═══════════════════════════════════════════════════
+function exportJSON() {
+  const data = {
+    family: state.familyName,
+    imgSize: [state.imgW, state.imgH],
+    solY: state.solY,
+    nodes: state.nodes.map(n => ({
+      id: n.id, x: n.x, y: n.y, lk: n.lk, label: n.label, pid: n.pid
+    })),
+    connections: state.connections,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `skeleton_${state.familyName}_${state.imgW}x${state.imgH}.json`;
+  a.click();
+  updateStatus('✅ JSON exporté!');
+}
+
+function exportPositions() {
+  let lines = [`# Positions ${state.familyName} ${state.imgW}x${state.imgH}`];
+  lines.push(`# SOL_Y=${state.solY}`);
+  lines.push(`# CENTER_X=${Math.round(state.imgW / 2)}`);
+  state.nodes.forEach(n => {
+    lines.push(`${n.id.padEnd(8)} ${n.label.padEnd(22)} x=${String(n.x).padStart(4)}  y=${String(n.y).padStart(4)}  lk=${n.lk}  pid=${n.pid || '-'}`);
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${state.familyName}_positions_${state.imgW}x${state.imgH}.txt`;
+  a.click();
+  updateStatus('✅ Positions exportées!');
+}
+
+function importJSON() { document.getElementById('jsonInput').click(); }
+
+function handleJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.nodes) state.nodes = data.nodes;
+      if (data.connections) state.connections = data.connections;
+      if (data.solY) { state.solY = data.solY; document.getElementById('solInput').value = data.solY; }
+      if (data.family) state.familyName = data.family;
+      state.nextId = state.nodes.length + 1;
+      render();
+      updateStatus(`✅ Importé: ${state.nodes.length} nœuds, ${state.connections.length} connexions`);
+    } catch (err) {
+      alert('Erreur JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  if (!confirm('Tout supprimer?')) return;
+  state.nodes = [];
+  state.connections = [];
+  state.solY = null;
+  state.selectedNode = null;
+  state.nextId = 1;
+  document.getElementById('solInput').value = 0;
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+// STATUS
+// ═══════════════════════════════════════════════════
+function updateStatus(msg) {
+  const toolNames = { place: '⊕ Placer', sol: '━ Sol', connect: '⟋ Connecter', move: '✥ Déplacer', delete: '✕ Supprimer', select: '◎ Sélectionner' };
+  document.getElementById('statusLeft').textContent = msg || `${toolNames[state.tool]} | ${state.nodes.length} nœuds | SOL_Y=${state.solY || '—'}`;
+}
+
+// Window resize
+window.addEventListener('resize', () => { if (state.nodes.length) render(); });
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const keys = { '1': 'place', '2': 'sol', '3': 'connect', '4': 'move', '5': 'delete', '6': 'select' };
+  if (keys[e.key]) setTool(keys[e.key]);
+  if (e.key === 'Delete' && state.selectedNode !== null) deleteNode(state.selectedNode);
+  if (e.key === 'Escape') { state.selectedNode = null; state.connectFrom = null; render(); }
+});
+</script>
+
+</body>
+</html>
