@@ -2077,24 +2077,38 @@ def scan_repo(path):
 
 
 def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_path=None, all_files=None):
-    """Classifie la famille à partir des données scannées.
+    """Classifie la famille selon l'arbre de décision Q1→Q6.
 
-    Logique en 3 étapes :
-    1. BAOBAB CHECK — un fichier fait >50% du code ? → baobab, terminé
-    2. SÉPARER CŒUR / PÉRIPHÉRIE — src/, lib/, core/, app/ = architecture.
-       scripts/, tools/, outputs/, tests/ = outils autour. On classe sur le cœur.
-    3. TRACER LES IMPORTS dans le cœur — chaîne linéaire = conifère,
-       modules parallèles = feuillu, indépendants = buisson.
+    Fondements scientifiques :
+    - Lindenmayer 1968 : L-Systems, réécriture parallèle
+    - Prusinkiewicz & Lindenmayer 1990 : The Algorithmic Beauty of Plants
+    - Tomer & Schach 2000 : Evolution Tree (CSMR, Zurich)
+    - Fowler 2004 : Strangler Fig Application
+    - Barnes 2013 (CMU) : Software Architecture Evolution
+
+    Arbre de décision (réf: GROWTH_PATTERNS_6_FAMILIES.md l.339-362) :
+        Q3: Core énorme, petite interface ?       → 🌳 BAOBAB
+        Q6: Wrappe un système existant ?           → 🌿 LIANE
+        Q1: Pipeline linéaire (flux input→output) ?
+            Q2: Étroit, single meristem ?          → 🌴 PALMIER
+            Q2: Large, branches subordonnées ?     → 🌲 CONIFÈRE
+        Q4: Modules parallèles ?
+            Q5: Interdépendants ?                  → 🍁 FEUILLU
+            Q5: Indépendants ?                     → 🌿 BUISSON
     """
+    import re
 
+    files = all_files or []
     trunk_lines = biggest_file["lines"] if biggest_file else 0
     trunk_ratio = trunk_lines / total_code_lines if total_code_lines > 0 else 0
+    branch_nodes = [n for n in nodes if n["level"] == "B"]
+    n_branches = len(branch_nodes)
 
-    # ── Étape 1 : Baobab check ──
-    if trunk_ratio > 0.5:
-        return "baobab"
+    # ══════════════════════════════════════════════════════════════
+    # EXTRACTION DES MÉTRIQUES
+    # ══════════════════════════════════════════════════════════════
 
-    # ── Étape 2 : Séparer cœur / périphérie ──
+    # ── Séparer cœur / périphérie ──
     CORE_DIRS = {"src", "lib", "core", "app", "pkg", "internal", "modules",
                  "binance_bot", "engine", "api", "server", "services"}
     PERIPHERAL_DIRS = {"scripts", "tools", "utils", "outputs", "docs",
@@ -2105,13 +2119,12 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
     core_lines = 0
     peripheral_lines = 0
     core_dirs_found = set()
-    peripheral_dirs_found = set()
 
-    if all_files:
-        for f in all_files:
+    if files:
+        for f in files:
             if f["lines"] == 0:
                 continue
-            parts = f["path"].split(os.sep)
+            parts = f["path"].split(os.sep if os.sep in f["path"] else "/")
             if len(parts) > 1:
                 top = parts[0].lower()
                 if top in CORE_DIRS:
@@ -2119,41 +2132,46 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
                     core_dirs_found.add(parts[0])
                 elif top in PERIPHERAL_DIRS:
                     peripheral_lines += f["lines"]
-                    peripheral_dirs_found.add(parts[0])
                 else:
-                    # Dossier inconnu — on le compte comme cœur par défaut
                     core_lines += f["lines"]
                     core_dirs_found.add(parts[0])
             else:
-                # Fichier racine — cœur
                 core_lines += f["lines"]
 
-    # ── Étape 3 : Tracer les imports dans le cœur ──
-    import_graph = {}  # fichier → set(fichiers importés)
+    n_core_dirs = len(core_dirs_found)
 
-    if repo_path and all_files:
-        # Mapper les modules disponibles dans le projet
+    # ── Taille des branches vs tronc (Règle C2: BRANCH_SUBORDINATION) ──
+    branch_sizes = []
+    for dirname, info in top_dirs.items():
+        if isinstance(info, dict) and info.get("lines", 0) > 0:
+            branch_sizes.append(info["lines"])
+
+    # C2: branch.size < 0.6 × trunk.size
+    branches_subordinate = (
+        all(bs < trunk_lines * 0.6 for bs in branch_sizes)
+        if (branch_sizes and trunk_lines > 0) else False
+    )
+
+    # ── Tracer les imports ──
+    import_graph = {}
+
+    if repo_path and files:
         project_modules = set()
-        for f in all_files:
+        for f in files:
             if f["ext"] in (".py", ".dart", ".js", ".ts", ".jsx", ".tsx"):
-                # Extraire le nom de module du chemin
                 mod = f["path"].replace(os.sep, ".").replace("/", ".")
                 for ext in (".py", ".dart", ".js", ".ts", ".jsx", ".tsx"):
                     mod = mod.replace(ext, "")
                 project_modules.add(mod)
-                # Ajouter aussi les dossiers comme modules
                 parts = f["path"].split(os.sep)
                 for i in range(len(parts)):
                     project_modules.add(".".join(parts[:i + 1]).replace(".py", "").replace(".dart", ""))
 
-        # Scanner les imports de chaque fichier du cœur
-        for f in all_files:
+        for f in files:
             if f["ext"] not in (".py", ".dart", ".js", ".ts"):
                 continue
             if f["lines"] == 0:
                 continue
-
-            # Ne tracer que les fichiers du cœur (pas scripts/, tests/, etc)
             parts = f["path"].split(os.sep)
             if len(parts) > 1 and parts[0].lower() in PERIPHERAL_DIRS:
                 continue
@@ -2165,38 +2183,26 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
                 with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
                     for line in fh:
                         line = line.strip()
-
-                        # Python: from src.ichimoku.data import X
                         if line.startswith("from ") and " import " in line:
                             module = line.split("from ")[1].split(" import")[0].strip()
-                            # Imports relatifs (.data, ..utils)
                             if module.startswith("."):
-                                # Résoudre relative au dossier du fichier
                                 base = ".".join(parts[:-1])
                                 module = base + module
                             imports.add(module)
-
-                        # Python: import src.optimizer
                         elif line.startswith("import ") and not line.startswith("import "):
                             module = line.split("import ")[1].split(" as ")[0].split(",")[0].strip()
                             imports.add(module)
-
-                        # Dart: import 'package:myapp/services/engine.dart'
                         elif line.startswith("import '") or line.startswith('import "'):
                             path_str = line.split("'")[1] if "'" in line else line.split('"')[1]
                             if not path_str.startswith("dart:") and not path_str.startswith("package:flutter"):
                                 imports.add(path_str)
-
-                        # JS/TS: import X from './module'
                         elif line.startswith("import ") and "from " in line:
                             module = line.split("from ")[1].strip().strip("'\"").strip(";")
                             if module.startswith("."):
                                 imports.add(module)
-
             except:
                 continue
 
-            # Filtrer : garder seulement les imports INTERNES au projet
             internal_imports = set()
             for imp in imports:
                 imp_clean = imp.replace("/", ".").replace("\\", ".")
@@ -2204,40 +2210,43 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
                     if imp_clean.startswith(pm) or pm.startswith(imp_clean):
                         internal_imports.add(imp_clean)
                         break
-                # Aussi garder les imports relatifs (commencent par .)
                 if imp.startswith("."):
                     internal_imports.add(imp)
 
             if internal_imports:
-                file_key = f["path"]
-                import_graph[file_key] = internal_imports
+                import_graph[f["path"]] = internal_imports
 
-    # ── Étape 4 : Analyser la topologie du graphe d'imports ──
-
-    n_core_dirs = len(core_dirs_found)
-    n_files_with_imports = len(import_graph)
-    total_internal_imports = sum(len(v) for v in import_graph.values())
-
-    # Calculer la "profondeur de chaîne" — est-ce que A→B→C→D ?
-    # Si oui = pipeline = conifère
+    # ── Métriques du graphe d'imports ──
     chain_depth = _find_longest_chain(import_graph)
+    n_files_with_imports = len(import_graph)
+    has_imports = n_files_with_imports > 0
 
-    # Compter combien de fichiers importent le MÊME module (convergence)
     imported_by_count = {}
     for src_file, imports in import_graph.items():
         for imp in imports:
             imported_by_count[imp] = imported_by_count.get(imp, 0) + 1
-
-    # Hub = module importé par beaucoup d'autres (nœud central)
     max_hub = max(imported_by_count.values()) if imported_by_count else 0
 
-    has_imports = n_files_with_imports > 0  # True = scan local a marché
+    # ── Cross-imports entre branches (Q5: interdépendance) ──
+    cross_branch_imports = 0
+    if import_graph:
+        for src_file, imports in import_graph.items():
+            src_parts = src_file.split(os.sep if os.sep in src_file else "/")
+            src_branch = src_parts[0] if len(src_parts) > 1 else ""
+            for imp in imports:
+                imp_parts = imp.replace(".", "/")
+                for target_file in import_graph.keys():
+                    t_parts = target_file.split(os.sep if os.sep in target_file else "/")
+                    t_branch = t_parts[0] if len(t_parts) > 1 else ""
+                    if t_branch and t_branch != src_branch and imp_parts in target_file:
+                        cross_branch_imports += 1
+                        break
 
-    # ── Étape 4b : Heuristiques structurelles (marchent sans imports) ──
-    # Utilisées en mode GitHub API ou quand l'analyse d'imports est vide.
-
-    files = all_files or []
-    all_paths_lower = [f["path"].lower() for f in files]
+    # ── Détection de domaine fonctionnel (pour Q1) ──
+    CODE_EXTS = {".py", ".dart", ".js", ".ts", ".jsx", ".tsx", ".cpp", ".c", ".h",
+                 ".hpp", ".rs", ".go", ".java", ".kt", ".swift", ".rb", ".php",
+                 ".sh", ".ps1"}
+    code_paths = [f["path"].lower() for f in files if f.get("ext", "") in CODE_EXTS]
     all_names_lower = [f["name"].lower() for f in files]
     all_dirs_lower = set()
     for f in files:
@@ -2245,158 +2254,210 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
         if len(parts) > 1:
             all_dirs_lower.add(parts[0].lower())
 
-    # Détection Flutter / app mobile → feuillu
-    FLUTTER_MARKERS = {"pubspec.yaml", "pubspec.lock"}
-    MOBILE_DIRS = {"lib", "android", "ios", "macos", "windows", "linux", "web"}
-    is_flutter = bool(FLUTTER_MARKERS & set(all_names_lower))
-    n_mobile_dirs = len(MOBILE_DIRS & all_dirs_lower)
-    # Flutter = pubspec.yaml + lib/, OU 3+ platform dirs
-    is_mobile_app = (is_flutter and "lib" in all_dirs_lower) or n_mobile_dirs >= 3
-
-    # Détection pipeline / trading → conifère
-    # On ne matche que sur les fichiers CODE et noms de DOSSIERS, pas les assets
-    import re
-    CODE_EXTS = {".py", ".dart", ".js", ".ts", ".jsx", ".tsx", ".cpp", ".c", ".h",
-                 ".hpp", ".rs", ".go", ".java", ".kt", ".swift", ".rb", ".php",
-                 ".sh", ".ps1"}
-    code_paths_lower = [f["path"].lower() for f in files if f.get("ext", "") in CODE_EXTS]
-    dir_names_lower = list(all_dirs_lower)
-
-    # Mots-clés avec word boundary — évite "bot" dans "bottom", "step" dans "steps.png"
+    # Domaines pipeline (Prusinkiewicz: excurrent growth = flux linéaire)
+    # Word boundaries pour éviter "bot" ∈ "bottom", "step" ∈ "steps.png"
+    # IMPORTANT : on compte les DOSSIERS uniques contenant le pattern,
+    # pas les fichiers individuels. src/audio/ = 1 hit, pas 17.
     PIPELINE_PATTERNS = [
-        r'\bpipeline\b', r'\bstage[s]?\b', r'\bstep[s]?\b', r'\bphase\b',
-        r'\betape\b', r'\bworkflow\b', r'\bichimoku\b', r'\bbacktest\b',
-        r'\btrading\b', r'\bstrategy\b', r'\boptimizer\b', r'\broutine[s]?\b',
-        r'\bscheduler\b', r'\bcron\b', r'\bbot\b', r'\bsignal[s]?\b',
+        r'\bpipeline\b', r'\bstage[s]?\b', r'\bphase\b', r'\betape\b',
+        r'\bworkflow\b', r'\bichimoku\b', r'\bbacktest\b', r'\btrading\b',
+        r'\bstrategy\b', r'\boptimizer\b', r'\broutine[s]?\b', r'\bscheduler\b',
+        r'\bcron\b', r'\bbot\b', r'\bsignal[s]?\b', r'\bfft\b',
+        r'\bcapture\b', r'\bpitch\b', r'\btranslat', r'\btransform\b',
+        r'\bconversion\b', r'\bprocessing\b', r'\betl\b',
     ]
     _pipeline_re = re.compile("|".join(PIPELINE_PATTERNS))
-    pipeline_hits = sum(1 for p in code_paths_lower if _pipeline_re.search(p))
-    pipeline_hits += sum(1 for d in dir_names_lower if _pipeline_re.search(d))
-    has_pipeline_name = any("pipeline" in p for p in code_paths_lower)
-    has_versioned_files = _detect_versioned_files(files)
 
-    # Détection liane / wrapper → liane
+    # Compter les dossiers de 1er niveau contenant un pattern pipeline
+    pipeline_dirs = set()
+    for p in code_paths:
+        if _pipeline_re.search(p):
+            parts = p.split("/")
+            # Identifier le dossier de 1er ou 2ème niveau
+            dir_key = parts[0] if len(parts) <= 2 else "/".join(parts[:2])
+            pipeline_dirs.add(dir_key)
+    # Aussi checker les noms de dossiers top-level
+    for d in all_dirs_lower:
+        if _pipeline_re.search(d):
+            pipeline_dirs.add(d)
+
+    pipeline_hits = len(pipeline_dirs)
+    has_versioned = _detect_versioned_files(files)
+
+    # Détection liane (Fowler 2004: Strangler Fig)
     LIANE_MARKERS = {"setup.py", "setup.cfg", "pyproject.toml", "plugin.xml",
                      "manifest.json", "extension.json"}
-    WRAPPER_KEYWORDS = {"wrapper", "plugin", "extension", "addon", "bridge",
-                        "binding", "adapter", "connector", "proxy"}
-    is_wrapper = (len(LIANE_MARKERS & set(all_names_lower)) >= 2
-                  and sum(1 for p in all_paths_lower
-                          if any(kw in p for kw in WRAPPER_KEYWORDS)) >= 2)
+    WRAPPER_KW = {"wrapper", "plugin", "extension", "addon", "bridge",
+                  "binding", "adapter", "connector", "proxy"}
+    liane_marker_count = len(LIANE_MARKERS & set(all_names_lower))
+    wrapper_re = re.compile(r'\b(?:' + '|'.join(WRAPPER_KW) + r')\b')
+    wrapper_hits = sum(1 for p in code_paths if wrapper_re.search(p))
 
-    # Détection scripts indépendants → buisson
-    # Si la majorité du code est dans scripts/ et pas dans src/lib/core
-    scripts_lines = sum(info["lines"] for d, info in top_dirs.items()
-                        if d.lower() in {"scripts", "tools", "utils", "notebooks"})
-    has_dominant_scripts = (scripts_lines > core_lines * 1.5
-                           and scripts_lines > 0 and n_core_dirs <= 1)
+    # Détection app framework (pour Q5: interdépendance structurelle)
+    FLUTTER_MARKERS = {"pubspec.yaml", "pubspec.lock"}
+    is_flutter = bool(FLUTTER_MARKERS & set(all_names_lower)) and "lib" in all_dirs_lower
+    SHARED_CORE_DIRS = {"lib", "core", "src", "engine", "app", "pkg", "internal", "modules"}
+    has_shared_core = bool(SHARED_CORE_DIRS & all_dirs_lower)
 
-    # ── Décision finale ──
+    # ══════════════════════════════════════════════════════════════
+    # ARBRE DE DÉCISION Q1→Q6
+    # Réf: GROWTH_PATTERNS_6_FAMILIES.md l.339-362
+    # ══════════════════════════════════════════════════════════════
 
-    branch_nodes = [n for n in nodes if n["level"] == "B"]
-    n_branches = len(branch_nodes)
+    # ── Q3 : Core énorme, petite interface ? → BAOBAB ──
+    # Règle B1: TRUNK_IS_STORAGE — "tronc massif, canopée petite"
+    # Chapotin et al. 2006 : parenchyme 69-88%, densité 0.09-0.17 g/cm³
+    # Seuil : un seul fichier contient 70%+ du code = monolithe de stockage
+    if trunk_ratio > 0.70:
+        return "baobab"
 
-    # Palmier : très peu de structure
-    if n_branches <= 1 and (not has_imports or n_files_with_imports <= 2):
-        return "palmier"
-
-    # ── Résultats d'imports (si disponibles, ils priment) ──
-
-    if has_imports:
-        # Conifère : chaîne d'imports profonde
-        if chain_depth >= 3:
-            return "conifere"
-
-        # Hub fort = module central qui orchestre = conifère
-        if max_hub >= 4 and chain_depth >= 2:
-            return "conifere"
-
-        # Feuillu : plusieurs modules importent une base commune
-        if max_hub >= 3 and chain_depth <= 2 and n_core_dirs >= 2:
-            return "feuillu"
-
-    # ── Heuristiques structurelles (marchent toujours) ──
-
-    # Liane : wrapper / plugin autour d'un hôte
-    if is_wrapper and n_branches <= 4:
+    # ── Q6 : Wrappe un système existant ? → LIANE ──
+    # Fowler 2004 — HOST_REQUIRED, SPEED_OVER_STRUCTURE
+    if liane_marker_count >= 2 and wrapper_hits >= 2 and n_branches <= 4:
         return "liane"
 
-    # Conifère : pipeline détecté par noms de fichiers/dossiers
-    if has_pipeline_name and n_core_dirs >= 1:
+    # ── Q1 : Pipeline linéaire (flux input → process → output) ? ──
+    # Lindenmayer 1968 — pattern excurrent (dominance apicale)
+    # Un pipeline = un flux de données qui traverse des étapes séquentielles
+    # Signaux : chaîne d'imports, domaine fonctionnel, subordination des branches
+    #
+    # NOTE : le trunk_ratio peut être artificiellement bas si le repo contient
+    # beaucoup de fichiers non-code (HTML, data, outputs). Les signaux forts
+    # (chaîne d'imports, domaine fonctionnel) n'ont pas besoin de trunk dominant.
+    # Seuls les signaux faibles (subordination structurelle) nécessitent un tronc.
+
+    is_pipeline = False
+
+    # ── Signaux forts (pas besoin de trunk dominant) ──
+
+    # Import chain prouvé (A→B→C→D) — preuve directe de flux linéaire
+    if chain_depth >= 3:
+        is_pipeline = True
+
+    # Hub central orchestrateur + chaîne
+    if max_hub >= 4 and chain_depth >= 2:
+        is_pipeline = True
+
+    # Domaine fonctionnel pipeline fort (plusieurs keywords)
+    if pipeline_hits >= 4:
+        is_pipeline = True
+
+    # Fichiers versionnés = itérations sur même pipeline
+    if has_versioned:
+        is_pipeline = True
+
+    # Domaine pipeline + au moins un signal structurel
+    if pipeline_hits >= 2 and (has_versioned or chain_depth >= 2 or trunk_ratio > 0.1):
+        is_pipeline = True
+
+    # ── Signaux faibles (nécessitent trunk dominant — Brown 1971) ──
+
+    # Branches subordonnées : nécessite dominance apicale mesurable
+    if branches_subordinate and trunk_ratio > 0.15 and n_branches >= 2:
+        is_pipeline = True
+
+    if is_pipeline:
+        # ── Q2 : Pipeline étroit (palmier) ou large (conifère) ? ──
+        #
+        # PALMIER (Tomlinson 1990) :
+        #   P1: SINGLE_MERISTEM — un seul point de production
+        #   P3: NO_LATERAL_BRANCHING — zéro branche latérale
+        #   → Pipeline concentré, peu/pas de modules séparés
+        #
+        # CONIFÈRE (Brown 1971, Wilson 2000) :
+        #   C1: TRUNK_FIRST — tronc d'abord
+        #   C2: BRANCH_SUBORDINATION — branches < 0.6 × tronc
+        #   → Pipeline avec stages multiples, branches subordonnées
+        #
+        # IMPORTANT : les dossiers platform Flutter/mobile (android/, ios/,
+        # windows/, macos/, linux/, web/) sont du boilerplate, PAS des branches
+        # fonctionnelles. On les filtre pour Q2 (Tomlinson: structure vs delivery).
+
+        PLATFORM_BOILERPLATE = {"android", "ios", "macos", "windows", "linux", "web",
+                                "test", "tests", "docs", "scripts", "demo", "examples"}
+
+        significant_branches = 0
+        for dirname, info in top_dirs.items():
+            if isinstance(info, dict) and info.get("lines", 0) > trunk_lines * 0.1:
+                if dirname.lower() not in PLATFORM_BOILERPLATE:
+                    significant_branches += 1
+
+        # Palmier : peu de branches fonctionnelles significatives
+        # SAUF si on a des stages versionnés → multi-stage = conifère
+        if significant_branches <= 2 and not has_versioned and pipeline_hits <= 2:
+            return "palmier"
+
+        # Palmier : tronc très dominant, code concentré, pas de stages
+        if trunk_ratio > 0.35 and significant_branches <= 1 and not has_versioned:
+            return "palmier"
+
+        # Conifère : pipeline avec plusieurs stages subordonnés
         return "conifere"
 
-    if has_versioned_files and n_core_dirs >= 1:
-        return "conifere"
+    # ── Q4 : Modules parallèles ? ──
+    has_parallel_modules = n_branches >= 3 or n_core_dirs >= 2
 
-    # Conifère : beaucoup de hits pipeline (trading algos, bots, etc.)
-    if pipeline_hits >= 5 and n_branches >= 2:
-        return "conifere"
+    if has_parallel_modules:
+        # ── Q5 : Modules interdépendants ? ──
+        #
+        # FEUILLU (ISA Arboriculture, Virginia Tech) :
+        #   F2: LATERAL_COMPETITION — branches rivalisent avec le leader
+        #   F4: CO_DOMINANCE_RISK — modules connectés, risque de rupture
+        #   → Modules qui s'importent mutuellement, base commune
+        #
+        # BUISSON (U. Minnesota, Iowa State) :
+        #   S1: NO_CENTRAL_TRUNK — pas de module principal
+        #   S2: REDUNDANCY_IS_RESILIENCE — si un meurt, les autres vivent
+        #   → Outils indépendants, pas de cross-imports
 
-    # Conifère : structure séquentielle — peu de core dirs mais profonds
-    # Ex: src/ avec des sous-dossiers ordonnés (data→process→output)
-    if n_core_dirs == 1 and core_lines > peripheral_lines and n_branches >= 3:
-        # Un seul cœur dominant avec des branches = pipeline linéaire
-        if pipeline_hits >= 2:
-            return "conifere"
+        # Avec imports : cross-imports prouvent l'interdépendance
+        if has_imports:
+            if cross_branch_imports >= 2 or max_hub >= 3:
+                return "feuillu"
+            if n_files_with_imports <= 1 and n_branches >= 3:
+                return "buisson"
 
-    # Feuillu : app mobile / Flutter (multi-plateformes parallèles)
-    if is_mobile_app and n_branches >= 3:
-        return "feuillu"
-
-    # ── Diversité linguistique → buisson ──
-    # Si les branches top-level parlent 3+ langages différents,
-    # ce sont des projets indépendants, pas un codebase unifié
-    branch_langs = set()
-    REAL_CORE_DIRS = {"src", "lib", "core", "app", "pkg", "internal", "modules",
-                      "engine", "api", "server", "services"}
-    has_real_core = bool(REAL_CORE_DIRS & all_dirs_lower)
-
-    for dirname, info in top_dirs.items():
-        if info.get("langs"):
-            branch_langs.update(info["langs"])
-        elif isinstance(info, dict):
-            # Reconstruct from files if langs not tracked
-            pass
-
-    # 3+ langages dans les branches + pas de vrai dossier core = buisson
-    if len(branch_langs) >= 3 and not has_real_core and n_branches >= 3:
-        return "buisson"
-
-    # Feuillu : multi-modules cœur parallèles (vrais core dirs)
-    if n_core_dirs >= 2 and core_lines > peripheral_lines and has_real_core:
-        return "feuillu"
-
-    # Feuillu : multi-modules cœur même si imports pas dispo
-    if n_core_dirs >= 2 and has_real_core:
-        return "feuillu"
-
-    # Sans vrais core dirs, si beaucoup de branches = buisson
-    if n_branches >= 3 and not has_real_core:
-        return "buisson"
-
-    # Buisson : que des scripts indépendants, pas de cœur
-    if has_dominant_scripts:
-        return "buisson"
-
-    # Buisson : imports absents + beaucoup de branches sans structure dominante
-    if not has_imports and n_files_with_imports <= 1 and n_branches >= 3:
-        # Avant de déclarer buisson, checker si y'a des signaux conifère/feuillu
-        if pipeline_hits >= 3:
-            return "conifere"
-        if is_mobile_app:
+        # App framework intégré = modules interdépendants par design
+        # (Flutter/React app : lib/ screens dépendent de lib/ services)
+        if is_flutter and has_shared_core:
             return "feuillu"
-        if core_lines > 0 and n_core_dirs >= 1:
+
+        # Convention de nommage partagée = même produit = interdépendant
+        # Ex: "infernal-app", "infernal-migration" → préfixe commun = même système
+        dir_names = [d.lower() for d in top_dirs.keys() if top_dirs[d].get("lines", 0) > 0]
+        if len(dir_names) >= 2:
+            for i, d1 in enumerate(dir_names):
+                for d2 in dir_names[i+1:]:
+                    # Préfixe commun d'au moins 4 caractères
+                    prefix = os.path.commonprefix([d1, d2])
+                    if len(prefix) >= 4:
+                        return "feuillu"
+
+        # Shared core dir (lib/, src/, core/) = architecture unifiée → feuillu
+        if has_shared_core and core_lines > peripheral_lines:
             return "feuillu"
+
+        # Multi core dirs vrais (src/ + lib/, etc.) = feuillu
+        real_core = {"src", "lib", "core", "app"} & all_dirs_lower
+        if len(real_core) >= 2:
+            return "feuillu"
+
+        # Pas de core partagé, que du périphérique = outils indépendants → buisson
+        if not has_shared_core and core_lines == 0:
+            return "buisson"
+
+        # Pas d'indice d'interdépendance → buisson par défaut
+        # (S2: "si un composant meurt, les autres continuent")
         return "buisson"
 
-    # Buisson : que des fichiers périphériques
-    if core_lines == 0 and peripheral_lines > 0 and n_branches >= 5:
-        return "buisson"
+    # ── Pas de pipeline, pas de modules parallèles ──
+    # Peu de branches = projet simple
 
-    # Fallback intelligent
-    if n_branches >= 6 and core_lines == 0:
-        return "buisson"
+    # Palmier si très petit/simple
+    if n_branches <= 1:
+        return "palmier"
 
+    # Fallback : feuillu (Q6 NON → feuillu par défaut)
     return "feuillu"
 
 

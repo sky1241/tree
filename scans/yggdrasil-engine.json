@@ -4,7 +4,7 @@
   "family": "conifere",
   "family_name": "Conifère",
   "family_emoji": "🌲",
-  "date": "2026-02-24T23:10:10.450154",
+  "date": "2026-02-24T23:26:19.228931",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/yggdrasil-engine",
   "scale": {
@@ -12,7 +12,7 @@
     "factor": 2.08,
     "category": "géant",
     "height_px": 614,
-    "data_mb": 3.2481307983398438,
+    "data_mb": 3.3311386108398438,
     "density": 1.1,
     "trunk_width": 1.1,
     "data_category": "léger",
@@ -21,7 +21,7 @@
   "stats": {
     "total_files": 251,
     "total_code_lines": 92209,
-    "data_weight_mb": 3.2,
+    "data_weight_mb": 3.3,
     "languages": {
       "HTML": 67177,
       "Python": 25014,
@@ -202,7 +202,7 @@
     {
       "id": "B5",
       "level": "B",
-      "label": "hooks/ (2f, ~18L, Shell, PowerShell)",
+      "label": "hooks/ (2f, ~18L, PowerShell, Shell)",
       "status": "done",
       "entry": "hooks/",
       "depends": [],

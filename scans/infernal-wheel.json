@@ -1,10 +1,10 @@
 {
   "idea": "[scanned] infernal-wheel",
   "domain": "audio",
-  "family": "buisson",
-  "family_name": "Buisson",
-  "family_emoji": "🌿",
-  "date": "2026-02-24T23:10:11.774764",
+  "family": "feuillu",
+  "family_name": "Feuillu",
+  "family_emoji": "🍁",
+  "date": "2026-02-24T23:26:20.389036",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/infernal-wheel",
   "scale": {
@@ -139,7 +139,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "infernal-app/ (43f, ~5234L, C++, Dart)",
+      "label": "infernal-app/ (43f, ~5234L, C/C++ header, Dart)",
       "status": "done",
       "entry": "infernal-app/",
       "depends": [],
@@ -179,7 +179,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "trilateration/ (22f, ~5160L, Swift, Kotlin)",
+      "label": "trilateration/ (22f, ~5160L, Python, Swift)",
       "status": "done",
       "entry": "trilateration/",
       "depends": [],
@@ -271,15 +271,24 @@
     },
     {
       "phase": 2,
-      "name": "Tiges — lancer en parallèle",
+      "name": "Tronc — core minimal",
+      "ids": [
+        "T1"
+      ],
+      "action": "Core minimal — il va perdre la dominance face aux branches",
+      "bio": "Le tronc du feuillu se perd parmi les branches (forme décurrente)"
+    },
+    {
+      "phase": 3,
+      "name": "Branches — modules en parallèle",
       "ids": [
         "B1",
         "B2",
         "B3",
         "B4"
       ],
-      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
-      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+      "action": "Modules en parallèle — SURVEILLER la co-dominance",
+      "bio": "⚠️ Si une branche dépasse le tronc = risque de rupture"
     },
     {
       "phase": 4,

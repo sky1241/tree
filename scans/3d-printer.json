@@ -1,10 +1,10 @@
 {
   "idea": "[scanned] 3d-printer",
   "domain": "hardware_3d",
-  "family": "baobab",
-  "family_name": "Baobab",
-  "family_emoji": "🌳",
-  "date": "2026-02-24T23:10:12.316817",
+  "family": "feuillu",
+  "family_name": "Feuillu",
+  "family_emoji": "🍁",
+  "date": "2026-02-24T23:26:20.779832",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/3d-printer",
   "scale": {
@@ -99,7 +99,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "tests/ (4f, ~1193L, JavaScript, Python)",
+      "label": "tests/ (4f, ~1193L, Python, JavaScript)",
       "status": "done",
       "entry": "tests/",
       "depends": [],
@@ -150,23 +150,23 @@
     },
     {
       "phase": 2,
-      "name": "Tronc — core engine MASSIF",
+      "name": "Tronc — core minimal",
       "ids": [
         "T1"
       ],
-      "action": "Construire et CONSOLIDER le core avant toute extension",
-      "bio": "Le baobab met toute son énergie dans le tronc d'abord"
+      "action": "Core minimal — il va perdre la dominance face aux branches",
+      "bio": "Le tronc du feuillu se perd parmi les branches (forme décurrente)"
     },
     {
       "phase": 3,
-      "name": "Branches — petites extensions",
+      "name": "Branches — modules en parallèle",
       "ids": [
         "B1",
         "B2",
         "B3"
       ],
-      "action": "Extensions petites — ne pas rivaliser avec le tronc",
-      "bio": "Les branches du baobab sont fines comparées au tronc massif"
+      "action": "Modules en parallèle — SURVEILLER la co-dominance",
+      "bio": "⚠️ Si une branche dépasse le tronc = risque de rupture"
     },
     {
       "phase": 5,

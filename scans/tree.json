@@ -4,15 +4,15 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-24T23:10:16.327695",
+  "date": "2026-02-24T23:26:24.478642",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/tree",
   "scale": {
-    "lines": 13360,
+    "lines": 13385,
     "factor": 1.53,
     "category": "grand arbre",
     "height_px": 504,
-    "data_mb": 216.1641845703125,
+    "data_mb": 216.1632308959961,
     "density": 1.64,
     "trunk_width": 1.64,
     "data_category": "dense",
@@ -20,17 +20,17 @@
   },
   "stats": {
     "total_files": 140,
-    "total_code_lines": 13360,
+    "total_code_lines": 13385,
     "data_weight_mb": 216.2,
     "languages": {
-      "Python": 7962,
+      "Python": 7987,
       "HTML": 5025,
       "PowerShell": 367,
       "Shell": 6
     },
     "biggest_file": {
       "path": "scripts/engine.py",
-      "lines": 4760,
+      "lines": 4785,
       "lang": "Python"
     }
   },
@@ -60,7 +60,7 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Python (7962 lignes)",
+      "label": "Langage principal : Python (7987 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -82,7 +82,7 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : scripts/engine.py (~4760L, Python)",
+      "label": "Core : scripts/engine.py (~4785L, Python)",
       "status": "done",
       "entry": "scripts/engine.py",
       "depends": [],
@@ -92,7 +92,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "scripts/ (7f, ~6270L, PowerShell, Python)",
+      "label": "scripts/ (7f, ~6295L, PowerShell, Python)",
       "status": "done",
       "entry": "scripts/",
       "depends": [],
@@ -112,7 +112,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "hooks/ (3f, ~89L, Shell, PowerShell)",
+      "label": "hooks/ (3f, ~89L, PowerShell, Shell)",
       "status": "done",
       "entry": "hooks/",
       "depends": [],
