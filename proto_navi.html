@@ -96,81 +96,81 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
   box-shadow:inset 0 0 8px rgba(0,255,220,.1);
 }
 
-/* === 6 AILES — 3 de chaque côté, éventail === */
+/* === 6 AILES — éventail vertical, bien réparties === */
 
-/* GAUCHE — Grande (haut) */
+/* GAUCHE — Grande (HAUT, au-dessus de la boule) */
 .wing-tl{
-  width:50px;height:13px;
-  transform-origin:95% 85%;
-  transform:translate(-90%,-20px) rotate(-50deg);
+  width:52px;height:13px;
+  transform-origin:95% 95%;
+  transform:translate(-85%,-28px) rotate(-60deg);
   animation:flap-g .10s ease-in-out infinite alternate;
 }
-/* GAUCHE — Moyenne (milieu) */
+/* GAUCHE — Moyenne (MILIEU, à côté de la boule) */
 .wing-ml{
-  width:42px;height:11px;
-  transform-origin:95% 80%;
-  transform:translate(-88%,-8px) rotate(-25deg);
+  width:44px;height:11px;
+  transform-origin:95% 50%;
+  transform:translate(-92%,-2px) rotate(-15deg);
   animation:flap-m .12s ease-in-out infinite alternate;
 }
-/* GAUCHE — Petite (bas) */
+/* GAUCHE — Petite (BAS, sous la boule) */
 .wing-bl{
-  width:30px;height:9px;
-  transform-origin:95% 70%;
-  transform:translate(-85%,4px) rotate(-5deg);
+  width:32px;height:9px;
+  transform-origin:95% 10%;
+  transform:translate(-85%,22px) rotate(25deg);
   animation:flap-p .14s ease-in-out infinite alternate;
 }
 
-/* DROITE — Grande (haut) */
+/* DROITE — Grande (HAUT) */
 .wing-tr{
-  width:50px;height:13px;
-  transform-origin:5% 85%;
+  width:52px;height:13px;
+  transform-origin:5% 95%;
   border-radius:80% 80% 60% 60%;
-  transform:translate(-10%,-20px) rotate(50deg);
+  transform:translate(-15%,-28px) rotate(60deg);
   animation:flap-g-r .10s ease-in-out infinite alternate;
 }
-/* DROITE — Moyenne (milieu) */
+/* DROITE — Moyenne (MILIEU) */
 .wing-mr{
-  width:42px;height:11px;
-  transform-origin:5% 80%;
+  width:44px;height:11px;
+  transform-origin:5% 50%;
   border-radius:80% 80% 60% 60%;
-  transform:translate(-12%,-8px) rotate(25deg);
+  transform:translate(-8%,-2px) rotate(15deg);
   animation:flap-m-r .12s ease-in-out infinite alternate;
 }
-/* DROITE — Petite (bas) */
+/* DROITE — Petite (BAS) */
 .wing-br{
-  width:30px;height:9px;
-  transform-origin:5% 70%;
+  width:32px;height:9px;
+  transform-origin:5% 10%;
   border-radius:80% 80% 60% 60%;
-  transform:translate(-15%,4px) rotate(5deg);
+  transform:translate(-15%,22px) rotate(-25deg);
   animation:flap-p-r .14s ease-in-out infinite alternate;
 }
 
-/* Grandes — battement ample */
+/* Grandes — battement ample vers le haut */
 @keyframes flap-g{
-  from{transform:translate(-90%,-20px) rotate(-50deg) scaleY(1)}
-  to{transform:translate(-90%,-20px) rotate(-65deg) scaleY(.5)}
+  from{transform:translate(-85%,-28px) rotate(-60deg) scaleY(1)}
+  to{transform:translate(-85%,-28px) rotate(-78deg) scaleY(.45)}
 }
 @keyframes flap-g-r{
-  from{transform:translate(-10%,-20px) rotate(50deg) scaleY(1)}
-  to{transform:translate(-10%,-20px) rotate(65deg) scaleY(.5)}
+  from{transform:translate(-15%,-28px) rotate(60deg) scaleY(1)}
+  to{transform:translate(-15%,-28px) rotate(78deg) scaleY(.45)}
 }
-/* Moyennes — battement moyen, légèrement déphasé */
+/* Moyennes — battement horizontal */
 @keyframes flap-m{
-  from{transform:translate(-88%,-8px) rotate(-25deg) scaleY(1)}
-  to{transform:translate(-88%,-8px) rotate(-42deg) scaleY(.5)}
+  from{transform:translate(-92%,-2px) rotate(-15deg) scaleY(1)}
+  to{transform:translate(-92%,-2px) rotate(-30deg) scaleY(.5)}
 }
 @keyframes flap-m-r{
-  from{transform:translate(-12%,-8px) rotate(25deg) scaleY(1)}
-  to{transform:translate(-12%,-8px) rotate(42deg) scaleY(.5)}
+  from{transform:translate(-8%,-2px) rotate(15deg) scaleY(1)}
+  to{transform:translate(-8%,-2px) rotate(30deg) scaleY(.5)}
 }
-/* Petites — battement rapide subtil */
+/* Petites — battement vers le bas */
 @keyframes flap-p{
-  from{transform:translate(-85%,4px) rotate(-5deg) scaleY(1)}
-  to{transform:translate(-85%,4px) rotate(-22deg) scaleY(.5)}
+  from{transform:translate(-85%,22px) rotate(25deg) scaleY(1)}
+  to{transform:translate(-85%,22px) rotate(40deg) scaleY(.5)}
 }
 @keyframes flap-p-r{
-  from{transform:translate(-15%,4px) rotate(5deg) scaleY(1)}
-  to{transform:translate(-15%,4px) rotate(22deg) scaleY(.5)}
+  from{transform:translate(-15%,22px) rotate(-25deg) scaleY(1)}
+  to{transform:translate(-15%,22px) rotate(-40deg) scaleY(.5)}
 }
 
 /* particles */
