@@ -96,52 +96,52 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
   box-shadow:inset 0 0 8px rgba(0,255,220,.1);
 }
 
-/* Haut-gauche — GRANDE, inclinée en arrière */
+/* Haut-gauche — GRANDE, monte en V élégant */
 .wing-tl{
-  width:52px;height:14px;
-  transform-origin:100% 100%;
-  transform:translate(-95%,-18px) rotate(-55deg);
+  width:48px;height:13px;
+  transform-origin:95% 90%;
+  transform:translate(-90%,-16px) rotate(-40deg);
   animation:flap-long .11s ease-in-out infinite alternate;
 }
-/* Haut-droite — GRANDE, inclinée en arrière */
+/* Haut-droite — GRANDE, monte en V élégant */
 .wing-tr{
-  width:52px;height:14px;
-  transform-origin:0% 100%;
+  width:48px;height:13px;
+  transform-origin:5% 90%;
   border-radius:80% 80% 60% 60%;
-  transform:translate(-5%,-18px) rotate(55deg);
+  transform:translate(-10%,-16px) rotate(40deg);
   animation:flap-long-r .11s ease-in-out infinite alternate;
 }
-/* Bas-gauche — PETITE, inclinée en arrière */
+/* Bas-gauche — PETITE, suit le V un peu plus bas */
 .wing-bl{
-  width:38px;height:11px;
-  transform-origin:100% 100%;
-  transform:translate(-95%,-6px) rotate(-45deg);
+  width:34px;height:10px;
+  transform-origin:95% 70%;
+  transform:translate(-90%,-4px) rotate(-28deg);
   animation:flap-short .13s ease-in-out infinite alternate;
 }
-/* Bas-droite — PETITE, inclinée en arrière */
+/* Bas-droite — PETITE, suit le V un peu plus bas */
 .wing-br{
-  width:38px;height:11px;
-  transform-origin:0% 100%;
+  width:34px;height:10px;
+  transform-origin:5% 70%;
   border-radius:80% 80% 60% 60%;
-  transform:translate(-5%,-6px) rotate(45deg);
+  transform:translate(-10%,-4px) rotate(28deg);
   animation:flap-short-r .13s ease-in-out infinite alternate;
 }
 
 @keyframes flap-long{
-  from{transform:translate(-95%,-18px) rotate(-55deg) scaleX(1)}
-  to{transform:translate(-95%,-18px) rotate(-70deg) scaleX(.6)}
+  from{transform:translate(-90%,-16px) rotate(-40deg) scaleY(1)}
+  to{transform:translate(-90%,-16px) rotate(-60deg) scaleY(.55)}
 }
 @keyframes flap-long-r{
-  from{transform:translate(-5%,-18px) rotate(55deg) scaleX(1)}
-  to{transform:translate(-5%,-18px) rotate(70deg) scaleX(.6)}
+  from{transform:translate(-10%,-16px) rotate(40deg) scaleY(1)}
+  to{transform:translate(-10%,-16px) rotate(60deg) scaleY(.55)}
 }
 @keyframes flap-short{
-  from{transform:translate(-95%,-6px) rotate(-45deg) scaleX(1)}
-  to{transform:translate(-95%,-6px) rotate(-62deg) scaleX(.5)}
+  from{transform:translate(-90%,-4px) rotate(-28deg) scaleY(1)}
+  to{transform:translate(-90%,-4px) rotate(-48deg) scaleY(.45)}
 }
 @keyframes flap-short-r{
-  from{transform:translate(-5%,-6px) rotate(45deg) scaleX(1)}
-  to{transform:translate(-5%,-6px) rotate(62deg) scaleX(.5)}
+  from{transform:translate(-10%,-4px) rotate(28deg) scaleY(1)}
+  to{transform:translate(-10%,-4px) rotate(48deg) scaleY(.45)}
 }
 
 /* particles */
