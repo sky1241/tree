@@ -9,94 +9,152 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor:crosshair;width:100vw;height:100vh}
 
-/* ══════ TREE IMAGE ══════ */
 #tree-img{position:absolute;object-fit:contain;z-index:1}
 #tree-img.hidden{display:none}
-
-/* fallback: draw nodes on dark bg */
 #fallback-canvas{position:absolute;top:0;left:0;z-index:0}
 
-/* ══════ NODE HITBOXES ══════ */
 .node-dot{
   position:absolute;width:28px;height:28px;border-radius:50%;
-  cursor:pointer;transform:translate(-50%,-50%);z-index:10;
-  transition:all .2s ease;
+  cursor:pointer;transform:translate(-50%,-50%);z-index:10;transition:all .2s ease;
 }
 .node-dot::after{
   content:attr(data-label);position:absolute;bottom:-16px;left:50%;
   transform:translateX(-50%);font-family:'Orbitron',sans-serif;
-  font-size:8px;color:rgba(0,220,255,.5);white-space:nowrap;
-  opacity:0;transition:opacity .2s;
+  font-size:8px;color:rgba(0,220,255,.5);white-space:nowrap;opacity:0;transition:opacity .2s;
 }
 .node-dot:hover::after{opacity:1}
 .node-dot:hover{transform:translate(-50%,-50%) scale(1.4);filter:brightness(1.5)}
 .node-dot.active{transform:translate(-50%,-50%) scale(1.6);filter:brightness(2)}
 
-/* ══════ NAVI ══════ */
-#navi{position:fixed;z-index:500;pointer-events:none;width:60px;height:60px;transform:translate(-50%,-50%)}
+/* ══════════════════════════════════════
+   ✨ NAVI — THE REAL ONE ✨
+   Grosse boule lumineuse + ailes libellule
+   ══════════════════════════════════════ */
+#navi{
+  position:fixed;z-index:500;pointer-events:none;
+  width:120px;height:120px;
+  transform:translate(-50%,-50%);
+}
 
-.navi-core{
+/* === BOULE LUMINEUSE PRINCIPALE === */
+.orb{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:18px;height:18px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%, #ffffff 0%, #b0ffee 25%, #00e8c0 50%, #0088ff 80%, transparent 100%);
+  animation:orb-pulse .8s ease-in-out infinite;
+}
+
+/* Glow layers — 3 couches pour l'effet "boule de lumière" */
+.glow1{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:12px;height:12px;border-radius:50%;
-  background:radial-gradient(circle at 35% 35%,#fff,#00ffd5,#0088ff);
-  box-shadow:0 0 15px #00ffc8,0 0 35px #00aaff88,0 0 60px #0055ff44;
-  animation:core-pulse 1s ease infinite;
+  width:40px;height:40px;border-radius:50%;
+  background:radial-gradient(circle, rgba(0,255,210,.5) 0%, rgba(0,200,255,.2) 40%, transparent 70%);
+  animation:glow-breathe 1.2s ease-in-out infinite;
 }
-@keyframes core-pulse{
-  0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 15px #00ffc8,0 0 35px #00aaff88}
-  50%{transform:translate(-50%,-50%) scale(1.2);box-shadow:0 0 25px #00ffc8,0 0 50px #00aaffbb,0 0 70px #0055ff66}
+.glow2{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:70px;height:70px;border-radius:50%;
+  background:radial-gradient(circle, rgba(0,255,220,.15) 0%, rgba(0,150,255,.08) 40%, transparent 65%);
+  animation:glow-breathe 1.2s ease-in-out infinite .3s;
 }
-
-/* 4 AILES — battement rapide comme un colibri */
-.w{position:absolute;top:50%;left:50%;opacity:.55}
-
-.w1{/* haut-gauche */
-  width:20px;height:14px;border-radius:60% 60% 40% 10%;
-  transform-origin:100% 100%;
-  background:linear-gradient(140deg,rgba(0,255,210,.7),rgba(0,150,255,.1));
-  border:1px solid rgba(0,255,210,.35);
-  transform:translate(-100%,-100%) rotate(-15deg);
-  animation:flap1 .12s ease-in-out infinite alternate;
-}
-.w2{/* haut-droite */
-  width:20px;height:14px;border-radius:60% 60% 10% 40%;
-  transform-origin:0% 100%;
-  background:linear-gradient(40deg,rgba(0,150,255,.1),rgba(0,255,210,.7));
-  border:1px solid rgba(0,255,210,.35);
-  transform:translate(0%,-100%) rotate(15deg);
-  animation:flap2 .12s ease-in-out infinite alternate;
-}
-.w3{/* bas-gauche */
-  width:15px;height:10px;border-radius:50% 50% 30% 10%;
-  transform-origin:100% 0%;
-  background:linear-gradient(140deg,rgba(0,255,190,.45),transparent);
-  border:1px solid rgba(0,255,190,.25);
-  transform:translate(-100%,2px) rotate(8deg);
-  animation:flap3 .14s ease-in-out infinite alternate;
-}
-.w4{/* bas-droite */
-  width:15px;height:10px;border-radius:50% 50% 10% 30%;
-  transform-origin:0% 0%;
-  background:linear-gradient(40deg,transparent,rgba(0,255,190,.45));
-  border:1px solid rgba(0,255,190,.25);
-  transform:translate(0%,2px) rotate(-8deg);
-  animation:flap4 .14s ease-in-out infinite alternate;
+.glow3{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:110px;height:110px;border-radius:50%;
+  background:radial-gradient(circle, rgba(0,255,200,.06) 0%, rgba(0,100,255,.03) 40%, transparent 60%);
+  animation:glow-breathe 1.2s ease-in-out infinite .6s;
 }
 
-@keyframes flap1{from{transform:translate(-100%,-100%) rotate(-15deg) scaleX(1)}to{transform:translate(-100%,-100%) rotate(-45deg) scaleX(.5)}}
-@keyframes flap2{from{transform:translate(0%,-100%) rotate(15deg) scaleX(1)}to{transform:translate(0%,-100%) rotate(45deg) scaleX(.5)}}
-@keyframes flap3{from{transform:translate(-100%,2px) rotate(8deg) scaleX(1)}to{transform:translate(-100%,2px) rotate(30deg) scaleX(.4)}}
-@keyframes flap4{from{transform:translate(0%,2px) rotate(-8deg) scaleX(1)}to{transform:translate(0%,2px) rotate(-30deg) scaleX(.4)}}
+@keyframes orb-pulse{
+  0%,100%{transform:translate(-50%,-50%) scale(1);
+    box-shadow:0 0 15px #00ffd5, 0 0 30px #00ccff88, 0 0 5px #fff}
+  50%{transform:translate(-50%,-50%) scale(1.3);
+    box-shadow:0 0 25px #00ffd5, 0 0 50px #00ccffaa, 0 0 80px #0066ff44, 0 0 8px #fff}
+}
+@keyframes glow-breathe{
+  0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.8}
+  50%{transform:translate(-50%,-50%) scale(1.2);opacity:1}
+}
 
-/* trail particles */
+/* === AILES LIBELLULE — longues, fines, transparentes === */
+.wing{
+  position:absolute;top:50%;left:50%;
+  /* forme allongée libellule */
+  border-radius:80% 80% 60% 60%;
+  opacity:.35;
+  /* reflets irisés */
+  background:linear-gradient(
+    120deg,
+    rgba(0,255,220,.15) 0%,
+    rgba(100,200,255,.25) 30%,
+    rgba(180,220,255,.15) 50%,
+    rgba(0,255,200,.2) 70%,
+    rgba(0,180,255,.1) 100%
+  );
+  border:1px solid rgba(180,240,255,.2);
+  /* nervures */
+  box-shadow:inset 0 0 8px rgba(0,255,220,.1);
+}
+
+/* Haut-gauche — LONGUE */
+.wing-tl{
+  width:52px;height:16px;
+  transform-origin:100% 80%;
+  transform:translate(-100%,-12px) rotate(-18deg);
+  animation:flap-long .11s ease-in-out infinite alternate;
+}
+/* Haut-droite — LONGUE */
+.wing-tr{
+  width:52px;height:16px;
+  transform-origin:0% 80%;
+  border-radius:80% 80% 60% 60%;
+  transform:translate(0%,-12px) rotate(18deg);
+  animation:flap-long-r .11s ease-in-out infinite alternate;
+}
+/* Bas-gauche — un peu plus courte */
+.wing-bl{
+  width:38px;height:12px;
+  transform-origin:100% 20%;
+  transform:translate(-100%,4px) rotate(8deg);
+  animation:flap-short .13s ease-in-out infinite alternate;
+}
+/* Bas-droite — un peu plus courte */
+.wing-br{
+  width:38px;height:12px;
+  transform-origin:0% 20%;
+  border-radius:80% 80% 60% 60%;
+  transform:translate(0%,4px) rotate(-8deg);
+  animation:flap-short-r .13s ease-in-out infinite alternate;
+}
+
+@keyframes flap-long{
+  from{transform:translate(-100%,-12px) rotate(-18deg) scaleY(1)}
+  to{transform:translate(-100%,-12px) rotate(-50deg) scaleY(.5)}
+}
+@keyframes flap-long-r{
+  from{transform:translate(0%,-12px) rotate(18deg) scaleY(1)}
+  to{transform:translate(0%,-12px) rotate(50deg) scaleY(.5)}
+}
+@keyframes flap-short{
+  from{transform:translate(-100%,4px) rotate(8deg) scaleY(1)}
+  to{transform:translate(-100%,4px) rotate(35deg) scaleY(.4)}
+}
+@keyframes flap-short-r{
+  from{transform:translate(0%,4px) rotate(-8deg) scaleY(1)}
+  to{transform:translate(0%,4px) rotate(-35deg) scaleY(.4)}
+}
+
+/* particles */
 .spark{position:fixed;border-radius:50%;pointer-events:none;z-index:499}
 
-/* "Hey! Écoute!" */
+/* ══════ HEY! LISTEN! ══════ */
 #hey{
   position:fixed;z-index:501;pointer-events:none;
-  font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;
-  color:#00ffcc;text-shadow:0 0 12px #00ffcc,0 0 25px #00aaff;
-  opacity:0;transition:opacity .3s;white-space:nowrap;letter-spacing:1px;
+  font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;
+  color:#00ffcc;
+  text-shadow:0 0 8px #00ffcc, 0 0 20px #00aaff, 0 0 40px #0066ff88;
+  opacity:0;white-space:nowrap;letter-spacing:2px;
+  transition:opacity .15s;
 }
 
 /* ══════ HOLOGRAM PANEL ══════ */
@@ -132,8 +190,7 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
 
 .aib{
   background:rgba(0,220,255,.04);border:1px solid rgba(0,220,255,.18);
-  border-radius:3px;padding:10px 14px;margin-bottom:8px;cursor:pointer;
-  transition:all .2s;
+  border-radius:3px;padding:10px 14px;margin-bottom:8px;cursor:pointer;transition:all .2s;
 }
 .aib:hover{background:rgba(0,220,255,.1);border-color:rgba(0,220,255,.45)}
 .aib .pr{font-size:13.5px;color:#00dcff;font-style:italic;line-height:1.5}
@@ -151,28 +208,29 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
 }
 #xbtn:hover{background:rgba(0,220,255,.12);border-color:#00dcff}
 
-.pf.on{animation:flicker .25s ease}
+.pf.flick{animation:flicker .25s ease}
 @keyframes flicker{0%{opacity:0}20%{opacity:.8}40%{opacity:.2}60%{opacity:.9}80%{opacity:.5}100%{opacity:1}}
 
-/* scanlines */
 .scan{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:600}
 </style>
 </head>
 <body>
 
-<!-- tree bg — tries local image, fallback = canvas -->
 <img id="tree-img" class="hidden" />
 <canvas id="fallback-canvas"></canvas>
 
-<!-- NAVI FAIRY -->
+<!-- ✨ NAVI — boule lumineuse + 4 ailes libellule ✨ -->
 <div id="navi">
-  <div class="w w1"></div>
-  <div class="w w2"></div>
-  <div class="w w3"></div>
-  <div class="w w4"></div>
-  <div class="navi-core"></div>
+  <div class="glow3"></div>
+  <div class="glow2"></div>
+  <div class="glow1"></div>
+  <div class="wing wing-tl"></div>
+  <div class="wing wing-tr"></div>
+  <div class="wing wing-bl"></div>
+  <div class="wing wing-br"></div>
+  <div class="orb"></div>
 </div>
-<div id="hey">Hey!&nbsp;Écoute!</div>
+<div id="hey">Hey!&nbsp;Listen!</div>
 
 <!-- PANEL -->
 <div id="panel">
@@ -195,12 +253,9 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
 <div class="scan"></div>
 
 <script>
-// ══════════════════════════════════════════
-// DATA
-// ══════════════════════════════════════════
 const L={
   T:{n:'CIME — La Vision',c:'#5a9a35',
-    d:"C'est le sommet de ton projet. La cime. C'est là que tu définis CE QUE ton app fait, en une phrase. Si tu peux pas l'expliquer en une phrase, c'est pas encore clair dans ta tête.",
+    d:"C'est le sommet de ton projet. La cime. C'est là que tu définis CE QUE ton app fait, en une phrase. Si tu peux pas l'expliquer en une phrase, c'est pas encore clair.",
     t:"Écris une phrase qui résume ton projet. Genre: 'Une app qui affiche mes repos GitHub comme un arbre qui pousse.' C'est ta boussole.",
     p:["Aide-moi à résumer mon projet en une phrase claire","Quel est l'objectif principal de mon application ?","Explique-moi la vision de mon projet comme si j'avais 10 ans"]},
   B:{n:'BRANCHES — Les Grosses Features',c:'#3d8a3a',
@@ -209,34 +264,34 @@ const L={
     p:["Quelles sont les 3 features principales de mon projet ?","Aide-moi à découper mon projet en gros blocs","C'est quoi le MVP minimum de mon app ?"]},
   b:{n:'RAMEAUX — Les Sous-Features',c:'#389060',
     d:"Les rameaux c'est quand tu prends une grosse branche et tu la découpes en morceaux plus petits. Chaque rameau = une tâche faisable en une session.",
-    t:"Prends chaque feature et découpe-la en 2-3 sous-tâches. Genre: 'Afficher un arbre' → 'charger l'image', 'placer les nœuds', 'dessiner les câbles'.",
+    t:"Prends chaque feature et découpe-la en 2-3 sous-tâches. Des trucs faisables en une après-midi.",
     p:["Découpe cette feature en sous-tâches concrètes","Par quoi je commence pour coder cette partie ?","Quelles sont les étapes pour implémenter ça ?"]},
   F:{n:'FEUILLES — Le Code',c:'#32b555',
     d:"Les feuilles c'est là où le code vit. Chaque feuille = un fichier, une fonction, un composant. C'est ici que toi et l'IA vous bossez ensemble.",
-    t:"C'est le moment de coder. Décris à l'IA ce que tu veux, et laisse-la t'aider. Chaque feuille finie = un bout de vert sur ton arbre.",
+    t:"C'est le moment de coder. Décris à l'IA ce que tu veux et laisse-la t'aider. Chaque feuille finie = un bout de vert sur ton arbre.",
     p:["Écris-moi le code pour cette fonction","J'ai cette erreur, aide-moi à comprendre","Comment je structure ce fichier ?"]},
   C:{n:'CŒUR — Le Tronc',c:'#28c862',
-    d:"Le cœur c'est le tronc. Le fichier principal, le point d'entrée. C'est ton main.dart, ton app.py, ton index.js. Sans ça, rien tient debout.",
-    t:"Assure-toi que ton point d'entrée est propre. C'est le premier fichier que quelqu'un ouvre. Il doit être clair.",
+    d:"Le cœur c'est le tronc. Le fichier principal, le point d'entrée. C'est ton main.dart, ton app.py, ton index.js.",
+    t:"Assure-toi que ton point d'entrée est propre. C'est le premier fichier que quelqu'un ouvre.",
     p:["Structure-moi le fichier principal de mon projet","Comment organiser mes imports et mes routes ?","Fais-moi un squelette propre pour démarrer"]},
   'R-1':{n:'RACINE 1 — Setup & Config',c:'#9a7453',
-    d:"Première couche de racines. Le setup: dépendances, environnement, repo Git. C'est pas sexy mais sans ça RIEN pousse au-dessus.",
-    t:"Crée ton repo, installe tes packages, configure ton linter. Fais que quand tu tapes 'run' ça démarre.",
+    d:"Première couche de racines. Le setup: dépendances, environnement, repo Git. Sans ça RIEN pousse au-dessus.",
+    t:"Crée ton repo, installe tes packages. Fais que quand tu tapes 'run' ça démarre.",
     p:["Crée-moi le setup complet pour un projet Flutter/Python","Quelles dépendances j'ai besoin ?","Configure-moi le pubspec.yaml / requirements.txt"]},
   'R-2':{n:'RACINE 2 — Données & Modèles',c:'#8a6344',
-    d:"Deuxième couche. Tu définis tes données ici. Quels objets ton app manipule ? C'est les classes, les modèles, les schémas.",
-    t:"Dessine tes modèles. Même sur papier. Un User a un nom, un email. Ensuite demande à l'IA de les coder.",
+    d:"Tu définis tes données ici. Quels objets ton app manipule ? C'est les classes, les modèles, les schémas.",
+    t:"Dessine tes modèles. Même sur papier. Ensuite demande à l'IA de les coder.",
     p:["Crée-moi les modèles de données pour mon app","Comment je structure ma classe en Dart/Python ?","Fais-moi un schéma JSON pour mes données"]},
   'R-3':{n:'RACINE 3 — API & Services',c:'#7a5235',
-    d:"Troisième couche. Ton app parle au monde extérieur ici. API, base de données, fichiers — la plomberie qui connecte au monde réel.",
-    t:"Connecte ton app à ses sources de données. Teste que les données arrivent. Même brutes, tant que ça arrive.",
+    d:"Ton app parle au monde extérieur ici. API, base de données, fichiers — la plomberie.",
+    t:"Connecte ton app à ses sources de données. Teste que les données arrivent.",
     p:["Comment je fais un appel API à ce service ?","Écris-moi le service qui récupère les données","Comment je gère les erreurs réseau ?"]},
   'R-4':{n:'RACINE 4 — Tests',c:'#6b4226',
-    d:"Quatrième couche. Tu vérifies que rien est cassé. Clique partout, essaie de casser ton app. Note ce qui marche pas.",
+    d:"Tu vérifies que rien est cassé. Clique partout, essaie de casser ton app.",
     t:"Teste chaque feature à la main. Clique partout. C'est ton QA perso.",
     p:["Comment j'écris un test simple ?","Mon app crash, aide-moi à debug","Quels cas limites j'ai oublié ?"]},
   'R-5':{n:'RACINE 5 — Déploiement',c:'#5c3317',
-    d:"La couche la plus profonde. Ton app est prête, faut la mettre au monde. Build, deploy, partager le lien.",
+    d:"Ton app est prête, faut la mettre au monde. Build, deploy, partager.",
     t:"Build. Pousse sur GitHub. Déploie. Partage. Ton arbre est vivant.",
     p:["Comment je build et déploie mon app ?","Aide-moi à configurer le CI/CD","Comment je fais une release ?"]}
 };
@@ -262,24 +317,20 @@ const CONN=[
   ["R-36","R-48"],["R-48","R-510"]
 ];
 
-// ══════════════════════════════════════════
-// LAYOUT
-// ══════════════════════════════════════════
+// ══════ LAYOUT ══════
 const IW=1024,IH=1536;
 let sc,ox,oy,imgOK=false;
-
 const tImg=document.getElementById('tree-img');
-const fCanvas=document.getElementById('fallback-canvas');
-const fCtx=fCanvas.getContext('2d');
+const fC=document.getElementById('fallback-canvas');
+const fX=fC.getContext('2d');
 
-// try loading image from multiple paths
 const paths=['templates/baobab_render_final.png','./templates/baobab_render_final.png'];
-let pathIdx=0;
+let pi=0;
 function tryLoad(){
-  if(pathIdx>=paths.length){imgOK=false;layout();return}
+  if(pi>=paths.length){imgOK=false;layout();return}
   tImg.onload=()=>{imgOK=true;tImg.classList.remove('hidden');layout()};
-  tImg.onerror=()=>{pathIdx++;tryLoad()};
-  tImg.src=paths[pathIdx];
+  tImg.onerror=()=>{pi++;tryLoad()};
+  tImg.src=paths[pi];
 }
 tryLoad();
 
@@ -288,58 +339,43 @@ function layout(){
   sc=Math.min(vw/IW,vh/IH);
   const cw=IW*sc,ch=IH*sc;
   ox=(vw-cw)/2;oy=(vh-ch)/2;
-  
   if(imgOK){
     tImg.style.left=ox+'px';tImg.style.top=oy+'px';
     tImg.style.width=cw+'px';tImg.style.height=ch+'px';
-    fCanvas.style.display='none';
+    fC.style.display='none';
   } else {
-    // fallback: draw cables + nodes on canvas
-    fCanvas.width=vw;fCanvas.height=vh;
-    fCanvas.style.display='block';
-    drawFallback(vw,vh);
+    fC.width=vw;fC.height=vh;fC.style.display='block';
+    drawFB(vw,vh);
   }
   makeDots();
 }
 
-function drawFallback(vw,vh){
-  fCtx.fillStyle='#050510';fCtx.fillRect(0,0,vw,vh);
-  
-  // draw cables
-  fCtx.strokeStyle='rgba(0,180,255,0.15)';fCtx.lineWidth=2;
+function drawFB(vw,vh){
+  fX.fillStyle='#050510';fX.fillRect(0,0,vw,vh);
+  fX.strokeStyle='rgba(0,180,255,0.15)';fX.lineWidth=2;
   CONN.forEach(([a,b])=>{
     const na=N.find(n=>n.id===a),nb=N.find(n=>n.id===b);
     if(!na||!nb)return;
-    fCtx.beginPath();
+    fX.beginPath();
     const ax=ox+na.x*sc,ay=oy+na.y*sc,bx=ox+nb.x*sc,by=oy+nb.y*sc;
-    // catenary sag
-    const mx=(ax+bx)/2,my=(ay+by)/2+Math.abs(bx-ax)*0.12;
-    fCtx.moveTo(ax,ay);fCtx.quadraticCurveTo(mx,my,bx,by);
-    fCtx.stroke();
+    const mx=(ax+bx)/2,my=(ay+by)/2+Math.abs(bx-ax)*.12;
+    fX.moveTo(ax,ay);fX.quadraticCurveTo(mx,my,bx,by);fX.stroke();
   });
-  
-  // sol line
   const solY=oy+895*sc;
-  fCtx.strokeStyle='rgba(0,220,255,0.08)';fCtx.lineWidth=1;
-  fCtx.beginPath();fCtx.moveTo(ox,solY);fCtx.lineTo(ox+IW*sc,solY);fCtx.stroke();
-  fCtx.fillStyle='rgba(0,220,255,0.03)';
-  fCtx.font='9px Orbitron';fCtx.fillText('SOL',ox+10,solY-4);
-  
-  // glow nodes
+  fX.strokeStyle='rgba(0,220,255,0.08)';fX.lineWidth=1;
+  fX.beginPath();fX.moveTo(ox,solY);fX.lineTo(ox+IW*sc,solY);fX.stroke();
   N.forEach(n=>{
-    const x=ox+n.x*sc,y=oy+n.y*sc;
-    const col=L[n.lk]?.c||'#00dcff';
-    const g=fCtx.createRadialGradient(x,y,0,x,y,14*sc);
+    const x=ox+n.x*sc,y=oy+n.y*sc,col=L[n.lk]?.c||'#00dcff';
+    const g=fX.createRadialGradient(x,y,0,x,y,14*sc);
     g.addColorStop(0,col+'cc');g.addColorStop(.5,col+'44');g.addColorStop(1,'transparent');
-    fCtx.fillStyle=g;fCtx.beginPath();fCtx.arc(x,y,14*sc,0,Math.PI*2);fCtx.fill();
+    fX.fillStyle=g;fX.beginPath();fX.arc(x,y,14*sc,0,Math.PI*2);fX.fill();
   });
 }
 
 function makeDots(){
   document.querySelectorAll('.node-dot').forEach(e=>e.remove());
   N.forEach(n=>{
-    const d=document.createElement('div');
-    d.className='node-dot';d.dataset.id=n.id;d.dataset.label=n.id;
+    const d=document.createElement('div');d.className='node-dot';d.dataset.id=n.id;d.dataset.label=n.id;
     const info=L[n.lk];
     d.style.left=(ox+n.x*sc)+'px';d.style.top=(oy+n.y*sc)+'px';
     d.style.background=`radial-gradient(circle,${info.c}dd,${info.c}55,transparent)`;
@@ -352,22 +388,42 @@ function makeDots(){
 window.addEventListener('resize',layout);
 
 // ══════════════════════════════════════════
-// ✨ NAVI FAIRY FLIGHT ENGINE ✨
+// 🧚 NAVI FLIGHT ENGINE 
 // ══════════════════════════════════════════
 const navi=document.getElementById('navi');
 const hey=document.getElementById('hey');
 let nx=window.innerWidth/2,ny=window.innerHeight/2;
-let nvx=0,nvy=0;
-let tx=nx,ty=ny;
-let mode='wander'; // wander | goto | orbit | dash
-let tick=0,wAngle=Math.random()*Math.PI*2;
-let oAngle=0,oCX=0,oCY=0;
-let heyTTL=0;
+let nvx=0,nvy=0,tx=nx,ty=ny;
+let mode='wander',tick=0,wA=Math.random()*Math.PI*2;
+let oA=0,oCX=0,oCY=0;
 let sparks=[];
+
+// ════ HEY LISTEN SPAM — toutes les 2 secondes ════
+let heyVisible=false;
+let heyX=0,heyY=0;
+
+function spamHey(){
+  heyVisible=true;
+  hey.style.opacity='1';
+  // random message pool
+  const msgs=['Hey! Listen!','Hey!','Listen!','Hey! Écoute!','Watch out!','Hello!','Hey! Listen!','Hey! Listen!'];
+  hey.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+  
+  setTimeout(()=>{
+    hey.style.opacity='0';
+    heyVisible=false;
+  },1200);
+}
+
+// SPAM every 2 seconds
+setInterval(spamHey, 2000);
+// First one immediately
+setTimeout(spamHey, 500);
 
 function naviTo(x,y){
   tx=x;ty=y;mode='goto';
-  heyTTL=80;hey.style.opacity='1';
+  // instant hey on click
+  spamHey();
 }
 
 function naviLoop(){
@@ -375,103 +431,95 @@ function naviLoop(){
   const vw=window.innerWidth,vh=window.innerHeight;
   
   if(mode==='wander'){
-    wAngle+=(Math.random()-.5)*.12;
+    wA+=(Math.random()-.5)*.12;
     const spd=1.2+Math.sin(tick*.015)*.7;
-    tx+=Math.cos(wAngle)*spd;
-    ty+=Math.sin(wAngle)*spd;
-    // soft bounce
-    if(tx<40){wAngle=Math.abs(wAngle)%Math.PI;tx=40}
-    if(tx>vw-40){wAngle=Math.PI-wAngle;tx=vw-40}
-    if(ty<40){wAngle=-wAngle;ty=40}
-    if(ty>vh-40){wAngle=-wAngle;ty=vh-40}
+    tx+=Math.cos(wA)*spd;ty+=Math.sin(wA)*spd;
+    if(tx<40){wA=Math.abs(wA)%Math.PI;tx=40}
+    if(tx>vw-40){wA=Math.PI-wA;tx=vw-40}
+    if(ty<40){wA=-wA;ty=40}
+    if(ty>vh-40){wA=-wA;ty=vh-40}
     
-    // randomly fly to node
     if(Math.random()<.003){
       const rn=N[Math.floor(Math.random()*N.length)];
       tx=ox+rn.x*sc;ty=oy+rn.y*sc;mode='goto';
-      if(Math.random()<.4){heyTTL=55;hey.style.opacity='1'}
     }
-    // randomly DASH across screen
-    if(Math.random()<.0008){
-      mode='dash';
-      tx=Math.random()*vw;ty=Math.random()*vh;
-    }
-    // fly through panel sometimes
-    if(Math.random()<.0015&&document.getElementById('panel').classList.contains('on')){
+    if(Math.random()<.001){mode='dash';tx=Math.random()*vw;ty=Math.random()*vh}
+    if(Math.random()<.002&&document.getElementById('panel').classList.contains('on')){
       const r=document.getElementById('panel').getBoundingClientRect();
       tx=r.left+r.width*.5;ty=r.top+r.height*Math.random();mode='goto';
     }
   }
   else if(mode==='goto'){
-    const dx=tx-nx,dy=ty-ny,d=Math.sqrt(dx*dx+dy*dy);
-    if(d<15){mode='orbit';oCX=nx;oCY=ny;oAngle=0;tick=0}
+    const dx=tx-nx,dy=ty-ny;
+    if(Math.sqrt(dx*dx+dy*dy)<15){mode='orbit';oCX=nx;oCY=ny;oA=0;tick=0}
   }
   else if(mode==='orbit'){
-    oAngle+=.045;
-    const r=22+Math.sin(oAngle*2.5)*8;
-    tx=oCX+Math.cos(oAngle)*r;ty=oCY+Math.sin(oAngle)*r;
-    if(tick>160){mode='wander';wAngle=Math.random()*Math.PI*2}
+    oA+=.045;
+    const r=22+Math.sin(oA*2.5)*8;
+    tx=oCX+Math.cos(oA)*r;ty=oCY+Math.sin(oA)*r;
+    if(tick>160){mode='wander';wA=Math.random()*Math.PI*2}
   }
   else if(mode==='dash'){
-    // fast straight line
-    const dx=tx-nx,dy=ty-ny,d=Math.sqrt(dx*dx+dy*dy);
+    const dx=tx-nx,dy=ty-ny;
     nvx+=dx*.12;nvy+=dy*.12;
-    if(d<30){mode='wander';wAngle=Math.atan2(nvy,nvx)}
+    if(Math.sqrt(dx*dx+dy*dy)<30){mode='wander';wA=Math.atan2(nvy,nvx)}
   }
   
-  // physics
   const ease=mode==='dash'?.1:mode==='goto'?.055:.025;
   nvx+=(tx-nx)*ease;nvy+=(ty-ny)*ease;
   nvx*=.87;nvy*=.87;
   nx+=nvx;ny+=nvy;
   
-  const bob=Math.sin(tick*.055)*4;
+  const bob=Math.sin(tick*.055)*5;
   navi.style.left=nx+'px';navi.style.top=(ny+bob)+'px';
   
-  // wing speed = velocity
-  const speed=Math.sqrt(nvx*nvx+nvy*nvy);
-  const flapSpeed=Math.max(.06,Math.min(.2,.12-speed*.002));
-  navi.querySelectorAll('.w').forEach(w=>{
-    w.style.animationDuration=flapSpeed+'s';
-  });
-  
-  // hey listen
-  if(heyTTL>0){
-    heyTTL--;
-    hey.style.left=(nx+28)+'px';hey.style.top=(ny-18+bob)+'px';
-    if(heyTTL<=0)hey.style.opacity='0';
+  // hey listen position follows navi
+  if(heyVisible){
+    hey.style.left=(nx+35)+'px';
+    hey.style.top=(ny-22+bob)+'px';
   }
+  
+  // wing flap speed based on velocity
+  const speed=Math.sqrt(nvx*nvx+nvy*nvy);
+  const flapFast=Math.max(.05,Math.min(.18,.11-speed*.003));
+  const flapSlow=flapFast+.02;
+  document.querySelector('.wing-tl').style.animationDuration=flapFast+'s';
+  document.querySelector('.wing-tr').style.animationDuration=flapFast+'s';
+  document.querySelector('.wing-bl').style.animationDuration=flapSlow+'s';
+  document.querySelector('.wing-br').style.animationDuration=flapSlow+'s';
+  
+  // glow intensity based on speed
+  const glowI=Math.min(1,.6+speed*.03);
+  document.querySelector('.glow1').style.opacity=glowI;
+  document.querySelector('.glow2').style.opacity=glowI*.7;
   
   // sparkle trail
   if(tick%2===0){
-    const s=document.createElement('div');
-    s.className='spark';
-    const sz=2+Math.random()*4;
+    const s=document.createElement('div');s.className='spark';
+    const sz=2+Math.random()*5;
     s.style.width=sz+'px';s.style.height=sz+'px';
-    s.style.left=(nx+(Math.random()-.5)*12)+'px';
-    s.style.top=(ny+bob+(Math.random()-.5)*12)+'px';
-    const hue=160+Math.random()*40;
-    s.style.background=`radial-gradient(circle,hsla(${hue},100%,70%,.5),transparent)`;
-    s.style.boxShadow=`0 0 ${3+Math.random()*5}px hsla(${hue},100%,60%,.3)`;
+    s.style.left=(nx+(Math.random()-.5)*14)+'px';
+    s.style.top=(ny+bob+(Math.random()-.5)*14)+'px';
+    const hue=155+Math.random()*50;
+    s.style.background=`radial-gradient(circle,hsla(${hue},100%,75%,.6),transparent)`;
+    s.style.boxShadow=`0 0 ${4+Math.random()*6}px hsla(${hue},100%,65%,.4)`;
     document.body.appendChild(s);
-    sparks.push({el:s,life:25+Math.random()*20});
+    sparks.push({el:s,life:28+Math.random()*18});
   }
   
-  // extra sparkle burst on fast moves
   if(speed>8&&tick%3===0){
-    for(let i=0;i<3;i++){
+    for(let i=0;i<4;i++){
       const s=document.createElement('div');s.className='spark';
       const sz=1+Math.random()*3;
       s.style.width=sz+'px';s.style.height=sz+'px';
-      s.style.left=(nx+(Math.random()-.5)*20)+'px';
-      s.style.top=(ny+bob+(Math.random()-.5)*20)+'px';
-      s.style.background=`radial-gradient(circle,rgba(0,255,200,.6),transparent)`;
+      s.style.left=(nx+(Math.random()-.5)*24)+'px';
+      s.style.top=(ny+bob+(Math.random()-.5)*24)+'px';
+      s.style.background='radial-gradient(circle,rgba(200,255,240,.7),transparent)';
       document.body.appendChild(s);
-      sparks.push({el:s,life:12+Math.random()*10});
+      sparks.push({el:s,life:10+Math.random()*8});
     }
   }
   
-  // fade sparks
   for(let i=sparks.length-1;i>=0;i--){
     sparks[i].life--;
     sparks[i].el.style.opacity=Math.max(0,sparks[i].life/35);
@@ -482,9 +530,7 @@ function naviLoop(){
 }
 naviLoop();
 
-// ══════════════════════════════════════════
-// PANEL
-// ══════════════════════════════════════════
+// ══════ PANEL ══════
 function openPanel(node){
   const info=L[node.lk];if(!info)return;
   document.querySelectorAll('.node-dot.active').forEach(e=>e.classList.remove('active'));
@@ -504,8 +550,8 @@ function openPanel(node){
     });
     pd.appendChild(b);
   });
-  const pf=document.querySelector('.pf');pf.classList.remove('on');
-  void pf.offsetWidth;pf.classList.add('on');
+  const pf=document.querySelector('.pf');pf.classList.remove('flick');
+  void pf.offsetWidth;pf.classList.add('flick');
   document.getElementById('panel').classList.add('on');
 }
 
@@ -513,7 +559,6 @@ function closePanel(){
   document.getElementById('panel').classList.remove('on');
   document.querySelectorAll('.node-dot.active').forEach(e=>e.classList.remove('active'));
 }
-
 document.getElementById('xbtn').addEventListener('click',closePanel);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanel()});
 </script>
