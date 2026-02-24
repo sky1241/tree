@@ -96,52 +96,81 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
   box-shadow:inset 0 0 8px rgba(0,255,220,.1);
 }
 
-/* Haut-gauche — GRANDE, monte en V élégant */
+/* === 6 AILES — 3 de chaque côté, éventail === */
+
+/* GAUCHE — Grande (haut) */
 .wing-tl{
-  width:48px;height:13px;
-  transform-origin:95% 90%;
-  transform:translate(-90%,-16px) rotate(-40deg);
-  animation:flap-long .11s ease-in-out infinite alternate;
+  width:50px;height:13px;
+  transform-origin:95% 85%;
+  transform:translate(-90%,-20px) rotate(-50deg);
+  animation:flap-g .10s ease-in-out infinite alternate;
 }
-/* Haut-droite — GRANDE, monte en V élégant */
-.wing-tr{
-  width:48px;height:13px;
-  transform-origin:5% 90%;
-  border-radius:80% 80% 60% 60%;
-  transform:translate(-10%,-16px) rotate(40deg);
-  animation:flap-long-r .11s ease-in-out infinite alternate;
+/* GAUCHE — Moyenne (milieu) */
+.wing-ml{
+  width:42px;height:11px;
+  transform-origin:95% 80%;
+  transform:translate(-88%,-8px) rotate(-25deg);
+  animation:flap-m .12s ease-in-out infinite alternate;
 }
-/* Bas-gauche — PETITE, suit le V un peu plus bas */
+/* GAUCHE — Petite (bas) */
 .wing-bl{
-  width:34px;height:10px;
+  width:30px;height:9px;
   transform-origin:95% 70%;
-  transform:translate(-90%,-4px) rotate(-28deg);
-  animation:flap-short .13s ease-in-out infinite alternate;
-}
-/* Bas-droite — PETITE, suit le V un peu plus bas */
-.wing-br{
-  width:34px;height:10px;
-  transform-origin:5% 70%;
-  border-radius:80% 80% 60% 60%;
-  transform:translate(-10%,-4px) rotate(28deg);
-  animation:flap-short-r .13s ease-in-out infinite alternate;
+  transform:translate(-85%,4px) rotate(-5deg);
+  animation:flap-p .14s ease-in-out infinite alternate;
 }
 
-@keyframes flap-long{
-  from{transform:translate(-90%,-16px) rotate(-40deg) scaleY(1)}
-  to{transform:translate(-90%,-16px) rotate(-60deg) scaleY(.55)}
+/* DROITE — Grande (haut) */
+.wing-tr{
+  width:50px;height:13px;
+  transform-origin:5% 85%;
+  border-radius:80% 80% 60% 60%;
+  transform:translate(-10%,-20px) rotate(50deg);
+  animation:flap-g-r .10s ease-in-out infinite alternate;
 }
-@keyframes flap-long-r{
-  from{transform:translate(-10%,-16px) rotate(40deg) scaleY(1)}
-  to{transform:translate(-10%,-16px) rotate(60deg) scaleY(.55)}
+/* DROITE — Moyenne (milieu) */
+.wing-mr{
+  width:42px;height:11px;
+  transform-origin:5% 80%;
+  border-radius:80% 80% 60% 60%;
+  transform:translate(-12%,-8px) rotate(25deg);
+  animation:flap-m-r .12s ease-in-out infinite alternate;
 }
-@keyframes flap-short{
-  from{transform:translate(-90%,-4px) rotate(-28deg) scaleY(1)}
-  to{transform:translate(-90%,-4px) rotate(-48deg) scaleY(.45)}
+/* DROITE — Petite (bas) */
+.wing-br{
+  width:30px;height:9px;
+  transform-origin:5% 70%;
+  border-radius:80% 80% 60% 60%;
+  transform:translate(-15%,4px) rotate(5deg);
+  animation:flap-p-r .14s ease-in-out infinite alternate;
 }
-@keyframes flap-short-r{
-  from{transform:translate(-10%,-4px) rotate(28deg) scaleY(1)}
-  to{transform:translate(-10%,-4px) rotate(48deg) scaleY(.45)}
+
+/* Grandes — battement ample */
+@keyframes flap-g{
+  from{transform:translate(-90%,-20px) rotate(-50deg) scaleY(1)}
+  to{transform:translate(-90%,-20px) rotate(-65deg) scaleY(.5)}
+}
+@keyframes flap-g-r{
+  from{transform:translate(-10%,-20px) rotate(50deg) scaleY(1)}
+  to{transform:translate(-10%,-20px) rotate(65deg) scaleY(.5)}
+}
+/* Moyennes — battement moyen, légèrement déphasé */
+@keyframes flap-m{
+  from{transform:translate(-88%,-8px) rotate(-25deg) scaleY(1)}
+  to{transform:translate(-88%,-8px) rotate(-42deg) scaleY(.5)}
+}
+@keyframes flap-m-r{
+  from{transform:translate(-12%,-8px) rotate(25deg) scaleY(1)}
+  to{transform:translate(-12%,-8px) rotate(42deg) scaleY(.5)}
+}
+/* Petites — battement rapide subtil */
+@keyframes flap-p{
+  from{transform:translate(-85%,4px) rotate(-5deg) scaleY(1)}
+  to{transform:translate(-85%,4px) rotate(-22deg) scaleY(.5)}
+}
+@keyframes flap-p-r{
+  from{transform:translate(-15%,4px) rotate(5deg) scaleY(1)}
+  to{transform:translate(-15%,4px) rotate(22deg) scaleY(.5)}
 }
 
 /* particles */
@@ -225,7 +254,9 @@ body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor
   <div class="glow2"></div>
   <div class="glow1"></div>
   <div class="wing wing-tl"></div>
+  <div class="wing wing-ml"></div>
   <div class="wing wing-tr"></div>
+  <div class="wing wing-mr"></div>
   <div class="wing wing-bl"></div>
   <div class="wing wing-br"></div>
   <div class="orb"></div>
@@ -481,12 +512,16 @@ function naviLoop(){
   
   // wing flap speed based on velocity
   const speed=Math.sqrt(nvx*nvx+nvy*nvy);
-  const flapFast=Math.max(.05,Math.min(.18,.11-speed*.003));
-  const flapSlow=flapFast+.02;
-  document.querySelector('.wing-tl').style.animationDuration=flapFast+'s';
-  document.querySelector('.wing-tr').style.animationDuration=flapFast+'s';
-  document.querySelector('.wing-bl').style.animationDuration=flapSlow+'s';
-  document.querySelector('.wing-br').style.animationDuration=flapSlow+'s';
+  // 6 wings — chaque paire a sa vitesse
+  const fG=Math.max(.04,Math.min(.16,.10-speed*.003));
+  const fM=fG+.02;
+  const fP=fG+.04;
+  document.querySelector('.wing-tl').style.animationDuration=fG+'s';
+  document.querySelector('.wing-tr').style.animationDuration=fG+'s';
+  document.querySelector('.wing-ml').style.animationDuration=fM+'s';
+  document.querySelector('.wing-mr').style.animationDuration=fM+'s';
+  document.querySelector('.wing-bl').style.animationDuration=fP+'s';
+  document.querySelector('.wing-br').style.animationDuration=fP+'s';
   
   // glow intensity based on speed
   const glowI=Math.min(1,.6+speed*.03);
