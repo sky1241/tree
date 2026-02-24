@@ -4,27 +4,27 @@
   "family": "conifere",
   "family_name": "Conifère",
   "family_emoji": "🌲",
-  "date": "2026-02-24T22:57:20.826358",
+  "date": "2026-02-24T23:10:10.450154",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/yggdrasil-engine",
   "scale": {
-    "lines": 92082,
+    "lines": 92209,
     "factor": 2.08,
     "category": "géant",
     "height_px": 614,
-    "data_mb": 3.2529754638671875,
+    "data_mb": 3.2481307983398438,
     "density": 1.1,
     "trunk_width": 1.1,
     "data_category": "léger",
     "label": "🏔️ Géant (92k lignes, 3Mo data)"
   },
   "stats": {
-    "total_files": 250,
-    "total_code_lines": 92082,
-    "data_weight_mb": 3.3,
+    "total_files": 251,
+    "total_code_lines": 92209,
+    "data_weight_mb": 3.2,
     "languages": {
       "HTML": 67177,
-      "Python": 24887,
+      "Python": 25014,
       "PowerShell": 10,
       "Shell": 8
     },
@@ -91,7 +91,7 @@
     {
       "id": "M2",
       "level": "R",
-      "label": "Langage secondaire : Python (24887 lignes)",
+      "label": "Langage secondaire : Python (25014 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -112,7 +112,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "engine/ (40f, ~21658L, Python)",
+      "label": "engine/ (40f, ~21786L, Python)",
       "status": "done",
       "entry": "engine/",
       "depends": [],
@@ -132,7 +132,7 @@
     {
       "id": "b2",
       "level": "b",
-      "label": "engine/topology/ (9f, ~2974L)",
+      "label": "engine/topology/ (9f, ~3102L)",
       "status": "done",
       "entry": "engine/topology/",
       "depends": [],
@@ -202,7 +202,7 @@
     {
       "id": "B5",
       "level": "B",
-      "label": "hooks/ (2f, ~18L, PowerShell, Shell)",
+      "label": "hooks/ (2f, ~18L, Shell, PowerShell)",
       "status": "done",
       "entry": "hooks/",
       "depends": [],

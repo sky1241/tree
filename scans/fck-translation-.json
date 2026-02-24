@@ -4,7 +4,7 @@
   "family": "feuillu",
   "family_name": "Feuillu",
   "family_emoji": "🍁",
-  "date": "2026-02-24T22:57:21.923438",
+  "date": "2026-02-24T23:10:14.597018",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/fck-translation-",
   "scale": {
@@ -158,7 +158,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "tools/ (8f, ~544L, Dart, PowerShell)",
+      "label": "tools/ (8f, ~544L, PowerShell, Dart)",
       "status": "done",
       "entry": "tools/",
       "depends": [],

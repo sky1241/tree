@@ -4,7 +4,7 @@
   "family": "feuillu",
   "family_name": "Feuillu",
   "family_emoji": "🍁",
-  "date": "2026-02-24T22:55:27.598843",
+  "date": "2026-02-24T23:10:11.164435",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/shazam-piano",
   "scale": {
@@ -199,7 +199,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "app/ (127f, ~30946L, Dart, PowerShell)",
+      "label": "app/ (127f, ~30946L, Swift, Kotlin)",
       "status": "done",
       "entry": "app/",
       "depends": [],
@@ -289,7 +289,7 @@
     {
       "id": "B5",
       "level": "B",
-      "label": "packages/ (3f, ~60L, Dart, C)",
+      "label": "packages/ (3f, ~60L, C, Dart)",
       "status": "done",
       "entry": "packages/",
       "depends": [],

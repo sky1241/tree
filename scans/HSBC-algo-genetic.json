@@ -3,8 +3,8 @@
   "domain": "trading",
   "family": "conifere",
   "family_name": "Conifère",
-  "family_emoji": "🌿",
-  "date": "2026-02-24T22:14:28.440129",
+  "family_emoji": "🌲",
+  "date": "2026-02-24T23:10:13.359093",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/HSBC-algo-genetic",
   "scale": {
@@ -213,7 +213,7 @@
     {
       "id": "B4",
       "level": "B",
-      "label": "binance_bot/ (27f, ~1872L, Python, PowerShell)",
+      "label": "binance_bot/ (27f, ~1872L, PowerShell, Python)",
       "status": "done",
       "entry": "binance_bot/",
       "depends": [],
@@ -323,7 +323,16 @@
     },
     {
       "phase": 2,
-      "name": "Tiges — lancer en parallèle",
+      "name": "Tronc — pipeline principal",
+      "ids": [
+        "T1"
+      ],
+      "action": "Construire le pipeline end-to-end minimal",
+      "bio": "Le leader terminal pousse en premier (contrôle apical)"
+    },
+    {
+      "phase": 3,
+      "name": "Branches — modules subordonnés",
       "ids": [
         "B1",
         "B2",
@@ -333,8 +342,8 @@
         "B6",
         "B7"
       ],
-      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
-      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+      "action": "Ajouter les modules UN PAR UN, toujours subordonnés au tronc",
+      "bio": "Les latérales ne dépassent jamais le leader"
     },
     {
       "phase": 4,

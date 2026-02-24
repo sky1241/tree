@@ -2343,13 +2343,36 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
     if is_mobile_app and n_branches >= 3:
         return "feuillu"
 
-    # Feuillu : multi-modules cœur parallèles
-    if n_core_dirs >= 2 and core_lines > peripheral_lines:
+    # ── Diversité linguistique → buisson ──
+    # Si les branches top-level parlent 3+ langages différents,
+    # ce sont des projets indépendants, pas un codebase unifié
+    branch_langs = set()
+    REAL_CORE_DIRS = {"src", "lib", "core", "app", "pkg", "internal", "modules",
+                      "engine", "api", "server", "services"}
+    has_real_core = bool(REAL_CORE_DIRS & all_dirs_lower)
+
+    for dirname, info in top_dirs.items():
+        if info.get("langs"):
+            branch_langs.update(info["langs"])
+        elif isinstance(info, dict):
+            # Reconstruct from files if langs not tracked
+            pass
+
+    # 3+ langages dans les branches + pas de vrai dossier core = buisson
+    if len(branch_langs) >= 3 and not has_real_core and n_branches >= 3:
+        return "buisson"
+
+    # Feuillu : multi-modules cœur parallèles (vrais core dirs)
+    if n_core_dirs >= 2 and core_lines > peripheral_lines and has_real_core:
         return "feuillu"
 
     # Feuillu : multi-modules cœur même si imports pas dispo
-    if n_core_dirs >= 2:
+    if n_core_dirs >= 2 and has_real_core:
         return "feuillu"
+
+    # Sans vrais core dirs, si beaucoup de branches = buisson
+    if n_branches >= 3 and not has_real_core:
+        return "buisson"
 
     # Buisson : que des scripts indépendants, pas de cœur
     if has_dominant_scripts:

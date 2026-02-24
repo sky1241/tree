@@ -4,7 +4,7 @@
   "family": "feuillu",
   "family_name": "Feuillu",
   "family_emoji": "🍁",
-  "date": "2026-02-24T22:57:22.667927",
+  "date": "2026-02-24T23:10:15.384218",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/jeu-pour-les-gamin",
   "scale": {
@@ -195,7 +195,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "mk/ (14f, ~5444L, C/C++ header, Java)",
+      "label": "mk/ (14f, ~5444L, Java, Shell)",
       "status": "done",
       "entry": "mk/",
       "depends": [],
@@ -235,7 +235,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "tools/ (25f, ~2691L, Ruby, C++)",
+      "label": "tools/ (25f, ~2691L, Ruby, Python)",
       "status": "done",
       "entry": "tools/",
       "depends": [],

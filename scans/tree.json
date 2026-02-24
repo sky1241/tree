@@ -4,33 +4,33 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-24T22:14:31.788051",
+  "date": "2026-02-24T23:10:16.327695",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/tree",
   "scale": {
-    "lines": 12933,
-    "factor": 1.52,
+    "lines": 13360,
+    "factor": 1.53,
     "category": "grand arbre",
-    "height_px": 503,
-    "data_mb": 169.34844207763672,
-    "density": 1.62,
-    "trunk_width": 1.62,
+    "height_px": 504,
+    "data_mb": 216.1641845703125,
+    "density": 1.64,
+    "trunk_width": 1.64,
     "data_category": "dense",
-    "label": "🌲 Grand Arbre (12k lignes, 169Mo data)"
+    "label": "🌲 Grand Arbre (13k lignes, 216Mo data)"
   },
   "stats": {
-    "total_files": 124,
-    "total_code_lines": 12933,
-    "data_weight_mb": 169.3,
+    "total_files": 140,
+    "total_code_lines": 13360,
+    "data_weight_mb": 216.2,
     "languages": {
-      "Python": 7842,
-      "HTML": 4718,
+      "Python": 7962,
+      "HTML": 5025,
       "PowerShell": 367,
       "Shell": 6
     },
     "biggest_file": {
       "path": "scripts/engine.py",
-      "lines": 4640,
+      "lines": 4760,
       "lang": "Python"
     }
   },
@@ -60,7 +60,7 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Python (7842 lignes)",
+      "label": "Langage principal : Python (7962 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -71,7 +71,7 @@
     {
       "id": "M2",
       "level": "R",
-      "label": "Langage secondaire : HTML (4718 lignes)",
+      "label": "Langage secondaire : HTML (5025 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -82,7 +82,7 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : scripts/engine.py (~4640L, Python)",
+      "label": "Core : scripts/engine.py (~4760L, Python)",
       "status": "done",
       "entry": "scripts/engine.py",
       "depends": [],
@@ -92,7 +92,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "scripts/ (7f, ~6150L, Python, PowerShell)",
+      "label": "scripts/ (7f, ~6270L, PowerShell, Python)",
       "status": "done",
       "entry": "scripts/",
       "depends": [],
@@ -112,7 +112,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "hooks/ (3f, ~89L, PowerShell, Python)",
+      "label": "hooks/ (3f, ~89L, Shell, PowerShell)",
       "status": "done",
       "entry": "hooks/",
       "depends": [],
