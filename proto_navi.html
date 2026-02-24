@@ -3,585 +3,519 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Winter Tree — Navi Guide</title>
+<title>Winter Tree — Navi Guide 🧚</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#050510;overflow:hidden;font-family:'Rajdhani',sans-serif;cursor:crosshair;width:100vw;height:100vh}
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ══════ TREE IMAGE ══════ */
+#tree-img{position:absolute;object-fit:contain;z-index:1}
+#tree-img.hidden{display:none}
 
-body {
-  background: #0a0a0f;
-  overflow: hidden;
-  font-family: 'Rajdhani', sans-serif;
-  cursor: crosshair;
+/* fallback: draw nodes on dark bg */
+#fallback-canvas{position:absolute;top:0;left:0;z-index:0}
+
+/* ══════ NODE HITBOXES ══════ */
+.node-dot{
+  position:absolute;width:28px;height:28px;border-radius:50%;
+  cursor:pointer;transform:translate(-50%,-50%);z-index:10;
+  transition:all .2s ease;
+}
+.node-dot::after{
+  content:attr(data-label);position:absolute;bottom:-16px;left:50%;
+  transform:translateX(-50%);font-family:'Orbitron',sans-serif;
+  font-size:8px;color:rgba(0,220,255,.5);white-space:nowrap;
+  opacity:0;transition:opacity .2s;
+}
+.node-dot:hover::after{opacity:1}
+.node-dot:hover{transform:translate(-50%,-50%) scale(1.4);filter:brightness(1.5)}
+.node-dot.active{transform:translate(-50%,-50%) scale(1.6);filter:brightness(2)}
+
+/* ══════ NAVI ══════ */
+#navi{position:fixed;z-index:500;pointer-events:none;width:60px;height:60px;transform:translate(-50%,-50%)}
+
+.navi-core{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:12px;height:12px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#fff,#00ffd5,#0088ff);
+  box-shadow:0 0 15px #00ffc8,0 0 35px #00aaff88,0 0 60px #0055ff44;
+  animation:core-pulse 1s ease infinite;
+}
+@keyframes core-pulse{
+  0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 15px #00ffc8,0 0 35px #00aaff88}
+  50%{transform:translate(-50%,-50%) scale(1.2);box-shadow:0 0 25px #00ffc8,0 0 50px #00aaffbb,0 0 70px #0055ff66}
 }
 
-#canvas-container {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* 4 AILES — battement rapide comme un colibri */
+.w{position:absolute;top:50%;left:50%;opacity:.55}
+
+.w1{/* haut-gauche */
+  width:20px;height:14px;border-radius:60% 60% 40% 10%;
+  transform-origin:100% 100%;
+  background:linear-gradient(140deg,rgba(0,255,210,.7),rgba(0,150,255,.1));
+  border:1px solid rgba(0,255,210,.35);
+  transform:translate(-100%,-100%) rotate(-15deg);
+  animation:flap1 .12s ease-in-out infinite alternate;
+}
+.w2{/* haut-droite */
+  width:20px;height:14px;border-radius:60% 60% 10% 40%;
+  transform-origin:0% 100%;
+  background:linear-gradient(40deg,rgba(0,150,255,.1),rgba(0,255,210,.7));
+  border:1px solid rgba(0,255,210,.35);
+  transform:translate(0%,-100%) rotate(15deg);
+  animation:flap2 .12s ease-in-out infinite alternate;
+}
+.w3{/* bas-gauche */
+  width:15px;height:10px;border-radius:50% 50% 30% 10%;
+  transform-origin:100% 0%;
+  background:linear-gradient(140deg,rgba(0,255,190,.45),transparent);
+  border:1px solid rgba(0,255,190,.25);
+  transform:translate(-100%,2px) rotate(8deg);
+  animation:flap3 .14s ease-in-out infinite alternate;
+}
+.w4{/* bas-droite */
+  width:15px;height:10px;border-radius:50% 50% 10% 30%;
+  transform-origin:0% 0%;
+  background:linear-gradient(40deg,transparent,rgba(0,255,190,.45));
+  border:1px solid rgba(0,255,190,.25);
+  transform:translate(0%,2px) rotate(-8deg);
+  animation:flap4 .14s ease-in-out infinite alternate;
 }
 
-#tree-canvas {
-  max-height: 100vh;
-  max-width: 100vw;
-  object-fit: contain;
-}
+@keyframes flap1{from{transform:translate(-100%,-100%) rotate(-15deg) scaleX(1)}to{transform:translate(-100%,-100%) rotate(-45deg) scaleX(.5)}}
+@keyframes flap2{from{transform:translate(0%,-100%) rotate(15deg) scaleX(1)}to{transform:translate(0%,-100%) rotate(45deg) scaleX(.5)}}
+@keyframes flap3{from{transform:translate(-100%,2px) rotate(8deg) scaleX(1)}to{transform:translate(-100%,2px) rotate(30deg) scaleX(.4)}}
+@keyframes flap4{from{transform:translate(0%,2px) rotate(-8deg) scaleX(1)}to{transform:translate(0%,2px) rotate(-30deg) scaleX(.4)}}
 
-.node-hitbox {
-  position: absolute;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  transition: all 0.2s ease;
-}
+/* trail particles */
+.spark{position:fixed;border-radius:50%;pointer-events:none;z-index:499}
 
-.node-hitbox::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 220, 255, 0);
-  transition: all 0.3s ease;
-}
-
-.node-hitbox:hover::before {
-  border-color: rgba(0, 220, 255, 0.6);
-  box-shadow: 0 0 15px rgba(0, 220, 255, 0.3);
-  animation: pulse-ring 1.5s ease infinite;
-}
-
-.node-hitbox:hover {
-  transform: translate(-50%, -50%) scale(1.3);
-}
-
-.node-hitbox.active {
-  transform: translate(-50%, -50%) scale(1.5);
-}
-
-.node-hitbox.active::before {
-  border-color: rgba(0, 220, 255, 0.9);
-  box-shadow: 0 0 25px rgba(0, 220, 255, 0.5);
-}
-
-@keyframes pulse-ring {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.4); opacity: 0.4; }
+/* "Hey! Écoute!" */
+#hey{
+  position:fixed;z-index:501;pointer-events:none;
+  font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;
+  color:#00ffcc;text-shadow:0 0 12px #00ffcc,0 0 25px #00aaff;
+  opacity:0;transition:opacity .3s;white-space:nowrap;letter-spacing:1px;
 }
 
 /* ══════ HOLOGRAM PANEL ══════ */
-#holo-panel {
-  position: fixed;
-  top: 50%;
-  right: 30px;
-  transform: translateY(-50%) scaleY(0);
-  width: 420px;
-  max-height: 80vh;
-  z-index: 100;
-  opacity: 0;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
+#panel{
+  position:fixed;top:50%;right:24px;transform:translateY(-50%) scaleY(0);
+  width:380px;max-height:88vh;overflow-y:auto;z-index:100;
+  opacity:0;transition:all .35s cubic-bezier(.16,1,.3,1);pointer-events:none;
 }
+#panel.on{transform:translateY(-50%) scaleY(1);opacity:1;pointer-events:all}
+#panel::-webkit-scrollbar{width:4px}
+#panel::-webkit-scrollbar-thumb{background:#00dcff44;border-radius:2px}
 
-#holo-panel.visible {
-  transform: translateY(-50%) scaleY(1);
-  opacity: 1;
-  pointer-events: all;
+.pf{
+  position:relative;background:rgba(2,8,22,.92);
+  border:1px solid rgba(0,180,255,.25);border-radius:3px;
+  padding:28px 22px;backdrop-filter:blur(18px);
 }
+.pf::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#00dcff,transparent);animation:scanbar 2.5s linear infinite}
+.pf::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#00dcff66,transparent)}
+@keyframes scanbar{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
 
-.panel-frame {
-  position: relative;
-  background: rgba(0, 8, 20, 0.85);
-  border: 1px solid rgba(0, 180, 255, 0.3);
-  border-radius: 4px;
-  padding: 30px 25px;
-  backdrop-filter: blur(20px);
-  overflow: hidden;
+.cn{position:absolute;width:16px;height:16px}
+.cn.tl{top:-1px;left:-1px;border-top:2px solid #00dcff;border-left:2px solid #00dcff}
+.cn.tr{top:-1px;right:-1px;border-top:2px solid #00dcff;border-right:2px solid #00dcff}
+.cn.bl{bottom:-1px;left:-1px;border-bottom:2px solid #00dcff;border-left:2px solid #00dcff}
+.cn.br{bottom:-1px;right:-1px;border-bottom:2px solid #00dcff;border-right:2px solid #00dcff}
+
+.pf .tag{font-family:'Orbitron',sans-serif;font-size:9px;color:#00ffcc;text-transform:uppercase;letter-spacing:3px;margin-bottom:14px;text-shadow:0 0 8px #00ffcc;opacity:.8}
+.pf .name{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:900;color:#00dcff;text-shadow:0 0 18px rgba(0,220,255,.5);margin-bottom:4px}
+.pf .layer{font-family:'Orbitron',sans-serif;font-size:10px;color:#00dcff77;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(0,220,255,.12)}
+.pf .stit{font-family:'Orbitron',sans-serif;font-size:9px;color:#00ffcc;letter-spacing:3px;text-transform:uppercase;margin-bottom:7px;text-shadow:0 0 6px #00ffcc55}
+.pf .stxt{font-size:14.5px;font-weight:400;color:rgba(195,235,255,.88);line-height:1.6;margin-bottom:18px}
+
+.aib{
+  background:rgba(0,220,255,.04);border:1px solid rgba(0,220,255,.18);
+  border-radius:3px;padding:10px 14px;margin-bottom:8px;cursor:pointer;
+  transition:all .2s;
 }
+.aib:hover{background:rgba(0,220,255,.1);border-color:rgba(0,220,255,.45)}
+.aib .pr{font-size:13.5px;color:#00dcff;font-style:italic;line-height:1.5}
+.aib .pr::before{content:'💬 '}
 
-.panel-frame::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #00dcff, #00dcff, transparent);
-  animation: scan-line 3s linear infinite;
+.sbar{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(0,220,255,.12)}
+.sdot{width:7px;height:7px;border-radius:50%;background:#ff4444;box-shadow:0 0 6px #ff444488}
+.stx{font-family:'Orbitron',sans-serif;font-size:9px;color:#00dcff77;letter-spacing:2px}
+
+#xbtn{
+  position:absolute;top:8px;right:10px;background:none;
+  border:1px solid rgba(0,220,255,.25);color:#00dcff;
+  font-family:'Orbitron',sans-serif;font-size:10px;padding:2px 7px;
+  cursor:pointer;z-index:102;transition:all .2s;
 }
+#xbtn:hover{background:rgba(0,220,255,.12);border-color:#00dcff}
 
-.panel-frame::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #00dcff88, transparent);
-}
+.pf.on{animation:flicker .25s ease}
+@keyframes flicker{0%{opacity:0}20%{opacity:.8}40%{opacity:.2}60%{opacity:.9}80%{opacity:.5}100%{opacity:1}}
 
-@keyframes scan-line {
-  0% { opacity: 0.3; }
-  50% { opacity: 1; }
-  100% { opacity: 0.3; }
-}
-
-/* Corner accents */
-.corner { position: absolute; width: 20px; height: 20px; }
-.corner-tl { top: -1px; left: -1px; border-top: 2px solid #00dcff; border-left: 2px solid #00dcff; }
-.corner-tr { top: -1px; right: -1px; border-top: 2px solid #00dcff; border-right: 2px solid #00dcff; }
-.corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #00dcff; border-left: 2px solid #00dcff; }
-.corner-br { bottom: -1px; right: -1px; border-bottom: 2px solid #00dcff; border-right: 2px solid #00dcff; }
-
-/* Navi fairy */
-#navi {
-  position: absolute;
-  top: -20px;
-  left: 20px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #00ffcc, #00aaff, transparent);
-  animation: navi-float 2s ease-in-out infinite, navi-glow 1.5s ease infinite;
-  z-index: 101;
-}
-
-@keyframes navi-float {
-  0%, 100% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-8px) scale(1.1); }
-}
-
-@keyframes navi-glow {
-  0%, 100% { box-shadow: 0 0 15px #00ffcc, 0 0 30px #00aaff44; }
-  50% { box-shadow: 0 0 25px #00ffcc, 0 0 50px #00aaff66; }
-}
-
-.navi-text {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 10px;
-  color: #00ffcc;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  margin-bottom: 15px;
-  text-shadow: 0 0 10px #00ffcc;
-  opacity: 0.8;
-}
-
-.node-name {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 22px;
-  font-weight: 900;
-  color: #00dcff;
-  text-shadow: 0 0 20px rgba(0, 220, 255, 0.6);
-  margin-bottom: 5px;
-}
-
-.node-layer {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
-  color: #00dcff88;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid rgba(0, 220, 255, 0.15);
-}
-
-.section-title {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 10px;
-  color: #00ffcc;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  text-shadow: 0 0 8px #00ffcc66;
-}
-
-.section-text {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 15px;
-  font-weight: 400;
-  color: rgba(200, 240, 255, 0.9);
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-
-.ask-ai-box {
-  background: rgba(0, 220, 255, 0.05);
-  border: 1px solid rgba(0, 220, 255, 0.2);
-  border-radius: 3px;
-  padding: 12px 15px;
-  margin-bottom: 10px;
-}
-
-.ask-ai-box .prompt {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 14px;
-  color: #00dcff;
-  font-style: italic;
-  line-height: 1.5;
-}
-
-.ask-ai-box .prompt::before {
-  content: '💬 ';
-}
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid rgba(0, 220, 255, 0.15);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff4444;
-  box-shadow: 0 0 8px #ff444488;
-}
-
-.status-dot.done { background: #00ff88; box-shadow: 0 0 8px #00ff8888; }
-.status-dot.wip { background: #ffaa00; box-shadow: 0 0 8px #ffaa0088; }
-
-.status-text {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 10px;
-  color: #00dcff88;
-  letter-spacing: 2px;
-}
-
-#close-btn {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  background: none;
-  border: 1px solid rgba(0, 220, 255, 0.3);
-  color: #00dcff;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
-  padding: 3px 8px;
-  cursor: pointer;
-  z-index: 102;
-  transition: all 0.2s;
-}
-
-#close-btn:hover {
-  background: rgba(0, 220, 255, 0.15);
-  border-color: #00dcff;
-}
-
-/* Scanline overlay */
-.scanlines {
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
-  pointer-events: none;
-  z-index: 200;
-}
-
-/* Flicker on appear */
-#holo-panel.visible .panel-frame {
-  animation: holo-flicker 0.3s ease;
-}
-
-@keyframes holo-flicker {
-  0% { opacity: 0; }
-  20% { opacity: 0.8; }
-  40% { opacity: 0.3; }
-  60% { opacity: 0.9; }
-  80% { opacity: 0.6; }
-  100% { opacity: 1; }
-}
+/* scanlines */
+.scan{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:600}
 </style>
 </head>
 <body>
 
-<div id="canvas-container">
-  <canvas id="tree-canvas"></canvas>
-</div>
+<!-- tree bg — tries local image, fallback = canvas -->
+<img id="tree-img" class="hidden" />
+<canvas id="fallback-canvas"></canvas>
 
-<!-- HOLOGRAM PANEL -->
-<div id="holo-panel">
-  <div id="navi"></div>
-  <div class="panel-frame">
-    <div class="corner corner-tl"></div>
-    <div class="corner corner-tr"></div>
-    <div class="corner corner-bl"></div>
-    <div class="corner corner-br"></div>
-    <button id="close-btn">✕ ESC</button>
-    
-    <div class="navi-text">◈ Hey! Écoute! ◈</div>
-    <div class="node-name" id="panel-name"></div>
-    <div class="node-layer" id="panel-layer"></div>
-    
-    <div class="section-title">◇ C'est quoi ?</div>
-    <div class="section-text" id="panel-desc"></div>
-    
-    <div class="section-title">◇ Ce que tu dois faire</div>
-    <div class="section-text" id="panel-task"></div>
-    
-    <div class="section-title">◇ Demande à l'IA</div>
-    <div id="panel-prompts"></div>
-    
-    <div class="status-bar">
-      <div class="status-dot" id="panel-dot"></div>
-      <div class="status-text" id="panel-status">TODO</div>
-    </div>
+<!-- NAVI FAIRY -->
+<div id="navi">
+  <div class="w w1"></div>
+  <div class="w w2"></div>
+  <div class="w w3"></div>
+  <div class="w w4"></div>
+  <div class="navi-core"></div>
+</div>
+<div id="hey">Hey!&nbsp;Écoute!</div>
+
+<!-- PANEL -->
+<div id="panel">
+  <div class="pf">
+    <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+    <button id="xbtn">✕ ESC</button>
+    <div class="tag">◈ Hey! Écoute! ◈</div>
+    <div class="name" id="p-name"></div>
+    <div class="layer" id="p-layer"></div>
+    <div class="stit">◇ C'est quoi ?</div>
+    <div class="stxt" id="p-desc"></div>
+    <div class="stit">◇ Ce que tu dois faire</div>
+    <div class="stxt" id="p-task"></div>
+    <div class="stit">◇ Demande à l'IA</div>
+    <div id="p-prompts"></div>
+    <div class="sbar"><div class="sdot"></div><div class="stx">TODO</div></div>
   </div>
 </div>
 
-<div class="scanlines"></div>
+<div class="scan"></div>
 
 <script>
-// ══════ NODE DATA ══════
-const LAYER_INFO = {
-  'T': {
-    fullName: 'CIME — La Vision',
-    color: '#5a9a35',
-    desc: "C'est le sommet de ton projet. La cime de l'arbre. C'est là que tu définis CE QUE ton app fait, en une phrase. Si tu peux pas l'expliquer en une phrase, c'est que c'est pas encore clair dans ta tête.",
-    task: "Écris une phrase qui résume ton projet. Genre: 'Une app qui affiche mes repos GitHub comme un arbre qui pousse.' C'est ta boussole. Tout le reste découle de là.",
-    prompts: [
-      "Aide-moi à résumer mon projet en une phrase claire",
-      "Quel est l'objectif principal de mon application ?",
-      "Explique-moi la vision de mon projet comme si j'avais 10 ans"
-    ]
-  },
-  'B': {
-    fullName: 'BRANCHES — Les Grosses Features',
-    color: '#3d8a3a',
-    desc: "Les branches, c'est les GROS morceaux de ton projet. Les features principales. Chaque branche = une chose importante que ton app sait faire. T'en as pas 50, t'en as 3 ou 4 max.",
-    task: "Liste les 3-4 trucs les plus importants que ton app doit faire. Pas les détails, les GROS trucs. Genre: '1. Lire les repos GitHub 2. Afficher un arbre 3. Tracker la progression'.",
-    prompts: [
-      "Quelles sont les 3 features principales de mon projet ?",
-      "Aide-moi à découper mon projet en gros blocs fonctionnels",
-      "C'est quoi le MVP minimum de mon app ?"
-    ]
-  },
-  'b': {
-    fullName: 'RAMEAUX — Les Sous-Features',
-    color: '#389060',
-    desc: "Les rameaux, c'est quand tu prends une grosse branche et tu la découpes en morceaux plus petits. C'est là que ça commence à devenir concret. Chaque rameau c'est une tâche que tu peux faire en une session.",
-    task: "Prends chaque grosse feature et découpe-la en 2-3 sous-tâches. Genre: 'Afficher un arbre' → 'charger l'image', 'placer les nœuds', 'dessiner les câbles'. Des trucs faisables en une après-midi.",
-    prompts: [
-      "Découpe cette feature en sous-tâches concrètes",
-      "Quels sont les étapes pour implémenter [feature] ?",
-      "Par quoi je commence pour coder cette partie ?"
-    ]
-  },
-  'F': {
-    fullName: 'FEUILLES — Le Code',
-    color: '#32b555',
-    desc: "Les feuilles, c'est là où le code vit. Chaque feuille = un fichier, une fonction, un composant. C'est le niveau où tu ouvres ton éditeur et tu tapes. C'est ici que toi et l'IA vous bossez ensemble.",
-    task: "C'est le moment de coder. Ouvre ton éditeur, décris à l'IA ce que tu veux, et laisse-la t'aider. Teste, corrige, avance. Chaque feuille finie = un bout de vert sur ton arbre.",
-    prompts: [
-      "Écris-moi le code pour [fonction spécifique]",
-      "J'ai cette erreur, aide-moi à comprendre et corriger",
-      "Comment je structure ce fichier pour faire [chose] ?"
-    ]
-  },
-  'C': {
-    fullName: 'CŒUR — Le Tronc',
-    color: '#28c862',
-    desc: "Le cœur, c'est le tronc de ton arbre. C'est le fichier principal, le point d'entrée, le truc qui tient TOUT ensemble. Sans le tronc, rien ne tient debout. C'est ton main.dart, ton app.py, ton index.js.",
-    task: "Assure-toi que ton point d'entrée est propre. C'est le premier fichier que quelqu'un ouvre. Il doit être clair, bien structuré, et dire 'voilà ce que ce projet fait'. Tout part de là, tout revient à là.",
-    prompts: [
-      "Structure-moi le fichier principal de mon projet",
-      "Comment organiser mes imports et mes routes ?",
-      "Fais-moi un squelette propre pour démarrer mon app"
-    ]
-  },
-  'R-1': {
-    fullName: 'RACINE 1 — Setup & Config',
-    color: '#9a7453',
-    desc: "La première couche de racines. C'est le setup: installer les dépendances, configurer l'environnement, créer le repo Git. C'est pas sexy mais sans ça, RIEN ne pousse au-dessus.",
-    task: "Crée ton repo, installe tes packages, configure ton linter. Fais en sorte que quand tu tapes 'run', ça démarre. Même si ça affiche rien de beau, le moteur doit tourner.",
-    prompts: [
-      "Crée-moi le setup complet pour un projet [Flutter/Python/etc]",
-      "Quelles dépendances j'ai besoin pour faire [chose] ?",
-      "Configure-moi le pubspec.yaml / requirements.txt / package.json"
-    ]
-  },
-  'R-2': {
-    fullName: 'RACINE 2 — Données & Modèles',
-    color: '#8a6344',
-    desc: "Deuxième couche. C'est là que tu définis tes données. Quels objets ton app manipule ? Un User ? Un Repo ? Un Node ? C'est les classes, les modèles, les schémas. Le squelette invisible de ton app.",
-    task: "Dessine tes modèles de données. Même sur papier. Un User a un nom, un email. Un Repo a un nom, des commits. Ensuite demande à l'IA de te les coder proprement.",
-    prompts: [
-      "Crée-moi les modèles de données pour mon app",
-      "Comment je structure ma classe [Chose] en [langage] ?",
-      "Fais-moi un schéma JSON pour représenter [données]"
-    ]
-  },
-  'R-3': {
-    fullName: 'RACINE 3 — API & Services',
-    color: '#7a5235',
-    desc: "Troisième couche. Ton app parle au monde extérieur ici. API GitHub, base de données, fichiers locaux — c'est la plomberie qui connecte tes données au monde réel.",
-    task: "Connecte ton app à ses sources de données. Un appel API, une lecture de fichier, une requête en base. Teste que les données arrivent. Même brutes, même moches, tant que ça arrive.",
-    prompts: [
-      "Comment je fais un appel API à [service] ?",
-      "Écris-moi le service qui récupère les données de [source]",
-      "Comment je gère les erreurs réseau proprement ?"
-    ]
-  },
-  'R-4': {
-    fullName: 'RACINE 4 — Tests & Validation',
-    color: '#6b4226',
-    desc: "Quatrième couche. C'est là que tu vérifies que rien est cassé. Pas besoin de tests unitaires compliqués — juste vérifier que quand tu appuies sur un bouton, le bon truc se passe.",
-    task: "Teste chaque feature à la main. Clique partout, essaie de casser ton app. Note ce qui marche pas. C'est ton QA perso. Si t'es motivé, écris un ou deux tests automatiques sur les trucs critiques.",
-    prompts: [
-      "Comment j'écris un test simple pour [fonction] ?",
-      "Mon app crash quand je fais [action], aide-moi à debug",
-      "Quels sont les cas limites que j'ai oublié ?"
-    ]
-  },
-  'R-5': {
-    fullName: 'RACINE 5 — Déploiement & Partage',
-    color: '#5c3317',
-    desc: "La couche la plus profonde. Ton app est prête, faut la mettre au monde. Build, deploy, partager le lien. C'est le moment où ton arbre sort de terre et les autres peuvent le voir.",
-    task: "Build ton app. Pousse sur GitHub. Si c'est une app web, déploie sur Vercel ou Netlify. Si c'est mobile, fais un APK. Partage le lien. Ton arbre est vivant.",
-    prompts: [
-      "Comment je build et déploie mon app [type] ?",
-      "Aide-moi à configurer le CI/CD sur GitHub Actions",
-      "Comment je fais un APK / une release de mon app ?"
-    ]
-  }
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+const L={
+  T:{n:'CIME — La Vision',c:'#5a9a35',
+    d:"C'est le sommet de ton projet. La cime. C'est là que tu définis CE QUE ton app fait, en une phrase. Si tu peux pas l'expliquer en une phrase, c'est pas encore clair dans ta tête.",
+    t:"Écris une phrase qui résume ton projet. Genre: 'Une app qui affiche mes repos GitHub comme un arbre qui pousse.' C'est ta boussole.",
+    p:["Aide-moi à résumer mon projet en une phrase claire","Quel est l'objectif principal de mon application ?","Explique-moi la vision de mon projet comme si j'avais 10 ans"]},
+  B:{n:'BRANCHES — Les Grosses Features',c:'#3d8a3a',
+    d:"Les branches c'est les GROS morceaux. Les features principales. Chaque branche = une chose importante que ton app sait faire. T'en as pas 50, t'en as 3 ou 4 max.",
+    t:"Liste les 3-4 trucs les plus importants que ton app doit faire. Pas les détails, les GROS trucs.",
+    p:["Quelles sont les 3 features principales de mon projet ?","Aide-moi à découper mon projet en gros blocs","C'est quoi le MVP minimum de mon app ?"]},
+  b:{n:'RAMEAUX — Les Sous-Features',c:'#389060',
+    d:"Les rameaux c'est quand tu prends une grosse branche et tu la découpes en morceaux plus petits. Chaque rameau = une tâche faisable en une session.",
+    t:"Prends chaque feature et découpe-la en 2-3 sous-tâches. Genre: 'Afficher un arbre' → 'charger l'image', 'placer les nœuds', 'dessiner les câbles'.",
+    p:["Découpe cette feature en sous-tâches concrètes","Par quoi je commence pour coder cette partie ?","Quelles sont les étapes pour implémenter ça ?"]},
+  F:{n:'FEUILLES — Le Code',c:'#32b555',
+    d:"Les feuilles c'est là où le code vit. Chaque feuille = un fichier, une fonction, un composant. C'est ici que toi et l'IA vous bossez ensemble.",
+    t:"C'est le moment de coder. Décris à l'IA ce que tu veux, et laisse-la t'aider. Chaque feuille finie = un bout de vert sur ton arbre.",
+    p:["Écris-moi le code pour cette fonction","J'ai cette erreur, aide-moi à comprendre","Comment je structure ce fichier ?"]},
+  C:{n:'CŒUR — Le Tronc',c:'#28c862',
+    d:"Le cœur c'est le tronc. Le fichier principal, le point d'entrée. C'est ton main.dart, ton app.py, ton index.js. Sans ça, rien tient debout.",
+    t:"Assure-toi que ton point d'entrée est propre. C'est le premier fichier que quelqu'un ouvre. Il doit être clair.",
+    p:["Structure-moi le fichier principal de mon projet","Comment organiser mes imports et mes routes ?","Fais-moi un squelette propre pour démarrer"]},
+  'R-1':{n:'RACINE 1 — Setup & Config',c:'#9a7453',
+    d:"Première couche de racines. Le setup: dépendances, environnement, repo Git. C'est pas sexy mais sans ça RIEN pousse au-dessus.",
+    t:"Crée ton repo, installe tes packages, configure ton linter. Fais que quand tu tapes 'run' ça démarre.",
+    p:["Crée-moi le setup complet pour un projet Flutter/Python","Quelles dépendances j'ai besoin ?","Configure-moi le pubspec.yaml / requirements.txt"]},
+  'R-2':{n:'RACINE 2 — Données & Modèles',c:'#8a6344',
+    d:"Deuxième couche. Tu définis tes données ici. Quels objets ton app manipule ? C'est les classes, les modèles, les schémas.",
+    t:"Dessine tes modèles. Même sur papier. Un User a un nom, un email. Ensuite demande à l'IA de les coder.",
+    p:["Crée-moi les modèles de données pour mon app","Comment je structure ma classe en Dart/Python ?","Fais-moi un schéma JSON pour mes données"]},
+  'R-3':{n:'RACINE 3 — API & Services',c:'#7a5235',
+    d:"Troisième couche. Ton app parle au monde extérieur ici. API, base de données, fichiers — la plomberie qui connecte au monde réel.",
+    t:"Connecte ton app à ses sources de données. Teste que les données arrivent. Même brutes, tant que ça arrive.",
+    p:["Comment je fais un appel API à ce service ?","Écris-moi le service qui récupère les données","Comment je gère les erreurs réseau ?"]},
+  'R-4':{n:'RACINE 4 — Tests',c:'#6b4226',
+    d:"Quatrième couche. Tu vérifies que rien est cassé. Clique partout, essaie de casser ton app. Note ce qui marche pas.",
+    t:"Teste chaque feature à la main. Clique partout. C'est ton QA perso.",
+    p:["Comment j'écris un test simple ?","Mon app crash, aide-moi à debug","Quels cas limites j'ai oublié ?"]},
+  'R-5':{n:'RACINE 5 — Déploiement',c:'#5c3317',
+    d:"La couche la plus profonde. Ton app est prête, faut la mettre au monde. Build, deploy, partager le lien.",
+    t:"Build. Pousse sur GitHub. Déploie. Partage. Ton arbre est vivant.",
+    p:["Comment je build et déploie mon app ?","Aide-moi à configurer le CI/CD","Comment je fais une release ?"]}
 };
 
-const NODES = [
-  {id:"T22",lk:"T",x:432,y:144}, {id:"T23",lk:"T",x:592,y:144},
-  {id:"B20",lk:"B",x:299,y:257}, {id:"B21",lk:"B",x:674,y:254},
-  {id:"b17",lk:"b",x:336,y:370}, {id:"b18",lk:"b",x:601,y:359}, {id:"b19",lk:"b",x:739,y:404},
-  {id:"F13",lk:"F",x:412,y:484}, {id:"F14",lk:"F",x:595,y:484}, {id:"F15",lk:"F",x:674,y:563},
+const N=[
+  {id:"T22",lk:"T",x:432,y:144},{id:"T23",lk:"T",x:592,y:144},
+  {id:"B20",lk:"B",x:299,y:257},{id:"B21",lk:"B",x:674,y:254},
+  {id:"b17",lk:"b",x:336,y:370},{id:"b18",lk:"b",x:601,y:359},{id:"b19",lk:"b",x:739,y:404},
+  {id:"F13",lk:"F",x:412,y:484},{id:"F14",lk:"F",x:595,y:484},{id:"F15",lk:"F",x:674,y:563},
   {id:"C12",lk:"C",x:513,y:743},
-  {id:"R-11",lk:"R-1",x:336,y:957}, {id:"R-12",lk:"R-1",x:618,y:960}, {id:"R-13",lk:"R-1",x:703,y:997},
-  {id:"R-24",lk:"R-2",x:316,y:1056}, {id:"R-25",lk:"R-2",x:762,y:1062},
-  {id:"R-36",lk:"R-3",x:189,y:1121}, {id:"R-37",lk:"R-3",x:945,y:1127}, {id:"R-38",lk:"R-3",x:785,y:1130},
-  {id:"R-48",lk:"R-4",x:293,y:1206}, {id:"R-49",lk:"R-4",x:731,y:1208},
-  {id:"R-510",lk:"R-5",x:352,y:1347}, {id:"R-511",lk:"R-5",x:683,y:1333}
+  {id:"R-11",lk:"R-1",x:336,y:957},{id:"R-12",lk:"R-1",x:618,y:960},{id:"R-13",lk:"R-1",x:703,y:997},
+  {id:"R-24",lk:"R-2",x:316,y:1056},{id:"R-25",lk:"R-2",x:762,y:1062},
+  {id:"R-36",lk:"R-3",x:189,y:1121},{id:"R-37",lk:"R-3",x:945,y:1127},{id:"R-38",lk:"R-3",x:785,y:1130},
+  {id:"R-48",lk:"R-4",x:293,y:1206},{id:"R-49",lk:"R-4",x:731,y:1208},
+  {id:"R-510",lk:"R-5",x:352,y:1347},{id:"R-511",lk:"R-5",x:683,y:1333}
 ];
 
-const CONNECTIONS = [
-  ["C12","T22"],["C12","T23"],["C12","F13"],["C12","F14"],["C12","F15"],
-  ["F13","b17"],["F14","b18"],["F15","b19"],["b17","B20"],["b18","B21"],
-  ["C12","R-11"],["C12","R-12"],["C12","R-13"],
-  ["R-11","R-24"],["R-12","R-25"],["R-24","R-36"],["R-25","R-38"],
-  ["R-38","R-49"],["R-49","R-511"],["R-36","R-48"],["R-48","R-510"]
+const CONN=[
+  ["C12","R-11"],["C12","R-12"],["C12","R-13"],["C12","F13"],["C12","F14"],["C12","F15"],
+  ["C12","T22"],["C12","T23"],["F13","b17"],["F14","b18"],["F15","b19"],
+  ["b17","B20"],["b18","B21"],["R-11","R-24"],["R-12","R-25"],
+  ["R-24","R-36"],["R-25","R-38"],["R-38","R-49"],["R-49","R-511"],
+  ["R-36","R-48"],["R-48","R-510"]
 ];
 
-// ══════ CANVAS SETUP ══════
-const canvas = document.getElementById('tree-canvas');
-const ctx = canvas.getContext('2d');
-const container = document.getElementById('canvas-container');
+// ══════════════════════════════════════════
+// LAYOUT
+// ══════════════════════════════════════════
+const IW=1024,IH=1536;
+let sc,ox,oy,imgOK=false;
 
-const IMG_W = 1024, IMG_H = 1536;
-let scale = 1, offsetX = 0, offsetY = 0;
+const tImg=document.getElementById('tree-img');
+const fCanvas=document.getElementById('fallback-canvas');
+const fCtx=fCanvas.getContext('2d');
 
-const img = new Image();
-img.src = 'templates/baobab_render_final.png';
-img.onload = () => {
-  resize();
-  render();
-  createHitboxes();
-};
-
-function resize() {
-  const vw = window.innerWidth, vh = window.innerHeight;
-  scale = Math.min(vw / IMG_W, vh / IMG_H);
-  canvas.width = IMG_W * scale;
-  canvas.height = IMG_H * scale;
-  offsetX = (vw - canvas.width) / 2;
-  offsetY = (vh - canvas.height) / 2;
-  canvas.style.position = 'absolute';
-  canvas.style.left = offsetX + 'px';
-  canvas.style.top = offsetY + 'px';
+// try loading image from multiple paths
+const paths=['templates/baobab_render_final.png','./templates/baobab_render_final.png'];
+let pathIdx=0;
+function tryLoad(){
+  if(pathIdx>=paths.length){imgOK=false;layout();return}
+  tImg.onload=()=>{imgOK=true;tImg.classList.remove('hidden');layout()};
+  tImg.onerror=()=>{pathIdx++;tryLoad()};
+  tImg.src=paths[pathIdx];
 }
+tryLoad();
 
-function render() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-}
-
-function createHitboxes() {
-  document.querySelectorAll('.node-hitbox').forEach(e => e.remove());
-  NODES.forEach(n => {
-    const div = document.createElement('div');
-    div.className = 'node-hitbox';
-    div.dataset.id = n.id;
-    div.dataset.lk = n.lk;
-    div.style.left = (offsetX + n.x * scale) + 'px';
-    div.style.top = (offsetY + n.y * scale) + 'px';
-    const info = LAYER_INFO[n.lk];
-    div.style.background = `radial-gradient(circle, ${info.color}cc, ${info.color}44, transparent)`;
-    div.addEventListener('click', () => showPanel(n));
-    container.appendChild(div);
-  });
-}
-
-// ══════ PANEL ══════
-const panel = document.getElementById('holo-panel');
-let activeNode = null;
-
-function showPanel(node) {
-  const info = LAYER_INFO[node.lk];
-  if (!info) return;
-
-  // Deselect previous
-  document.querySelectorAll('.node-hitbox.active').forEach(e => e.classList.remove('active'));
-  document.querySelector(`[data-id="${node.id}"]`)?.classList.add('active');
-  activeNode = node;
-
-  document.getElementById('panel-name').textContent = node.id;
-  document.getElementById('panel-layer').textContent = info.fullName;
-  document.getElementById('panel-desc').textContent = info.desc;
-  document.getElementById('panel-task').textContent = info.task;
+function layout(){
+  const vw=window.innerWidth,vh=window.innerHeight;
+  sc=Math.min(vw/IW,vh/IH);
+  const cw=IW*sc,ch=IH*sc;
+  ox=(vw-cw)/2;oy=(vh-ch)/2;
   
-  const promptsDiv = document.getElementById('panel-prompts');
-  promptsDiv.innerHTML = '';
-  info.prompts.forEach(p => {
-    const box = document.createElement('div');
-    box.className = 'ask-ai-box';
-    box.innerHTML = `<div class="prompt">${p}</div>`;
-    box.style.cursor = 'pointer';
-    box.addEventListener('click', () => {
-      navigator.clipboard?.writeText(p);
-      box.style.borderColor = '#00ffcc';
-      box.querySelector('.prompt').textContent = '✓ Copié !';
-      setTimeout(() => {
-        box.style.borderColor = '';
-        box.querySelector('.prompt').textContent = p;
-      }, 1500);
-    });
-    promptsDiv.appendChild(box);
+  if(imgOK){
+    tImg.style.left=ox+'px';tImg.style.top=oy+'px';
+    tImg.style.width=cw+'px';tImg.style.height=ch+'px';
+    fCanvas.style.display='none';
+  } else {
+    // fallback: draw cables + nodes on canvas
+    fCanvas.width=vw;fCanvas.height=vh;
+    fCanvas.style.display='block';
+    drawFallback(vw,vh);
+  }
+  makeDots();
+}
+
+function drawFallback(vw,vh){
+  fCtx.fillStyle='#050510';fCtx.fillRect(0,0,vw,vh);
+  
+  // draw cables
+  fCtx.strokeStyle='rgba(0,180,255,0.15)';fCtx.lineWidth=2;
+  CONN.forEach(([a,b])=>{
+    const na=N.find(n=>n.id===a),nb=N.find(n=>n.id===b);
+    if(!na||!nb)return;
+    fCtx.beginPath();
+    const ax=ox+na.x*sc,ay=oy+na.y*sc,bx=ox+nb.x*sc,by=oy+nb.y*sc;
+    // catenary sag
+    const mx=(ax+bx)/2,my=(ay+by)/2+Math.abs(bx-ax)*0.12;
+    fCtx.moveTo(ax,ay);fCtx.quadraticCurveTo(mx,my,bx,by);
+    fCtx.stroke();
   });
-
-  panel.classList.add('visible');
+  
+  // sol line
+  const solY=oy+895*sc;
+  fCtx.strokeStyle='rgba(0,220,255,0.08)';fCtx.lineWidth=1;
+  fCtx.beginPath();fCtx.moveTo(ox,solY);fCtx.lineTo(ox+IW*sc,solY);fCtx.stroke();
+  fCtx.fillStyle='rgba(0,220,255,0.03)';
+  fCtx.font='9px Orbitron';fCtx.fillText('SOL',ox+10,solY-4);
+  
+  // glow nodes
+  N.forEach(n=>{
+    const x=ox+n.x*sc,y=oy+n.y*sc;
+    const col=L[n.lk]?.c||'#00dcff';
+    const g=fCtx.createRadialGradient(x,y,0,x,y,14*sc);
+    g.addColorStop(0,col+'cc');g.addColorStop(.5,col+'44');g.addColorStop(1,'transparent');
+    fCtx.fillStyle=g;fCtx.beginPath();fCtx.arc(x,y,14*sc,0,Math.PI*2);fCtx.fill();
+  });
 }
 
-function hidePanel() {
-  panel.classList.remove('visible');
-  document.querySelectorAll('.node-hitbox.active').forEach(e => e.classList.remove('active'));
-  activeNode = null;
+function makeDots(){
+  document.querySelectorAll('.node-dot').forEach(e=>e.remove());
+  N.forEach(n=>{
+    const d=document.createElement('div');
+    d.className='node-dot';d.dataset.id=n.id;d.dataset.label=n.id;
+    const info=L[n.lk];
+    d.style.left=(ox+n.x*sc)+'px';d.style.top=(oy+n.y*sc)+'px';
+    d.style.background=`radial-gradient(circle,${info.c}dd,${info.c}55,transparent)`;
+    d.style.boxShadow=`0 0 12px ${info.c}66`;
+    d.addEventListener('click',()=>{openPanel(n);naviTo(ox+n.x*sc,oy+n.y*sc)});
+    document.body.appendChild(d);
+  });
 }
 
-document.getElementById('close-btn').addEventListener('click', hidePanel);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePanel(); });
+window.addEventListener('resize',layout);
 
-window.addEventListener('resize', () => {
-  resize();
-  render();
-  createHitboxes();
-});
+// ══════════════════════════════════════════
+// ✨ NAVI FAIRY FLIGHT ENGINE ✨
+// ══════════════════════════════════════════
+const navi=document.getElementById('navi');
+const hey=document.getElementById('hey');
+let nx=window.innerWidth/2,ny=window.innerHeight/2;
+let nvx=0,nvy=0;
+let tx=nx,ty=ny;
+let mode='wander'; // wander | goto | orbit | dash
+let tick=0,wAngle=Math.random()*Math.PI*2;
+let oAngle=0,oCX=0,oCY=0;
+let heyTTL=0;
+let sparks=[];
+
+function naviTo(x,y){
+  tx=x;ty=y;mode='goto';
+  heyTTL=80;hey.style.opacity='1';
+}
+
+function naviLoop(){
+  tick++;
+  const vw=window.innerWidth,vh=window.innerHeight;
+  
+  if(mode==='wander'){
+    wAngle+=(Math.random()-.5)*.12;
+    const spd=1.2+Math.sin(tick*.015)*.7;
+    tx+=Math.cos(wAngle)*spd;
+    ty+=Math.sin(wAngle)*spd;
+    // soft bounce
+    if(tx<40){wAngle=Math.abs(wAngle)%Math.PI;tx=40}
+    if(tx>vw-40){wAngle=Math.PI-wAngle;tx=vw-40}
+    if(ty<40){wAngle=-wAngle;ty=40}
+    if(ty>vh-40){wAngle=-wAngle;ty=vh-40}
+    
+    // randomly fly to node
+    if(Math.random()<.003){
+      const rn=N[Math.floor(Math.random()*N.length)];
+      tx=ox+rn.x*sc;ty=oy+rn.y*sc;mode='goto';
+      if(Math.random()<.4){heyTTL=55;hey.style.opacity='1'}
+    }
+    // randomly DASH across screen
+    if(Math.random()<.0008){
+      mode='dash';
+      tx=Math.random()*vw;ty=Math.random()*vh;
+    }
+    // fly through panel sometimes
+    if(Math.random()<.0015&&document.getElementById('panel').classList.contains('on')){
+      const r=document.getElementById('panel').getBoundingClientRect();
+      tx=r.left+r.width*.5;ty=r.top+r.height*Math.random();mode='goto';
+    }
+  }
+  else if(mode==='goto'){
+    const dx=tx-nx,dy=ty-ny,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<15){mode='orbit';oCX=nx;oCY=ny;oAngle=0;tick=0}
+  }
+  else if(mode==='orbit'){
+    oAngle+=.045;
+    const r=22+Math.sin(oAngle*2.5)*8;
+    tx=oCX+Math.cos(oAngle)*r;ty=oCY+Math.sin(oAngle)*r;
+    if(tick>160){mode='wander';wAngle=Math.random()*Math.PI*2}
+  }
+  else if(mode==='dash'){
+    // fast straight line
+    const dx=tx-nx,dy=ty-ny,d=Math.sqrt(dx*dx+dy*dy);
+    nvx+=dx*.12;nvy+=dy*.12;
+    if(d<30){mode='wander';wAngle=Math.atan2(nvy,nvx)}
+  }
+  
+  // physics
+  const ease=mode==='dash'?.1:mode==='goto'?.055:.025;
+  nvx+=(tx-nx)*ease;nvy+=(ty-ny)*ease;
+  nvx*=.87;nvy*=.87;
+  nx+=nvx;ny+=nvy;
+  
+  const bob=Math.sin(tick*.055)*4;
+  navi.style.left=nx+'px';navi.style.top=(ny+bob)+'px';
+  
+  // wing speed = velocity
+  const speed=Math.sqrt(nvx*nvx+nvy*nvy);
+  const flapSpeed=Math.max(.06,Math.min(.2,.12-speed*.002));
+  navi.querySelectorAll('.w').forEach(w=>{
+    w.style.animationDuration=flapSpeed+'s';
+  });
+  
+  // hey listen
+  if(heyTTL>0){
+    heyTTL--;
+    hey.style.left=(nx+28)+'px';hey.style.top=(ny-18+bob)+'px';
+    if(heyTTL<=0)hey.style.opacity='0';
+  }
+  
+  // sparkle trail
+  if(tick%2===0){
+    const s=document.createElement('div');
+    s.className='spark';
+    const sz=2+Math.random()*4;
+    s.style.width=sz+'px';s.style.height=sz+'px';
+    s.style.left=(nx+(Math.random()-.5)*12)+'px';
+    s.style.top=(ny+bob+(Math.random()-.5)*12)+'px';
+    const hue=160+Math.random()*40;
+    s.style.background=`radial-gradient(circle,hsla(${hue},100%,70%,.5),transparent)`;
+    s.style.boxShadow=`0 0 ${3+Math.random()*5}px hsla(${hue},100%,60%,.3)`;
+    document.body.appendChild(s);
+    sparks.push({el:s,life:25+Math.random()*20});
+  }
+  
+  // extra sparkle burst on fast moves
+  if(speed>8&&tick%3===0){
+    for(let i=0;i<3;i++){
+      const s=document.createElement('div');s.className='spark';
+      const sz=1+Math.random()*3;
+      s.style.width=sz+'px';s.style.height=sz+'px';
+      s.style.left=(nx+(Math.random()-.5)*20)+'px';
+      s.style.top=(ny+bob+(Math.random()-.5)*20)+'px';
+      s.style.background=`radial-gradient(circle,rgba(0,255,200,.6),transparent)`;
+      document.body.appendChild(s);
+      sparks.push({el:s,life:12+Math.random()*10});
+    }
+  }
+  
+  // fade sparks
+  for(let i=sparks.length-1;i>=0;i--){
+    sparks[i].life--;
+    sparks[i].el.style.opacity=Math.max(0,sparks[i].life/35);
+    if(sparks[i].life<=0){sparks[i].el.remove();sparks.splice(i,1)}
+  }
+  
+  requestAnimationFrame(naviLoop);
+}
+naviLoop();
+
+// ══════════════════════════════════════════
+// PANEL
+// ══════════════════════════════════════════
+function openPanel(node){
+  const info=L[node.lk];if(!info)return;
+  document.querySelectorAll('.node-dot.active').forEach(e=>e.classList.remove('active'));
+  document.querySelector(`[data-id="${node.id}"]`)?.classList.add('active');
+  document.getElementById('p-name').textContent=node.id;
+  document.getElementById('p-layer').textContent=info.n;
+  document.getElementById('p-desc').textContent=info.d;
+  document.getElementById('p-task').textContent=info.t;
+  const pd=document.getElementById('p-prompts');pd.innerHTML='';
+  info.p.forEach(p=>{
+    const b=document.createElement('div');b.className='aib';
+    b.innerHTML=`<div class="pr">${p}</div>`;
+    b.addEventListener('click',()=>{
+      navigator.clipboard?.writeText(p);
+      b.querySelector('.pr').textContent='✓ Copié !';b.style.borderColor='#00ffcc';
+      setTimeout(()=>{b.querySelector('.pr').textContent=p;b.style.borderColor=''},1200);
+    });
+    pd.appendChild(b);
+  });
+  const pf=document.querySelector('.pf');pf.classList.remove('on');
+  void pf.offsetWidth;pf.classList.add('on');
+  document.getElementById('panel').classList.add('on');
+}
+
+function closePanel(){
+  document.getElementById('panel').classList.remove('on');
+  document.querySelectorAll('.node-dot.active').forEach(e=>e.classList.remove('active'));
+}
+
+document.getElementById('xbtn').addEventListener('click',closePanel);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanel()});
 </script>
 </body>
 </html>
