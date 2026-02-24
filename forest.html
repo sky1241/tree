@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌲 Sky's Forest — 663K Lines</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#050510;font-family:'Rajdhani',sans-serif;color:#c8f0ff;min-height:100vh;overflow-x:hidden}
+
+/* Header */
+.header{
+  text-align:center;padding:40px 20px 20px;
+  background:linear-gradient(180deg,rgba(0,15,30,.95),transparent);
+  position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+}
+.header h1{
+  font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;
+  color:#00dcff;text-shadow:0 0 30px rgba(0,220,255,.4);
+  letter-spacing:4px;
+}
+.header .stats{
+  font-size:14px;color:#00dcff88;letter-spacing:2px;margin-top:8px;
+  font-family:'Orbitron',sans-serif;
+}
+.header .stats span{color:#00ffcc}
+
+/* Grid */
+.forest{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+  gap:20px;padding:20px 30px 80px;
+  max-width:1600px;margin:0 auto;
+}
+
+.tree-card{
+  position:relative;
+  background:rgba(5,10,25,.8);
+  border:1px solid rgba(0,180,255,.15);
+  border-radius:6px;
+  overflow:hidden;
+  cursor:pointer;
+  transition:all .3s ease;
+}
+.tree-card:hover{
+  border-color:rgba(0,220,255,.5);
+  transform:translateY(-4px);
+  box-shadow:0 8px 30px rgba(0,180,255,.15);
+}
+
+.tree-card img{
+  width:100%;aspect-ratio:1024/1536;object-fit:cover;
+  display:block;opacity:.85;transition:opacity .3s;
+}
+.tree-card:hover img{opacity:1}
+
+.card-info{
+  padding:14px 16px;
+  background:linear-gradient(180deg,transparent,rgba(0,8,20,.95) 30%);
+  position:absolute;bottom:0;left:0;right:0;
+}
+.card-name{
+  font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;
+  color:#00dcff;text-shadow:0 0 12px rgba(0,220,255,.4);
+  margin-bottom:4px;
+}
+.card-meta{
+  font-size:12px;color:#00dcff88;letter-spacing:1px;
+  font-family:'Orbitron',sans-serif;
+}
+.card-meta span{color:#00ffcc}
+
+.card-badge{
+  position:absolute;top:12px;right:12px;
+  font-size:28px;filter:drop-shadow(0 0 8px rgba(0,0,0,.8));
+}
+.card-phase{
+  position:absolute;top:14px;left:12px;
+  font-family:'Orbitron',sans-serif;font-size:9px;
+  color:#00ffcc;letter-spacing:2px;
+  background:rgba(0,20,40,.8);padding:3px 8px;border-radius:3px;
+  border:1px solid rgba(0,255,200,.2);
+}
+
+/* ══════ NAVI ══════ */
+#navi{position:fixed;z-index:500;pointer-events:none;width:120px;height:120px;transform:translate(-50%,-50%)}
+.orb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff,#b0ffee,#00e8c0,#0088ff,transparent);animation:op .8s ease-in-out infinite}
+.g1{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,210,.5),rgba(0,200,255,.2),transparent);animation:gb 1.2s ease-in-out infinite}
+.g2{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,220,.15),rgba(0,150,255,.08),transparent);animation:gb 1.2s ease-in-out infinite .3s}
+.g3{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,200,.06),rgba(0,100,255,.03),transparent);animation:gb 1.2s ease-in-out infinite .6s}
+@keyframes op{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 15px #00ffd5,0 0 30px #00ccff88,0 0 5px #fff}50%{transform:translate(-50%,-50%) scale(1.3);box-shadow:0 0 25px #00ffd5,0 0 50px #00ccffaa,0 0 80px #0066ff44,0 0 8px #fff}}
+@keyframes gb{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.8}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1}}
+
+.w{position:absolute;top:50%;left:50%;border-radius:80% 80% 60% 60%;opacity:.35;
+  background:linear-gradient(120deg,rgba(0,255,220,.15),rgba(100,200,255,.25),rgba(180,220,255,.15),rgba(0,255,200,.2),rgba(0,180,255,.1));
+  border:1px solid rgba(180,240,255,.2);box-shadow:inset 0 0 8px rgba(0,255,220,.1)}
+.w-tl{width:52px;height:13px;transform-origin:95% 95%;transform:translate(-85%,-28px) rotate(-60deg);animation:fg .10s ease-in-out infinite alternate}
+.w-ml{width:44px;height:11px;transform-origin:95% 80%;transform:translate(-92%,-2px) rotate(-15deg);animation:fm .12s ease-in-out infinite alternate}
+.w-bl{width:32px;height:9px;transform-origin:95% 10%;transform:translate(-85%,-3px) rotate(25deg);animation:fp .14s ease-in-out infinite alternate}
+.w-tr{width:52px;height:13px;transform-origin:5% 95%;transform:translate(-15%,-28px) rotate(60deg);animation:fgr .10s ease-in-out infinite alternate}
+.w-mr{width:44px;height:11px;transform-origin:5% 80%;transform:translate(-8%,-2px) rotate(15deg);animation:fmr .12s ease-in-out infinite alternate}
+.w-br{width:32px;height:9px;transform-origin:5% 10%;transform:translate(-15%,-3px) rotate(-25deg);animation:fpr .14s ease-in-out infinite alternate}
+@keyframes fg{from{transform:translate(-85%,-28px) rotate(-60deg) scaleY(1)}to{transform:translate(-85%,-28px) rotate(-78deg) scaleY(.45)}}
+@keyframes fgr{from{transform:translate(-15%,-28px) rotate(60deg) scaleY(1)}to{transform:translate(-15%,-28px) rotate(78deg) scaleY(.45)}}
+@keyframes fm{from{transform:translate(-92%,-2px) rotate(-15deg) scaleY(1)}to{transform:translate(-92%,-2px) rotate(-30deg) scaleY(.5)}}
+@keyframes fmr{from{transform:translate(-8%,-2px) rotate(15deg) scaleY(1)}to{transform:translate(-8%,-2px) rotate(30deg) scaleY(.5)}}
+@keyframes fp{from{transform:translate(-85%,-3px) rotate(25deg) scaleY(1)}to{transform:translate(-85%,-3px) rotate(40deg) scaleY(.5)}}
+@keyframes fpr{from{transform:translate(-15%,-3px) rotate(-25deg) scaleY(1)}to{transform:translate(-15%,-3px) rotate(-40deg) scaleY(.5)}}
+
+.spark{position:fixed;border-radius:50%;pointer-events:none;z-index:499}
+#hey{position:fixed;z-index:501;pointer-events:none;font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;color:#00ffcc;text-shadow:0 0 8px #00ffcc,0 0 20px #00aaff,0 0 40px #0066ff88;opacity:0;white-space:nowrap;letter-spacing:2px;transition:opacity .15s}
+
+.scan{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.02) 2px,rgba(0,0,0,.02) 4px);pointer-events:none;z-index:600}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌲 SKY'S FOREST</h1>
+  <div class="stats"><span>10</span> repos &nbsp;·&nbsp; <span>663,116</span> lines &nbsp;·&nbsp; <span>17,770</span> files &nbsp;·&nbsp; <span>6</span> families</div>
+</div>
+
+<div class="forest" id="forest"></div>
+
+<div id="navi">
+  <div class="g3"></div><div class="g2"></div><div class="g1"></div>
+  <div class="w w-tl"></div><div class="w w-ml"></div><div class="w w-bl"></div>
+  <div class="w w-tr"></div><div class="w w-mr"></div><div class="w w-br"></div>
+  <div class="orb"></div>
+</div>
+<div id="hey">Hey! Listen!</div>
+<div class="scan"></div>
+
+<script>
+const REPOS = [
+  {name:"HSBC-algo-genetic",family:"buisson",emoji:"🌿",lines:310511,files:9960,phase:"MATURE",langs:"HTML, Python",nodes:25},
+  {name:"jeu-pour-les-gamin",family:"buisson",emoji:"🌿",lines:126781,files:6286,phase:"MATURE",langs:"C++, Scheme",nodes:31},
+  {name:"yggdrasil-engine",family:"buisson",emoji:"🌿",lines:91620,files:248,phase:"MATURE",langs:"HTML, Python",nodes:17},
+  {name:"shazam-piano",family:"buisson",emoji:"🌿",lines:36061,files:350,phase:"MATURE",langs:"Dart, Python",nodes:25},
+  {name:"3d-printer",family:"baobab",emoji:"🌳",lines:34713,files:66,phase:"CROISSANCE",langs:"Python, HTML",nodes:9},
+  {name:"infernal-wheel",family:"buisson",emoji:"🌿",lines:22360,files:253,phase:"CROISSANCE",langs:"PowerShell, Dart",nodes:19},
+  {name:"p-egal-np-on-s-amuse-",family:"feuillu",emoji:"🍁",lines:19769,files:181,phase:"CROISSANCE",langs:"HTML, Python",nodes:8},
+  {name:"tree",family:"buisson",emoji:"🌿",lines:12933,files:124,phase:"CROISSANCE",langs:"Python, HTML",nodes:9},
+  {name:"fck-translation-",family:"buisson",emoji:"🌿",lines:6615,files:284,phase:"CROISSANCE",langs:"Dart, PowerShell",nodes:30},
+  {name:"-cole-de-danse",family:"palmier",emoji:"🌴",lines:1753,files:16,phase:"CROISSANCE",langs:"HTML",nodes:3},
+];
+
+const forest=document.getElementById('forest');
+REPOS.forEach(r=>{
+  const card=document.createElement('div');
+  card.className='tree-card';
+  const imgSrc=`templates/${r.name}_tree_render.png`;
+  card.innerHTML=`
+    <img src="${imgSrc}" alt="${r.name}" loading="lazy" onerror="this.style.background='#0a1020';this.style.minHeight='200px'"/>
+    <div class="card-badge">${r.emoji}</div>
+    <div class="card-phase">${r.phase}</div>
+    <div class="card-info">
+      <div class="card-name">${r.name}</div>
+      <div class="card-meta"><span>${r.lines.toLocaleString()}</span> lines · <span>${r.files}</span> files · ${r.langs}</div>
+    </div>`;
+  card.addEventListener('click',()=>{
+    window.open(`proto_navi.html?repo=${r.name}&family=${r.family}`,'_blank');
+  });
+  forest.appendChild(card);
+});
+
+// ═══ NAVI ═══
+const navi=document.getElementById('navi'),hey=document.getElementById('hey');
+let nx=window.innerWidth/2,ny=300,nvx=0,nvy=0,tx=nx,ty=ny;
+let mode='wander',tick=0,wA=Math.random()*Math.PI*2,oA=0,oCX=0,oCY=0;
+let sparks=[];
+
+function spamHey(){
+  hey.style.opacity='1';
+  const msgs=['Hey! Listen!','Hey!','Listen!','Hey! Écoute!','Watch out!'];
+  hey.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+  setTimeout(()=>{hey.style.opacity='0'},1200);
+}
+setInterval(spamHey,2000);
+setTimeout(spamHey,500);
+
+function loop(){
+  tick++;
+  const vw=window.innerWidth,vh=document.documentElement.scrollHeight;
+  const sy=window.scrollY,svh=window.innerHeight;
+  
+  if(mode==='wander'){
+    wA+=(Math.random()-.5)*.12;
+    const spd=1.5+Math.sin(tick*.015)*.8;
+    tx+=Math.cos(wA)*spd;ty+=Math.sin(wA)*spd;
+    // Keep near visible area
+    const visTop=sy+60,visBtm=sy+svh-60;
+    if(tx<40){wA=Math.abs(wA)%Math.PI;tx=40}
+    if(tx>vw-40){wA=Math.PI-wA;tx=vw-40}
+    if(ty<visTop){wA=Math.abs(wA);ty=visTop}
+    if(ty>visBtm){wA=-Math.abs(wA);ty=visBtm}
+    
+    // Fly to random card
+    if(Math.random()<.004){
+      const cards=document.querySelectorAll('.tree-card');
+      const c=cards[Math.floor(Math.random()*cards.length)];
+      const r=c.getBoundingClientRect();
+      tx=r.left+r.width/2;ty=sy+r.top+r.height*.3;mode='goto';
+      if(Math.random()<.5)spamHey();
+    }
+    if(Math.random()<.001){mode='dash';tx=Math.random()*vw;ty=sy+Math.random()*svh}
+  }else if(mode==='goto'){
+    if(Math.sqrt((tx-nx)**2+(ty-ny)**2)<15){mode='orbit';oCX=nx;oCY=ny;oA=0;tick=0}
+  }else if(mode==='orbit'){
+    oA+=.045;const r=25+Math.sin(oA*2.5)*10;
+    tx=oCX+Math.cos(oA)*r;ty=oCY+Math.sin(oA)*r;
+    if(tick>140){mode='wander';wA=Math.random()*Math.PI*2}
+  }else if(mode==='dash'){
+    nvx+=(tx-nx)*.12;nvy+=(ty-ny)*.12;
+    if(Math.sqrt((tx-nx)**2+(ty-ny)**2)<30){mode='wander';wA=Math.atan2(nvy,nvx)}
+  }
+  
+  const ease=mode==='dash'?.1:mode==='goto'?.055:.025;
+  nvx+=(tx-nx)*ease;nvy+=(ty-ny)*ease;
+  nvx*=.87;nvy*=.87;nx+=nvx;ny+=nvy;
+  const bob=Math.sin(tick*.055)*5;
+  navi.style.left=nx+'px';navi.style.top=(ny+bob-sy)+'px';
+  
+  hey.style.left=(nx+35)+'px';hey.style.top=(ny-22+bob-sy)+'px';
+  
+  if(tick%3===0){
+    const s=document.createElement('div');s.className='spark';
+    const sz=2+Math.random()*4;
+    s.style.width=sz+'px';s.style.height=sz+'px';
+    s.style.left=(nx+(Math.random()-.5)*14)+'px';
+    s.style.top=(ny+bob-sy+(Math.random()-.5)*14)+'px';
+    const hue=155+Math.random()*50;
+    s.style.background=`radial-gradient(circle,hsla(${hue},100%,75%,.5),transparent)`;
+    s.style.boxShadow=`0 0 ${4+Math.random()*5}px hsla(${hue},100%,65%,.3)`;
+    document.body.appendChild(s);sparks.push({el:s,life:25+Math.random()*18});
+  }
+  for(let i=sparks.length-1;i>=0;i--){
+    sparks[i].life--;sparks[i].el.style.opacity=Math.max(0,sparks[i].life/35);
+    if(sparks[i].life<=0){sparks[i].el.remove();sparks.splice(i,1)}
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-23T19:12:57.419171",
+  "date": "2026-02-24T22:14:29.612260",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/fck-translation-",
   "scale": {
@@ -168,7 +168,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "windows/ (9f, ~485L, C++, C/C++ header)",
+      "label": "windows/ (9f, ~485L, C/C++ header, C++)",
       "status": "done",
       "entry": "windows/",
       "depends": [],
@@ -308,7 +308,7 @@
     {
       "id": "B10",
       "level": "B",
-      "label": "ios/ (3f, ~17L, Swift, C/C++ header)",
+      "label": "ios/ (3f, ~17L, C/C++ header, Swift)",
       "status": "done",
       "entry": "ios/",
       "depends": [],

@@ -4,7 +4,7 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-23T19:12:56.189249",
+  "date": "2026-02-24T22:14:28.440129",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/HSBC-algo-genetic",
   "scale": {
@@ -123,7 +123,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "scripts/ (133f, ~20009L, Python, PowerShell)",
+      "label": "scripts/ (133f, ~20009L, PowerShell, Python)",
       "status": "done",
       "entry": "scripts/",
       "depends": [],

@@ -1,37 +1,62 @@
 {
   "idea": "[scanned] yggdrasil-engine",
   "domain": "audio",
-  "family": "baobab",
-  "family_name": "Baobab",
-  "family_emoji": "🌳",
-  "date": "2026-02-23T20:13:03.044511",
-  "phase": "CROISSANCE",
-  "scanned_from": "/home/claude/yggdrasil-engine",
+  "family": "buisson",
+  "family_name": "Buisson",
+  "family_emoji": "🌿",
+  "date": "2026-02-24T22:14:25.015844",
+  "phase": "MATURE",
+  "scanned_from": "https://github.com/sky1241/yggdrasil-engine",
   "scale": {
-    "lines": 2291,
-    "factor": 1.01,
-    "category": "arbre",
-    "height_px": 401,
-    "data_mb": 0.11496448516845703,
-    "density": 1.0,
-    "trunk_width": 1.0,
+    "lines": 91620,
+    "factor": 2.08,
+    "category": "géant",
+    "height_px": 613,
+    "data_mb": 3.270599365234375,
+    "density": 1.1,
+    "trunk_width": 1.1,
     "data_category": "léger",
-    "label": "🌳 Arbre (2k lignes, 0Mo data)"
+    "label": "🏔️ Géant (91k lignes, 3Mo data)"
   },
   "stats": {
-    "total_files": 15,
-    "total_code_lines": 2291,
-    "data_weight_mb": 0.1,
+    "total_files": 248,
+    "total_code_lines": 91620,
+    "data_weight_mb": 3.3,
     "languages": {
-      "Python": 2291
+      "HTML": 67177,
+      "Python": 24425,
+      "PowerShell": 10,
+      "Shell": 8
     },
     "biggest_file": {
-      "path": "tests/test_pluie_bulletproof.py",
-      "lines": 1358,
-      "lang": "Python"
+      "path": "viz/three.min.js",
+      "lines": 15086,
+      "lang": "JavaScript"
     }
   },
   "nodes": [
+    {
+      "id": "R1",
+      "level": "R",
+      "label": "Python deps",
+      "status": "done",
+      "entry": "requirements.txt",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -1
+    },
+    {
+      "id": "P1",
+      "level": "R",
+      "label": "Licence projet",
+      "status": "done",
+      "entry": "LICENSE",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -4
+    },
     {
       "id": "C1",
       "level": "C",
@@ -55,7 +80,18 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : Python (2291 lignes)",
+      "label": "Langage principal : HTML (67177 lignes)",
+      "status": "done",
+      "entry": "~",
+      "depends": [],
+      "desc": "",
+      "confidence": 80,
+      "depth": -5
+    },
+    {
+      "id": "M2",
+      "level": "R",
+      "label": "Langage secondaire : Python (24425 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -66,9 +102,9 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : tests/test_pluie_bulletproof.py (1358 lignes, Python)",
+      "label": "Core : viz/three.min.js (~15086L, JavaScript)",
       "status": "done",
-      "entry": "tests/test_pluie_bulletproof.py",
+      "entry": "viz/three.min.js",
       "depends": [],
       "desc": "",
       "confidence": 80
@@ -76,17 +112,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "tests/ (2 fichiers, 1521L, Python)",
-      "status": "done",
-      "entry": "tests/",
-      "depends": [],
-      "desc": "",
-      "confidence": 80
-    },
-    {
-      "id": "B2",
-      "level": "B",
-      "label": "engine/ (2 fichiers, 770L, Python)",
+      "label": "engine/ (39f, ~21197L, Python)",
       "status": "done",
       "entry": "engine/",
       "depends": [],
@@ -94,15 +120,94 @@
       "confidence": 80
     },
     {
-      "id": "P1",
-      "level": "R",
-      "label": "Licence/Legal — ABSENT",
-      "status": "todo",
-      "entry": "~",
+      "id": "b1",
+      "level": "b",
+      "label": "engine/pipeline/ (7f, ~10554L)",
+      "status": "done",
+      "entry": "engine/pipeline/",
       "depends": [],
       "desc": "",
-      "confidence": 0,
-      "depth": -4
+      "confidence": 80
+    },
+    {
+      "id": "b2",
+      "level": "b",
+      "label": "engine/topology/ (8f, ~2513L)",
+      "status": "done",
+      "entry": "engine/topology/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b3",
+      "level": "b",
+      "label": "engine/mining/ (4f, ~2334L)",
+      "status": "done",
+      "entry": "engine/mining/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b4",
+      "level": "b",
+      "label": "engine/analysis/ (8f, ~2296L)",
+      "status": "done",
+      "entry": "engine/analysis/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "b5",
+      "level": "b",
+      "label": "engine/vizgen/ (5f, ~2133L)",
+      "status": "done",
+      "entry": "engine/vizgen/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B2",
+      "level": "B",
+      "label": "viz/ (1f, ~15086L, JavaScript)",
+      "status": "done",
+      "entry": "viz/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B3",
+      "level": "B",
+      "label": "tests/ (4f, ~1934L, Python)",
+      "status": "done",
+      "entry": "tests/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B4",
+      "level": "B",
+      "label": "blind_test/ (6f, ~1094L, Python)",
+      "status": "done",
+      "entry": "blind_test/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
+    },
+    {
+      "id": "B5",
+      "level": "B",
+      "label": "hooks/ (2f, ~18L, PowerShell, Shell)",
+      "status": "done",
+      "entry": "hooks/",
+      "depends": [],
+      "desc": "",
+      "confidence": 80
     }
   ],
   "build_order": [
@@ -110,7 +215,8 @@
       "phase": 0,
       "name": "Mycorhizes — lois physiques",
       "ids": [
-        "M1"
+        "M1",
+        "M2"
       ],
       "action": "Identifier les lois physiques/math immuables du projet",
       "bio": "Sans mycorhizes, rien ne pousse. Sans comprendre les lois, rien ne marche."
@@ -125,23 +231,39 @@
       "bio": "Extensions microscopiques de l'épiderme. Cuticule très fine. Filtrent TOUT ce qui entre"
     },
     {
-      "phase": 2,
-      "name": "Tronc — core engine MASSIF",
+      "phase": 1,
+      "name": "Structurelles — stack technique",
       "ids": [
-        "T1"
+        "R1"
       ],
-      "action": "Construire et CONSOLIDER le core avant toute extension",
-      "bio": "Le baobab met toute son énergie dans le tronc d'abord"
+      "action": "Définir les contraintes de niveau -1",
+      "bio": "5-15 racines principales, jusqu'à 30cm diamètre. Spread = 2-4x couronne. 80-90% dans top 60cm"
     },
     {
-      "phase": 3,
-      "name": "Branches — petites extensions",
+      "phase": 2,
+      "name": "Tiges — lancer en parallèle",
       "ids": [
         "B1",
-        "B2"
+        "B2",
+        "B3",
+        "B4",
+        "B5"
       ],
-      "action": "Extensions petites — ne pas rivaliser avec le tronc",
-      "bio": "Les branches du baobab sont fines comparées au tronc massif"
+      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
+      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+    },
+    {
+      "phase": 4,
+      "name": "Rameaux — sous-features",
+      "ids": [
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5"
+      ],
+      "action": "Implémenter rameaux — sous-features",
+      "bio": "Subdivisions des branches, <4 ans. Les plus flexibles, se plient au vent, premiers à casser"
     },
     {
       "phase": 5,
@@ -154,5 +276,6 @@
       "bio": "Bourgeons terminaux, méristèmes apicaux — produisent les auxines qui contrôlent TOUTE la croissance"
     }
   ],
-  "next_step": "Vérifier l'arbre scanné et compléter les nœuds manquants"
+  "next_step": "Vérifier l'arbre scanné",
+  "scan_method": "github_api"
 }

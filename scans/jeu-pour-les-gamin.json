@@ -4,7 +4,7 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-23T19:12:58.381319",
+  "date": "2026-02-24T22:14:30.765508",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/jeu-pour-les-gamin",
   "scale": {
@@ -135,7 +135,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "src/ (477f, ~75404L, C++, C/C++ header)",
+      "label": "src/ (477f, ~75404L, C/C++ header, C++)",
       "status": "done",
       "entry": "src/",
       "depends": [],
@@ -195,7 +195,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "mk/ (14f, ~5444L, Shell, Java)",
+      "label": "mk/ (14f, ~5444L, C/C++ header, Java)",
       "status": "done",
       "entry": "mk/",
       "depends": [],
@@ -235,7 +235,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "tools/ (25f, ~2691L, Shell, Ruby)",
+      "label": "tools/ (25f, ~2691L, C#, Ruby)",
       "status": "done",
       "entry": "tools/",
       "depends": [],
@@ -275,7 +275,7 @@
     {
       "id": "B4",
       "level": "B",
-      "label": "external/ (9f, ~2036L, C++, C)",
+      "label": "external/ (9f, ~2036L, C/C++ header, C++)",
       "status": "done",
       "entry": "external/",
       "depends": [],

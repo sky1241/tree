@@ -4,26 +4,26 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-23T19:12:54.302340",
+  "date": "2026-02-24T22:14:26.307223",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/infernal-wheel",
   "scale": {
-    "lines": 21935,
+    "lines": 22360,
     "factor": 1.59,
     "category": "grand arbre",
-    "height_px": 514,
-    "data_mb": 1.7120742797851562,
-    "density": 1.05,
-    "trunk_width": 1.05,
+    "height_px": 515,
+    "data_mb": 2.01422119140625,
+    "density": 1.06,
+    "trunk_width": 1.06,
     "data_category": "léger",
-    "label": "🌲 Grand Arbre (21k lignes, 1Mo data)"
+    "label": "🌲 Grand Arbre (22k lignes, 2Mo data)"
   },
   "stats": {
-    "total_files": 251,
-    "total_code_lines": 21935,
-    "data_weight_mb": 1.7,
+    "total_files": 253,
+    "total_code_lines": 22360,
+    "data_weight_mb": 2.0,
     "languages": {
-      "PowerShell": 10948,
+      "PowerShell": 11373,
       "Dart": 4765,
       "Python": 1971,
       "Kotlin": 1955,
@@ -36,7 +36,7 @@
     },
     "biggest_file": {
       "path": "hellwell/dashboard/Dashboard.Page.ps1",
-      "lines": 4444,
+      "lines": 4757,
       "lang": "PowerShell"
     }
   },
@@ -77,7 +77,7 @@
     {
       "id": "M1",
       "level": "R",
-      "label": "Langage principal : PowerShell (10948 lignes)",
+      "label": "Langage principal : PowerShell (11373 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -99,7 +99,7 @@
     {
       "id": "T1",
       "level": "T",
-      "label": "Core : hellwell/dashboard/Dashboard.Page.ps1 (~4444L, PowerShell)",
+      "label": "Core : hellwell/dashboard/Dashboard.Page.ps1 (~4757L, PowerShell)",
       "status": "done",
       "entry": "hellwell/dashboard/Dashboard.Page.ps1",
       "depends": [],
@@ -109,7 +109,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "hellwell/ (8f, ~10628L, PowerShell)",
+      "label": "hellwell/ (8f, ~11053L, PowerShell)",
       "status": "done",
       "entry": "hellwell/",
       "depends": [],
@@ -119,7 +119,7 @@
     {
       "id": "b1",
       "level": "b",
-      "label": "hellwell/dashboard/ (2f, ~5952L)",
+      "label": "hellwell/dashboard/ (2f, ~6265L)",
       "status": "done",
       "entry": "hellwell/dashboard/",
       "depends": [],
@@ -139,7 +139,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "infernal-app/ (43f, ~5234L, C++, C/C++ header)",
+      "label": "infernal-app/ (43f, ~5234L, C/C++ header, C++)",
       "status": "done",
       "entry": "infernal-app/",
       "depends": [],
@@ -179,7 +179,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "trilateration/ (22f, ~5160L, Kotlin, Python)",
+      "label": "trilateration/ (22f, ~5160L, Python, Swift)",
       "status": "done",
       "entry": "trilateration/",
       "depends": [],

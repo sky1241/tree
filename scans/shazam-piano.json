@@ -4,7 +4,7 @@
   "family": "buisson",
   "family_name": "Buisson",
   "family_emoji": "🌿",
-  "date": "2026-02-23T19:12:53.725625",
+  "date": "2026-02-24T22:14:25.660818",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/shazam-piano",
   "scale": {
@@ -199,7 +199,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "app/ (127f, ~30946L, Swift, PowerShell)",
+      "label": "app/ (127f, ~30946L, PowerShell, C/C++ header)",
       "status": "done",
       "entry": "app/",
       "depends": [],
