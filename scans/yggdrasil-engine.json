@@ -1,30 +1,30 @@
 {
   "idea": "[scanned] yggdrasil-engine",
   "domain": "audio",
-  "family": "buisson",
-  "family_name": "Buisson",
-  "family_emoji": "🌿",
-  "date": "2026-02-24T22:14:25.015844",
+  "family": "conifere",
+  "family_name": "Conifère",
+  "family_emoji": "🌲",
+  "date": "2026-02-24T22:57:20.826358",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/yggdrasil-engine",
   "scale": {
-    "lines": 91620,
+    "lines": 92082,
     "factor": 2.08,
     "category": "géant",
-    "height_px": 613,
-    "data_mb": 3.270599365234375,
+    "height_px": 614,
+    "data_mb": 3.2529754638671875,
     "density": 1.1,
     "trunk_width": 1.1,
     "data_category": "léger",
-    "label": "🏔️ Géant (91k lignes, 3Mo data)"
+    "label": "🏔️ Géant (92k lignes, 3Mo data)"
   },
   "stats": {
-    "total_files": 248,
-    "total_code_lines": 91620,
+    "total_files": 250,
+    "total_code_lines": 92082,
     "data_weight_mb": 3.3,
     "languages": {
       "HTML": 67177,
-      "Python": 24425,
+      "Python": 24887,
       "PowerShell": 10,
       "Shell": 8
     },
@@ -91,7 +91,7 @@
     {
       "id": "M2",
       "level": "R",
-      "label": "Langage secondaire : Python (24425 lignes)",
+      "label": "Langage secondaire : Python (24887 lignes)",
       "status": "done",
       "entry": "~",
       "depends": [],
@@ -112,7 +112,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "engine/ (39f, ~21197L, Python)",
+      "label": "engine/ (40f, ~21658L, Python)",
       "status": "done",
       "entry": "engine/",
       "depends": [],
@@ -132,7 +132,7 @@
     {
       "id": "b2",
       "level": "b",
-      "label": "engine/topology/ (8f, ~2513L)",
+      "label": "engine/topology/ (9f, ~2974L)",
       "status": "done",
       "entry": "engine/topology/",
       "depends": [],
@@ -241,7 +241,16 @@
     },
     {
       "phase": 2,
-      "name": "Tiges — lancer en parallèle",
+      "name": "Tronc — pipeline principal",
+      "ids": [
+        "T1"
+      ],
+      "action": "Construire le pipeline end-to-end minimal",
+      "bio": "Le leader terminal pousse en premier (contrôle apical)"
+    },
+    {
+      "phase": 3,
+      "name": "Branches — modules subordonnés",
       "ids": [
         "B1",
         "B2",
@@ -249,8 +258,8 @@
         "B4",
         "B5"
       ],
-      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
-      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+      "action": "Ajouter les modules UN PAR UN, toujours subordonnés au tronc",
+      "bio": "Les latérales ne dépassent jamais le leader"
     },
     {
       "phase": 4,

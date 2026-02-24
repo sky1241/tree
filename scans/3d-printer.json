@@ -4,7 +4,7 @@
   "family": "baobab",
   "family_name": "Baobab",
   "family_emoji": "🌳",
-  "date": "2026-02-24T22:14:26.960356",
+  "date": "2026-02-24T22:55:28.448396",
   "phase": "CROISSANCE",
   "scanned_from": "https://github.com/sky1241/3d-printer",
   "scale": {
@@ -99,7 +99,7 @@
     {
       "id": "B2",
       "level": "B",
-      "label": "tests/ (4f, ~1193L, Python, JavaScript)",
+      "label": "tests/ (4f, ~1193L, JavaScript, Python)",
       "status": "done",
       "entry": "tests/",
       "depends": [],

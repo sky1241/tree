@@ -1,10 +1,10 @@
 {
   "idea": "[scanned] shazam-piano",
   "domain": "audio",
-  "family": "buisson",
-  "family_name": "Buisson",
-  "family_emoji": "🌿",
-  "date": "2026-02-24T22:14:25.660818",
+  "family": "feuillu",
+  "family_name": "Feuillu",
+  "family_emoji": "🍁",
+  "date": "2026-02-24T22:55:27.598843",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/shazam-piano",
   "scale": {
@@ -199,7 +199,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "app/ (127f, ~30946L, PowerShell, C/C++ header)",
+      "label": "app/ (127f, ~30946L, Dart, PowerShell)",
       "status": "done",
       "entry": "app/",
       "depends": [],
@@ -269,7 +269,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "scripts/ (12f, ~1150L, PowerShell, Shell)",
+      "label": "scripts/ (12f, ~1150L, Shell, PowerShell)",
       "status": "done",
       "entry": "scripts/",
       "depends": [],
@@ -289,7 +289,7 @@
     {
       "id": "B5",
       "level": "B",
-      "label": "packages/ (3f, ~60L, C, C/C++ header)",
+      "label": "packages/ (3f, ~60L, Dart, C)",
       "status": "done",
       "entry": "packages/",
       "depends": [],
@@ -354,7 +354,16 @@
     },
     {
       "phase": 2,
-      "name": "Tiges — lancer en parallèle",
+      "name": "Tronc — core minimal",
+      "ids": [
+        "T1"
+      ],
+      "action": "Core minimal — il va perdre la dominance face aux branches",
+      "bio": "Le tronc du feuillu se perd parmi les branches (forme décurrente)"
+    },
+    {
+      "phase": 3,
+      "name": "Branches — modules en parallèle",
       "ids": [
         "B1",
         "B2",
@@ -362,8 +371,8 @@
         "B4",
         "B5"
       ],
-      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
-      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+      "action": "Modules en parallèle — SURVEILLER la co-dominance",
+      "bio": "⚠️ Si une branche dépasse le tronc = risque de rupture"
     },
     {
       "phase": 4,

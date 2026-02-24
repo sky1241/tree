@@ -2231,53 +2231,147 @@ def _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_pa
     # Hub = module importé par beaucoup d'autres (nœud central)
     max_hub = max(imported_by_count.values()) if imported_by_count else 0
 
+    has_imports = n_files_with_imports > 0  # True = scan local a marché
+
+    # ── Étape 4b : Heuristiques structurelles (marchent sans imports) ──
+    # Utilisées en mode GitHub API ou quand l'analyse d'imports est vide.
+
+    files = all_files or []
+    all_paths_lower = [f["path"].lower() for f in files]
+    all_names_lower = [f["name"].lower() for f in files]
+    all_dirs_lower = set()
+    for f in files:
+        parts = f["path"].split(os.sep if os.sep in f["path"] else "/")
+        if len(parts) > 1:
+            all_dirs_lower.add(parts[0].lower())
+
+    # Détection Flutter / app mobile → feuillu
+    FLUTTER_MARKERS = {"pubspec.yaml", "pubspec.lock"}
+    MOBILE_DIRS = {"lib", "android", "ios", "macos", "windows", "linux", "web"}
+    is_flutter = bool(FLUTTER_MARKERS & set(all_names_lower))
+    n_mobile_dirs = len(MOBILE_DIRS & all_dirs_lower)
+    # Flutter = pubspec.yaml + lib/, OU 3+ platform dirs
+    is_mobile_app = (is_flutter and "lib" in all_dirs_lower) or n_mobile_dirs >= 3
+
+    # Détection pipeline / trading → conifère
+    # On ne matche que sur les fichiers CODE et noms de DOSSIERS, pas les assets
+    import re
+    CODE_EXTS = {".py", ".dart", ".js", ".ts", ".jsx", ".tsx", ".cpp", ".c", ".h",
+                 ".hpp", ".rs", ".go", ".java", ".kt", ".swift", ".rb", ".php",
+                 ".sh", ".ps1"}
+    code_paths_lower = [f["path"].lower() for f in files if f.get("ext", "") in CODE_EXTS]
+    dir_names_lower = list(all_dirs_lower)
+
+    # Mots-clés avec word boundary — évite "bot" dans "bottom", "step" dans "steps.png"
+    PIPELINE_PATTERNS = [
+        r'\bpipeline\b', r'\bstage[s]?\b', r'\bstep[s]?\b', r'\bphase\b',
+        r'\betape\b', r'\bworkflow\b', r'\bichimoku\b', r'\bbacktest\b',
+        r'\btrading\b', r'\bstrategy\b', r'\boptimizer\b', r'\broutine[s]?\b',
+        r'\bscheduler\b', r'\bcron\b', r'\bbot\b', r'\bsignal[s]?\b',
+    ]
+    _pipeline_re = re.compile("|".join(PIPELINE_PATTERNS))
+    pipeline_hits = sum(1 for p in code_paths_lower if _pipeline_re.search(p))
+    pipeline_hits += sum(1 for d in dir_names_lower if _pipeline_re.search(d))
+    has_pipeline_name = any("pipeline" in p for p in code_paths_lower)
+    has_versioned_files = _detect_versioned_files(files)
+
+    # Détection liane / wrapper → liane
+    LIANE_MARKERS = {"setup.py", "setup.cfg", "pyproject.toml", "plugin.xml",
+                     "manifest.json", "extension.json"}
+    WRAPPER_KEYWORDS = {"wrapper", "plugin", "extension", "addon", "bridge",
+                        "binding", "adapter", "connector", "proxy"}
+    is_wrapper = (len(LIANE_MARKERS & set(all_names_lower)) >= 2
+                  and sum(1 for p in all_paths_lower
+                          if any(kw in p for kw in WRAPPER_KEYWORDS)) >= 2)
+
+    # Détection scripts indépendants → buisson
+    # Si la majorité du code est dans scripts/ et pas dans src/lib/core
+    scripts_lines = sum(info["lines"] for d, info in top_dirs.items()
+                        if d.lower() in {"scripts", "tools", "utils", "notebooks"})
+    has_dominant_scripts = (scripts_lines > core_lines * 1.5
+                           and scripts_lines > 0 and n_core_dirs <= 1)
+
     # ── Décision finale ──
 
     branch_nodes = [n for n in nodes if n["level"] == "B"]
     n_branches = len(branch_nodes)
 
     # Palmier : très peu de structure
-    if n_branches <= 1 and n_files_with_imports <= 2:
+    if n_branches <= 1 and (not has_imports or n_files_with_imports <= 2):
         return "palmier"
 
-    # Conifère : chaîne d'imports profonde (pipeline)
-    # OU mot "pipeline" dans les noms de fichiers
-    has_pipeline_name = any("pipeline" in f["path"].lower() for f in (all_files or []))
-    has_versioned_files = _detect_versioned_files(all_files or [])
+    # ── Résultats d'imports (si disponibles, ils priment) ──
 
-    if chain_depth >= 3:
+    if has_imports:
+        # Conifère : chaîne d'imports profonde
+        if chain_depth >= 3:
+            return "conifere"
+
+        # Hub fort = module central qui orchestre = conifère
+        if max_hub >= 4 and chain_depth >= 2:
+            return "conifere"
+
+        # Feuillu : plusieurs modules importent une base commune
+        if max_hub >= 3 and chain_depth <= 2 and n_core_dirs >= 2:
+            return "feuillu"
+
+    # ── Heuristiques structurelles (marchent toujours) ──
+
+    # Liane : wrapper / plugin autour d'un hôte
+    if is_wrapper and n_branches <= 4:
+        return "liane"
+
+    # Conifère : pipeline détecté par noms de fichiers/dossiers
+    if has_pipeline_name and n_core_dirs >= 1:
         return "conifere"
 
-    if has_pipeline_name and n_core_dirs >= 2:
+    if has_versioned_files and n_core_dirs >= 1:
         return "conifere"
 
-    # Si y'a des fichiers versionnés (v1, v2, v3) ça veut dire itérations
-    # sur UN pipeline, pas des outils indépendants
-    if has_versioned_files and n_core_dirs >= 2:
+    # Conifère : beaucoup de hits pipeline (trading algos, bots, etc.)
+    if pipeline_hits >= 5 and n_branches >= 2:
         return "conifere"
 
-    # Hub fort = un module central qui orchestre = conifère
-    if max_hub >= 4 and chain_depth >= 2:
-        return "conifere"
+    # Conifère : structure séquentielle — peu de core dirs mais profonds
+    # Ex: src/ avec des sous-dossiers ordonnés (data→process→output)
+    if n_core_dirs == 1 and core_lines > peripheral_lines and n_branches >= 3:
+        # Un seul cœur dominant avec des branches = pipeline linéaire
+        if pipeline_hits >= 2:
+            return "conifere"
 
-    # Buisson : pas d'imports croisés dans le cœur, tout est indépendant
-    if n_files_with_imports <= 1 and n_branches >= 3:
-        return "buisson"
-
-    # Buisson : que des fichiers avec chacun son propre main
-    if core_lines == 0 and peripheral_lines > 0 and n_branches >= 5:
-        return "buisson"
-
-    # Feuillu : plusieurs modules qui importent une base commune (parallèle)
-    if max_hub >= 3 and chain_depth <= 2 and n_core_dirs >= 2:
+    # Feuillu : app mobile / Flutter (multi-plateformes parallèles)
+    if is_mobile_app and n_branches >= 3:
         return "feuillu"
 
-    # Feuillu par défaut si multi-modules
+    # Feuillu : multi-modules cœur parallèles
+    if n_core_dirs >= 2 and core_lines > peripheral_lines:
+        return "feuillu"
+
+    # Feuillu : multi-modules cœur même si imports pas dispo
     if n_core_dirs >= 2:
         return "feuillu"
 
-    # Fallback
-    if n_branches >= 6:
+    # Buisson : que des scripts indépendants, pas de cœur
+    if has_dominant_scripts:
+        return "buisson"
+
+    # Buisson : imports absents + beaucoup de branches sans structure dominante
+    if not has_imports and n_files_with_imports <= 1 and n_branches >= 3:
+        # Avant de déclarer buisson, checker si y'a des signaux conifère/feuillu
+        if pipeline_hits >= 3:
+            return "conifere"
+        if is_mobile_app:
+            return "feuillu"
+        if core_lines > 0 and n_core_dirs >= 1:
+            return "feuillu"
+        return "buisson"
+
+    # Buisson : que des fichiers périphériques
+    if core_lines == 0 and peripheral_lines > 0 and n_branches >= 5:
+        return "buisson"
+
+    # Fallback intelligent
+    if n_branches >= 6 and core_lines == 0:
         return "buisson"
 
     return "feuillu"
@@ -3664,6 +3758,12 @@ def scan_github_repo(owner, repo_name, token=None):
                 if lines > biggest_file["lines"]:
                     biggest_file = {"path": path, "lines": lines, "lang": lang}
 
+    # Guard : si l'API tree a échoué (rate limit), pas de fichiers = scan inutile
+    # On retourne None pour que sync_all conserve l'ancien scan
+    if not all_files:
+        print(f"  ⚠️ Aucun fichier récupéré pour {repo_name} (rate limit probable)")
+        return None
+
     # ── Construire les nœuds (même logique que scan_repo) ──
     nodes = []
     node_id_counter = {"M": 0, "P": 0, "D": 0, "A": 0, "R": 0,
@@ -3775,8 +3875,8 @@ def scan_github_repo(owner, repo_name, token=None):
     if not has_readme:
         add_node("F", "F", None, "README — ABSENT", "~", "todo")
 
-    # Classifier
-    family_id = _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines)
+    # Classifier — on passe all_files pour l'analyse structurelle
+    family_id = _classify_from_scan(nodes, top_dirs, biggest_file, total_code_lines, repo_path=None, all_files=all_files)
     domain = detect_domain((description + " " + repo_name + " " + " ".join(f["path"] for f in all_files[:50])).lower())
     build_order = generate_build_order(family_id, nodes)
 

@@ -1,10 +1,10 @@
 {
   "idea": "[scanned] jeu-pour-les-gamin",
   "domain": "mobile_app",
-  "family": "buisson",
-  "family_name": "Buisson",
-  "family_emoji": "🌿",
-  "date": "2026-02-24T22:14:30.765508",
+  "family": "feuillu",
+  "family_name": "Feuillu",
+  "family_emoji": "🍁",
+  "date": "2026-02-24T22:57:22.667927",
   "phase": "MATURE",
   "scanned_from": "https://github.com/sky1241/jeu-pour-les-gamin",
   "scale": {
@@ -135,7 +135,7 @@
     {
       "id": "B1",
       "level": "B",
-      "label": "src/ (477f, ~75404L, C/C++ header, C++)",
+      "label": "src/ (477f, ~75404L, C++, C/C++ header)",
       "status": "done",
       "entry": "src/",
       "depends": [],
@@ -235,7 +235,7 @@
     {
       "id": "B3",
       "level": "B",
-      "label": "tools/ (25f, ~2691L, C#, Ruby)",
+      "label": "tools/ (25f, ~2691L, Ruby, C++)",
       "status": "done",
       "entry": "tools/",
       "depends": [],
@@ -275,7 +275,7 @@
     {
       "id": "B4",
       "level": "B",
-      "label": "external/ (9f, ~2036L, C/C++ header, C++)",
+      "label": "external/ (9f, ~2036L, C, C++)",
       "status": "done",
       "entry": "external/",
       "depends": [],
@@ -395,7 +395,16 @@
     },
     {
       "phase": 2,
-      "name": "Tiges — lancer en parallèle",
+      "name": "Tronc — core minimal",
+      "ids": [
+        "T1"
+      ],
+      "action": "Core minimal — il va perdre la dominance face aux branches",
+      "bio": "Le tronc du feuillu se perd parmi les branches (forme décurrente)"
+    },
+    {
+      "phase": 3,
+      "name": "Branches — modules en parallèle",
       "ids": [
         "B1",
         "B2",
@@ -404,8 +413,8 @@
         "B5",
         "B6"
       ],
-      "action": "Lancer plusieurs tiges indépendantes — PAS de hiérarchie",
-      "bio": "Le buisson n'a pas de tronc dominant. Redondance = résilience."
+      "action": "Modules en parallèle — SURVEILLER la co-dominance",
+      "bio": "⚠️ Si une branche dépasse le tronc = risque de rupture"
     },
     {
       "phase": 4,
